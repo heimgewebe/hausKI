@@ -1,0 +1,16 @@
+{
+  "recommendations": [
+    "rust-lang.rust-analyzer",
+    "tamasfe.even-better-toml",
+    "ms-vscode-remote.remote-containers",
+    "ms-azuretools.vscode-docker",
+    "mkhl.direnv",
+    "eamodio.gitlens",
+    "github.vscode-pull-request-github",
+    "usernamehw.errorlens",
+    "charliermarsh.ruff",
+    "ms-python.python",
+    "yzhang.markdown-all-in-one",
+    "bierner.markdown-mermaid"
+  ]
+}

@@ -1,0 +1,9 @@
+models:
+  - id: llama3.1-8b-q4
+    path: /opt/models/llama3.1-8b-q4.gguf
+    vram_min_gb: 6
+    canary: false
+  - id: whisper-medium
+    path: /opt/models/whisper-medium.bin
+    vram_min_gb: 4
+    canary: true

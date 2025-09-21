@@ -1,0 +1,36 @@
+{
+  "name": "hauski-dev",
+  "build": { "dockerfile": "Dockerfile", "context": ".devcontainer" },
+  "runArgs": ["--gpus", "all"],
+  "hostRequirements": { "gpu": "optional" },
+  "containerEnv": {
+    "NVIDIA_VISIBLE_DEVICES": "all",
+    "NVIDIA_DRIVER_CAPABILITIES": "compute,utility"
+  },
+  "remoteUser": "vscode",
+  "postCreateCommand": "bash /workspaces/hauski/scripts/bootstrap.sh",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": { "username": "vscode", "installZsh": false },
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" },
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.11" },
+    "ghcr.io/devcontainers-contrib/features/gh-release:1": { "repo": "cli/cli", "release": "latest", "assetRegex": "linux_amd64" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-containers",
+        "eamodio.gitlens",
+        "usernamehw.errorlens",
+        "yzhang.markdown-all-in-one",
+        "bierner.markdown-mermaid"
+      ]
+    }
+  },
+  "mounts": [
+    "source=hauski-cargo,target=/usr/local/cargo,type=volume",
+    "source=hauski-rustup,target=/usr/local/rustup,type=volume"
+  ]
+}

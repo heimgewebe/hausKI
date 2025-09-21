@@ -1,0 +1,8 @@
+latency:
+  llm_p95_ms: 400
+  index_topk20_ms: 60
+thermal:
+  gpu_max_c: 80
+  dgpu_power_w: 220
+asr:
+  wer_max_pct: 10

@@ -1,0 +1,12 @@
+{
+  "folders": [
+    { "path": "." },
+    { "path": "crates" },
+    { "path": "plugins" },
+    { "path": "policies" },
+    { "path": "configs" }
+  ],
+  "settings": {
+    "files.watcherExclude": { "**/target/**": true }
+  }
+}
