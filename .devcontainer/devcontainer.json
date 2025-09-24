@@ -1,19 +1,15 @@
 {
   "name": "hauski-dev",
-  "build": { "dockerfile": "Dockerfile", "context": ".devcontainer" },
-  "runArgs": ["--gpus", "all"],
+  "build": { "dockerfile": "Dockerfile", "context": "." },
   "hostRequirements": { "gpu": "optional" },
-  "containerEnv": {
-    "NVIDIA_VISIBLE_DEVICES": "all",
-    "NVIDIA_DRIVER_CAPABILITIES": "compute,utility"
-  },
   "remoteUser": "vscode",
   "postCreateCommand": "bash /workspaces/hauski/scripts/bootstrap.sh",
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": { "username": "vscode", "installZsh": false },
     "ghcr.io/devcontainers/features/node:1": { "version": "20" },
     "ghcr.io/devcontainers/features/python:1": { "version": "3.11" },
-    "ghcr.io/devcontainers-contrib/features/gh-release:1": { "repo": "cli/cli", "release": "latest", "assetRegex": "linux_amd64" }
+    "ghcr.io/devcontainers-contrib/features/gh-release:1": { "repo": "cli/cli", "release": "latest", "assetRegex": "linux_amd64" },
+    "ghcr.io/devcontainers/features/nvidia-cuda:1": { "installCuda": false }
   },
   "customizations": {
     "vscode": {
