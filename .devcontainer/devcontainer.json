@@ -2,10 +2,6 @@
   "name": "hauski-dev",
   "build": { "dockerfile": "Dockerfile", "context": ".." },
   "hostRequirements": { "gpu": "optional" },
-  "containerEnv": {
-    "NVIDIA_VISIBLE_DEVICES": "all",
-    "NVIDIA_DRIVER_CAPABILITIES": "compute,utility"
-  },
   "remoteUser": "vscode",
 
   "features": {
@@ -15,6 +11,9 @@
     "ghcr.io/devcontainers/features/rust:1": {},
     "ghcr.io/devcontainers/features/nvidia-cuda:1": { "installCuda": false }
   },
+
+  "postCreateCommand": "bash -lc 'if [ -f /home/vscode/.cargo/env ]; then . /home/vscode/.cargo/env; fi; sudo apt-get update && sudo apt-get install -y direnv; grep -q \"direnv hook bash\" /home/vscode/.bashrc || echo \"eval \\\"\\$(direnv hook bash)\\\"\" >> /home/vscode/.bashrc; chown vscode:vscode /home/vscode/.bashrc; if [ -x /workspaces/hauski/scripts/bootstrap.sh ] ; then /workspaces/hauski/scripts/bootstrap.sh ; fi'",
+
   "customizations": {
     "vscode": {
       "extensions": [
@@ -26,8 +25,7 @@
         "eamodio.gitlens",
         "usernamehw.errorlens",
         "yzhang.markdown-all-in-one",
-        "bierner.markdown-mermaid",
-        "mkhl.direnv"
+        "bierner.markdown-mermaid"
       ]
     }
   },
