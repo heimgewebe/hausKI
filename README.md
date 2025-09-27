@@ -60,7 +60,7 @@ just run-core
 
 Verfügbare bzw. geplante API-Endpunkte:
 - `GET /health` → "ok"
-- *(geplant)* `GET /metrics`
+- `GET /metrics`
 - *(geplant)* OpenAI-kompatible Routen (`/v1/chat/completions`, `/v1/embeddings`)
 - *(geplant)* Spezialendpunkte: `/asr/transcribe`, `/audio/profile`, `/obsidian/canvas/suggest`
 

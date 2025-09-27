@@ -40,6 +40,10 @@
       ]
     }
   },
+  "runArgs": [
+    "--gpus",
+    "all"
+  ],
   "mounts": [
     "source=hauski-cargo,target=/home/vscode/.cargo,type=volume",
     "source=hauski-rustup,target=/home/vscode/.rustup,type=volume",
