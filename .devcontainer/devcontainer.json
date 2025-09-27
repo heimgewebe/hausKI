@@ -1,19 +1,30 @@
 {
   "name": "hauski-dev",
-  "build": { "dockerfile": "Dockerfile", "context": ".." },
-  "hostRequirements": { "gpu": "optional" },
-  "remoteUser": "vscode",
-
-  "features": {
-    "ghcr.io/devcontainers/features/common-utils:2": { "username": "vscode", "installZsh": false },
-    "ghcr.io/devcontainers/features/node:1": { "version": "20" },
-    "ghcr.io/devcontainers/features/python:1": { "version": "3.11" },
-    "ghcr.io/devcontainers/features/rust:1": {},
-    "ghcr.io/devcontainers/features/nvidia-cuda:1": { "installCuda": false }
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
   },
-
+  "hostRequirements": {
+    "gpu": "optional"
+  },
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "username": "vscode",
+      "installZsh": false
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    },
+    "ghcr.io/devcontainers/features/rust:1": {},
+    "ghcr.io/devcontainers/features/nvidia-cuda:1": {
+      "installCuda": false
+    }
+  },
   "postCreateCommand": "bash -lc 'if [ -f /home/vscode/.cargo/env ]; then . /home/vscode/.cargo/env; fi; sudo apt-get update && sudo apt-get install -y direnv; grep -q \"direnv hook bash\" /home/vscode/.bashrc || echo \"eval \\\"\\$(direnv hook bash)\\\"\" >> /home/vscode/.bashrc; chown vscode:vscode /home/vscode/.bashrc; if [ -x /workspaces/hauski/scripts/bootstrap.sh ] ; then /workspaces/hauski/scripts/bootstrap.sh ; fi'",
-
   "customizations": {
     "vscode": {
       "extensions": [
@@ -29,9 +40,12 @@
       ]
     }
   },
-
   "mounts": [
     "source=hauski-cargo,target=/home/vscode/.cargo,type=volume",
-    "source=hauski-rustup,target=/home/vscode/.rustup,type=volume"
+    "source=hauski-rustup,target=/home/vscode/.rustup,type=volume",
+    "source=${localWorkspaceFolder}/models,target=/opt/models,type=bind,consistency=cached"
+  ],
+  "forwardPorts": [
+    8080
   ]
 }

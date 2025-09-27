@@ -1,5 +1,6 @@
 use axum::{routing::get, Router};
 use std::net::SocketAddr;
+use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 async fn health() -> &'static str { "ok" }
@@ -15,6 +16,8 @@ async fn main() -> anyhow::Result<()> {
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     tracing::info!("listening on http://{addr}");
-    axum::Server::bind(&addr).serve(app.into_make_service()).await?;
+
+    let listener = TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
     Ok(())
 }
