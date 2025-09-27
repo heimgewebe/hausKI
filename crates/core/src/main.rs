@@ -9,6 +9,7 @@ use prometheus_client::{
     registry::Registry,
 };
 
+#[allow(clippy::explicit_auto_deref)]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
