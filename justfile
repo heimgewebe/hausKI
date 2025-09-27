@@ -16,4 +16,7 @@ test:
     cargo test --workspace -- --nocapture
 
 run-core:
-    cargo run -p core
+    cargo run -p hauski-core
+
+run-cli ARGS='':
+    cargo run -p hauski-cli -- {{ARGS}}
