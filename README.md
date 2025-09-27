@@ -85,10 +85,12 @@ models:
 
 - Geplante CLI-Kommandos (Preview):
 
+> **Hinweis:** Die folgenden Kommandos sind geplante Beispiele und noch nicht implementiert. Platzhalter wie `<model-id>`, `<input-file>`, `<output-file>`, `<profile-name>` zeigen die erwartete Syntax.
+
 ```bash
-hauski models pull <id>
-hauski asr transcribe in.wav --model medium --out out.srt
-hauski audio profile set hifi-qobuz
+hauski models pull <model-id>
+hauski asr transcribe <input-file> --model <model-name> --out <output-file>
+hauski audio profile set <profile-name>
 ```
 
 ---
