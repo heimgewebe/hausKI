@@ -5,6 +5,8 @@ on:
 jobs:
   rust:
     runs-on: ubuntu-24.04
+    env:
+      toolchain: stable
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
