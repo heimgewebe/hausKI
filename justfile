@@ -19,4 +19,4 @@ run-core:
     cargo run -p hauski-core
 
 run-cli ARGS='':
-    cargo run -p hauski-cli -- ${ARGS}
+    cargo run -p hauski-cli -- {{ARGS}}
