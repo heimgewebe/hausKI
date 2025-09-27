@@ -24,7 +24,7 @@ async fn main() -> anyhow::Result<()> {
     let http_requests_total = Counter::<u64>::default();
     registry.register(
         "http_requests_total",
-        "all http",
+        "Total number of HTTP requests received",
         http_requests_total.clone(),
     );
 
