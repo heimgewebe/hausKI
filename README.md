@@ -1,7 +1,13 @@
 # HausKI — Rust-first, Offline-Default, GPU-aware
 
-HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-GPU. Hot-Paths laufen in Rust (axum/tokio), Inferenz greift auf llama.cpp (FFI) zurück, ASR und TTS nutzen whisper-rs bzw. piper-rs. Wissen wird über ein VectorStore-Trait (tantivy + HNSW, optional Qdrant) verwaltet und Netzwerkzugriffe folgen einem "deny by default"-Modell.
+HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-GPU.
 
+**Hauptmerkmale:**
+- Hot-Paths laufen in Rust (axum/tokio).
+- Inferenz erfolgt über llama.cpp (FFI).
+- ASR und TTS nutzen whisper-rs bzw. piper-rs.
+- Wissen wird über ein VectorStore-Trait (tantivy + HNSW, optional Qdrant) verwaltet.
+- Netzwerkzugriffe folgen einem "deny by default"-Modell.
 ---
 
 ## Inhalt
