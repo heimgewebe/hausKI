@@ -1,4 +1,10 @@
-use axum::{extract::State, routing::get, Json, Router};
+use axum::{
+    extract::State,
+    http::{header::CONTENT_TYPE, StatusCode},
+    response::IntoResponse,
+    routing::get,
+    Json, Router,
+};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -60,9 +66,18 @@ async fn main() -> anyhow::Result<()> {
     let metrics = get(move || {
         let registry = metrics_registry.clone();
         async move {
-            let mut body = String::new();
-            encode(&mut body, &*registry).expect("encode metrics");
-            body
+            match encode_metrics(&registry) {
+                Ok(body) => (
+                    StatusCode::OK,
+                    [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+                    body,
+                )
+                    .into_response(),
+                Err(error) => {
+                    tracing::error!(?error, "failed to encode metrics");
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+            }
         }
     });
 
@@ -87,4 +102,10 @@ async fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+fn encode_metrics(registry: &Registry) -> Result<String, std::fmt::Error> {
+    let mut body = String::new();
+    encode(&mut body, registry)?;
+    Ok(body)
 }
