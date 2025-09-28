@@ -113,13 +113,13 @@ async fn metrics(state: AppState) -> impl IntoResponse {
             body,
         )
             .into_response(),
-        Err(err) => (
+        Err(_err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             [(
                 axum::http::header::CONTENT_TYPE,
                 "text/plain; version=0.0.4",
             )],
-            format!("failed to encode metrics: {err}"),
+            "Internal server error".to_string(),
         )
             .into_response(),
     }
