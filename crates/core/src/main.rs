@@ -1,11 +1,11 @@
 use axum::{
     extract::State,
-    http::{header::CONTENT_TYPE, StatusCode},
+    http::{header::CONTENT_TYPE, Method, StatusCode},
     response::IntoResponse,
     routing::get,
     Json, Router,
 };
-use std::{net::SocketAddr, sync::Arc};
+use std::{fmt, net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -41,11 +41,23 @@ async fn health(State(state): State<AppState>) -> &'static str {
     "ok"
 }
 
-async fn metrics(State(state): State<AppState>) -> String {
-    let mut body = String::new();
-    encode(&mut body, &*state.registry).expect("encode metrics");
-    state.record_http_request(Method::GET, "/metrics", StatusCode::OK);
-    body
+async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
+    match encode_metrics(&state.registry) {
+        Ok(body) => {
+            state.record_http_request(Method::GET, "/metrics", StatusCode::OK);
+            (
+                StatusCode::OK,
+                [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+                body,
+            )
+                .into_response()
+        }
+        Err(error) => {
+            tracing::error!(?error, "failed to encode metrics");
+            state.record_http_request(Method::GET, "/metrics", StatusCode::INTERNAL_SERVER_ERROR);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -112,33 +124,12 @@ async fn main() -> anyhow::Result<()> {
         std::env::var("HAUSKI_MODELS").unwrap_or_else(|_| "./configs/models.yml".to_string());
     let limits = Arc::new(load_limits(&limits_path)?);
     let models = Arc::new(load_models(&models_path)?);
-    let app_state = AppState { limits, models };
-
-    let metrics = get(move || {
-        let registry = metrics_registry.clone();
-        async move {
-            match encode_metrics(&registry) {
-                Ok(body) => (
-                    StatusCode::OK,
-                    [(CONTENT_TYPE, "text/plain; version=0.0.4")],
-                    body,
-                )
-                    .into_response(),
-                Err(error) => {
-                    tracing::error!(?error, "failed to encode metrics");
-                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
-                }
-            }
-        }
-    });
-
-    let health_route = get(move || {
-        let counter = http_requests_total.clone();
-        async move {
-            counter.inc();
-            "ok"
-        }
-    });
+    let app_state = AppState {
+        limits,
+        models,
+        registry: registry.clone(),
+        http_requests_total: http_requests_total.clone(),
+    };
 
     let app = Router::new()
         .route("/health", get(health))
@@ -155,7 +146,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn encode_metrics(registry: &Registry) -> Result<String, std::fmt::Error> {
+fn encode_metrics(registry: &Registry) -> Result<String, fmt::Error> {
     let mut body = String::new();
     encode(&mut body, registry)?;
     Ok(body)
