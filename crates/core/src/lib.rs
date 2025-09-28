@@ -6,10 +6,15 @@ use axum::{
 };
 use prometheus_client::{
     encoding::{text::encode, EncodeLabel, EncodeLabelSet},
-    metrics::{counter::Counter, family::Family, gauge::Gauge},
+    metrics::{
+        counter::Counter,
+        family::Family,
+        gauge::Gauge,
+        histogram::{exponential_buckets, Histogram},
+    },
     registry::Registry,
 };
-use std::{fmt, sync::Arc};
+use std::{fmt, sync::Arc, time::Instant};
 
 mod config;
 pub use config::{load_limits, load_models, Limits, ModelsFile};
@@ -21,6 +26,7 @@ struct AppStateInner {
     limits: Limits,
     models: ModelsFile,
     http_requests: Family<HttpLabels, Counter<u64>>,
+    http_latency: Family<HttpLabels, Histogram>,
     registry: Registry,
     /// Controls whether configuration endpoints are exposed.
     ///
@@ -44,10 +50,22 @@ impl AppState {
             http_requests.clone(),
         );
 
+        let buckets = exponential_buckets(0.005, 2.0, 14);
+        let http_latency: Family<HttpLabels, Histogram> = Family::new_with_constructor({
+            let buckets = buckets.clone();
+            move || Histogram::new(buckets.clone())
+        });
+        registry.register(
+            "http_request_duration_seconds",
+            "HTTP request duration",
+            http_latency.clone(),
+        );
+
         Self(Arc::new(AppStateInner {
             limits,
             models,
             http_requests,
+            http_latency,
             registry,
             expose_config,
         }))
@@ -68,6 +86,10 @@ impl AppState {
     fn record_http_request(&self, method: Method, path: &'static str, status: StatusCode) {
         let labels = HttpLabels::new(method, path, status);
         self.0.http_requests.get_or_create(&labels).inc();
+    }
+
+    fn observe_http_latency(&self, labels: &HttpLabels, secs: f64) {
+        self.0.http_latency.get_or_create(labels).observe(secs);
     }
 
     fn encode_metrics(&self) -> Result<String, std::fmt::Error> {
@@ -107,41 +129,70 @@ impl EncodeLabelSet for HttpLabels {
 }
 
 async fn get_limits(state: AppState) -> Json<Limits> {
-    state.record_http_request(Method::GET, "/config/limits", StatusCode::OK);
-    Json(state.limits())
+    let started = Instant::now();
+    let status = StatusCode::OK;
+    let response = Json(state.limits());
+    state.record_http_request(Method::GET, "/config/limits", status);
+    state.observe_http_latency(
+        &HttpLabels::new(Method::GET, "/config/limits", status),
+        started.elapsed().as_secs_f64(),
+    );
+    response
 }
 
 async fn get_models(state: AppState) -> Json<ModelsFile> {
-    state.record_http_request(Method::GET, "/config/models", StatusCode::OK);
-    Json(state.models())
+    let started = Instant::now();
+    let status = StatusCode::OK;
+    let response = Json(state.models());
+    state.record_http_request(Method::GET, "/config/models", status);
+    state.observe_http_latency(
+        &HttpLabels::new(Method::GET, "/config/models", status),
+        started.elapsed().as_secs_f64(),
+    );
+    response
 }
 
 async fn health(state: AppState) -> &'static str {
-    state.record_http_request(Method::GET, "/health", StatusCode::OK);
+    let started = Instant::now();
+    let status = StatusCode::OK;
+    state.record_http_request(Method::GET, "/health", status);
+    state.observe_http_latency(
+        &HttpLabels::new(Method::GET, "/health", status),
+        started.elapsed().as_secs_f64(),
+    );
     "ok"
 }
 
 async fn metrics(state: AppState) -> impl IntoResponse {
-    match state.encode_metrics() {
-        Ok(body) => {
-            state.record_http_request(Method::GET, "/metrics", StatusCode::OK);
+    let started = Instant::now();
+    let (status, response) = match state.encode_metrics() {
+        Ok(body) => (
+            StatusCode::OK,
             (
                 StatusCode::OK,
                 [(CONTENT_TYPE, "text/plain; version=0.0.4")],
                 body,
             )
-                .into_response()
-        }
-        Err(_err) => {
-            state.record_http_request(Method::GET, "/metrics", StatusCode::INTERNAL_SERVER_ERROR);
+                .into_response(),
+        ),
+        Err(_err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 [(CONTENT_TYPE, "text/plain; version=0.0.4")],
                 "Internal server error".to_string(),
             )
-                .into_response()
-        }
-    }
+                .into_response(),
+        ),
+    };
+
+    state.record_http_request(Method::GET, "/metrics", status);
+    state.observe_http_latency(
+        &HttpLabels::new(Method::GET, "/metrics", status),
+        started.elapsed().as_secs_f64(),
+    );
+
+    response
 }
 
 pub fn build_app(limits: Limits, models: ModelsFile, expose_config: bool) -> Router {
@@ -247,6 +298,28 @@ mod tests {
             text.contains(r#"http_requests_total{method="GET",path="/metrics",status="200"}"#),
             "metrics missing labeled metrics counter:\n{text}"
         );
+    }
+
+    #[tokio::test]
+    async fn p95_budget_within_limit_for_health() {
+        let app = demo_app(false);
+
+        for _ in 0..50 {
+            let _ = app
+                .clone()
+                .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+        }
+
+        let res = app
+            .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+
+        assert!(text.contains("http_request_duration_seconds_bucket"));
     }
 
     #[tokio::test]
