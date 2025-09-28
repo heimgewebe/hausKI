@@ -18,5 +18,8 @@ test:
 run-core:
     cargo run -p hauski-core
 
+run-core-expose:
+    HAUSKI_EXPOSE_CONFIG=true cargo run -p hauski-core
+
 run-cli ARGS='':
     cargo run -p hauski-cli -- {{ARGS}}
