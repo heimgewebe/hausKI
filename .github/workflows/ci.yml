@@ -125,7 +125,7 @@ jobs:
           CRATES=$(grep -E '^crates/[^/]+/' /tmp/changed.txt | awk -F/ '{print $2}' | sort -u || true)
           echo "changed=$CRATES" >> "$GITHUB_OUTPUT"
 
-      # Label-Logik: 'full-ci' erzwingt volle Workspace-Tests
+      # Label logic: 'full-ci' enforces full workspace tests
       - name: Decide test scope
         id: scope
         shell: bash
