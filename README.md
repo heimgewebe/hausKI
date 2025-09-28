@@ -48,6 +48,7 @@ cargo test --workspace -- --nocapture
 - Prüfe das Manifest vor Commits lokal mit `wgx validate --profile .wgx/profile.yml`.
 - Die JSON-Ansicht der Tasks erhältst du über `wgx tasks --json`.
 - Persönliche Overrides (Pfade, Log-Level, Tokens) gehören in `.wgx/profile.local.yml`; eine Vorlage findest du in `.wgx/profile.local.example.yml`. Die Datei ist git-ignored.
+- Gemeinsame Umgebungsvariablen landen im Manifest unter `envDefaults`, individuelle Anpassungen im lokalen Profil via `envOverrides`. So bleibt die Naming-Convention repo-weit konsistent.
 
 ---
 
