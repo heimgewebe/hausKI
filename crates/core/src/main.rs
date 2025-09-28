@@ -129,6 +129,6 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("listening on http://{addr}");
 
     let listener = TcpListener::bind(addr).await?;
-    axum::serve(listener, app.into_make_service()).await?;
+    axum::serve(listener, app).await?;
     Ok(())
 }
