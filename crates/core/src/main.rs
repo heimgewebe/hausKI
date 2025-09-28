@@ -1,19 +1,18 @@
 use axum::{
     extract::State,
-    http::{header::CONTENT_TYPE, StatusCode},
+    http::{header::CONTENT_TYPE, Method, StatusCode},
     response::IntoResponse,
     routing::get,
     Json, Router,
 };
-use std::{net::SocketAddr, sync::Arc};
-use tokio::net::TcpListener;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
 use prometheus_client::{
-    encoding::text::encode,
+    encoding::{EncodeLabel, EncodeLabelSet},
     metrics::{counter::Counter, family::Family, gauge::Gauge},
     registry::Registry,
 };
+use std::{fmt, net::SocketAddr, sync::Arc};
+use tokio::net::TcpListener;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod config;
 use crate::config::{load_limits, load_models, Limits, ModelsFile};
@@ -41,11 +40,23 @@ async fn health(State(state): State<AppState>) -> &'static str {
     "ok"
 }
 
-async fn metrics(State(state): State<AppState>) -> String {
+async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
     let mut body = String::new();
-    encode(&mut body, &*state.registry).expect("encode metrics");
-    state.record_http_request(Method::GET, "/metrics", StatusCode::OK);
-    body
+    match prometheus_client::encoding::text::encode(&mut body, &state.registry) {
+        Ok(()) => {
+            state.record_http_request(Method::GET, "/metrics", StatusCode::OK);
+            (
+                StatusCode::OK,
+                [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+                body,
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("Failed to encode metrics: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -65,14 +76,14 @@ impl HttpLabels {
     }
 }
 
-impl prometheus_client::encoding::text::EncodeLabelSet for HttpLabels {
+impl EncodeLabelSet for HttpLabels {
     fn encode(
         &self,
         mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
-        encoder.encode_label("method", self.method.as_str())?;
-        encoder.encode_label("path", self.path)?;
-        encoder.encode_label("status", self.status.as_str())?;
+        ("method", self.method.as_str()).encode(encoder.encode_label())?;
+        ("path", self.path).encode(encoder.encode_label())?;
+        ("status", self.status.as_str()).encode(encoder.encode_label())?;
         Ok(())
     }
 }
@@ -93,6 +104,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let mut registry = Registry::default();
+
     let build_info = Family::<(), Gauge>::default();
     build_info.get_or_create(&()).set(1);
     registry.register("hauski_build_info", "static 1", build_info);
@@ -104,41 +116,19 @@ async fn main() -> anyhow::Result<()> {
         http_requests_total.clone(),
     );
 
-    let registry = Arc::new(registry);
-
     let limits_path =
         std::env::var("HAUSKI_LIMITS").unwrap_or_else(|_| "./policies/limits.yaml".to_string());
     let models_path =
         std::env::var("HAUSKI_MODELS").unwrap_or_else(|_| "./configs/models.yml".to_string());
     let limits = Arc::new(load_limits(&limits_path)?);
     let models = Arc::new(load_models(&models_path)?);
-    let app_state = AppState { limits, models };
 
-    let metrics = get(move || {
-        let registry = metrics_registry.clone();
-        async move {
-            match encode_metrics(&registry) {
-                Ok(body) => (
-                    StatusCode::OK,
-                    [(CONTENT_TYPE, "text/plain; version=0.0.4")],
-                    body,
-                )
-                    .into_response(),
-                Err(error) => {
-                    tracing::error!(?error, "failed to encode metrics");
-                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
-                }
-            }
-        }
-    });
-
-    let health_route = get(move || {
-        let counter = http_requests_total.clone();
-        async move {
-            counter.inc();
-            "ok"
-        }
-    });
+    let app_state = AppState {
+        limits,
+        models,
+        registry: Arc::new(registry),
+        http_requests_total,
+    };
 
     let app = Router::new()
         .route("/health", get(health))
@@ -153,10 +143,4 @@ async fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
-}
-
-fn encode_metrics(registry: &Registry) -> Result<String, std::fmt::Error> {
-    let mut body = String::new();
-    encode(&mut body, registry)?;
-    Ok(body)
 }
