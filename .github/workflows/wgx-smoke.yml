@@ -1,0 +1,24 @@
+name: wgx-smoke
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch wgx
+        run: |
+          git clone --depth=1 https://github.com/alexdermohr/wgx /tmp/wgx
+          echo "/tmp/wgx" >> $GITHUB_PATH
+      - name: Validate manifest
+        run: /tmp/wgx/wgx validate --profile .wgx/profile.yml
+      - name: List tasks (JSON)
+        run: /tmp/wgx/wgx tasks --json
+      - name: Doctor (optional)
+        run: |
+          set -euo pipefail
+          if /tmp/wgx/wgx tasks --json | jq -r '.tasks[].name' | grep -qx doctor; then
+            /tmp/wgx/wgx task doctor --json || true
+          fi

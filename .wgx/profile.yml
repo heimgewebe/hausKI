@@ -1,0 +1,52 @@
+wgx:
+  apiVersion: v1
+  requiredWgx: "^2.0"
+  requiredCapabilities:
+    - task-router
+    - manifest-validate
+    - json-output
+  repoKind: "hauski"
+  dirs:
+    web: ""
+    api: "crates"
+    data: ".local/state/hauski"
+  tasks:
+    doctor:
+      cmd: cargo
+      args:
+        - run
+        - -p
+        - hauski-cli
+        - --
+        - doctor
+    serve:
+      cmd: cargo
+      args:
+        - run
+        - -p
+        - hauski-cli
+        - --
+        - serve
+    test:
+      cmd: cargo
+      args:
+        - test
+        - --workspace
+        - --
+        - --nocapture
+    fmt:
+      cmd: cargo
+      args:
+        - fmt
+        - --all
+    clippy:
+      cmd: cargo
+      args:
+        - clippy
+        - --all-targets
+        - --all-features
+        - --
+        - -D
+        - warnings
+  envDefaults:
+    RUST_LOG: "info,hauski=debug"

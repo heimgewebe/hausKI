@@ -41,6 +41,16 @@ cargo test --workspace -- --nocapture
 
 ---
 
+## wgx-Manifest & Aufgaben
+
+- Das wgx-Manifest liegt unter `.wgx/profile.yml` und verlangt einen Router mit den Fähigkeiten `task-router`, `manifest-validate` und `json-output`.
+- Tasks bestehen aus `cmd` + `args` und kommen ohne `eval`-Magie aus; zusätzliche Argumente werden sauber durchgereicht.
+- Prüfe das Manifest vor Commits lokal mit `wgx validate --profile .wgx/profile.yml`.
+- Die JSON-Ansicht der Tasks erhältst du über `wgx tasks --json`.
+- Persönliche Overrides (Pfade, Log-Level, Tokens) gehören in `.wgx/profile.local.yml`; eine Vorlage findest du in `.wgx/profile.local.example.yml`. Die Datei ist git-ignored.
+
+---
+
 ## Entwicklung im Devcontainer
 - Basis-Tooling: Rust, Node, Python sowie optionale CUDA-Runtime.
 - Empfohlene Extensions: rust-analyzer, direnv, Docker, GitLens, Markdown-Mermaid.
