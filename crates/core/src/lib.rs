@@ -1,11 +1,15 @@
-use axum::{http::StatusCode, response::IntoResponse, routing::get, Json, Router};
+use axum::{
+    http::{header::CONTENT_TYPE, Method, StatusCode},
+    response::IntoResponse,
+    routing::get,
+    Json, Router,
+};
 use prometheus_client::{
-    encoding::{text::encode, EncodeLabelSet},
+    encoding::{text::encode, EncodeLabel, EncodeLabelSet},
     metrics::{counter::Counter, family::Family, gauge::Gauge},
     registry::Registry,
 };
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 mod config;
 pub use config::{load_limits, load_models, Limits, ModelsFile};
@@ -35,8 +39,8 @@ impl AppState {
 
         let http_requests: Family<HttpLabels, Counter<u64>> = Family::default();
         registry.register(
-            "http_requests",
-            "Total HTTP requests by route",
+            "http_requests_total",
+            "Total number of HTTP requests received",
             http_requests.clone(),
         );
 
@@ -61,11 +65,9 @@ impl AppState {
         self.0.expose_config
     }
 
-    fn record_route(&self, route: &'static str) {
-        self.0
-            .http_requests
-            .get_or_create(&HttpLabels { route })
-            .inc();
+    fn record_http_request(&self, method: Method, path: &'static str, status: StatusCode) {
+        let labels = HttpLabels::new(method, path, status);
+        self.0.http_requests.get_or_create(&labels).inc();
     }
 
     fn encode_metrics(&self) -> Result<String, std::fmt::Error> {
@@ -75,45 +77,70 @@ impl AppState {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, EncodeLabelSet, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HttpLabels {
-    route: &'static str,
+    method: Method,
+    path: &'static str,
+    status: StatusCode,
+}
+
+impl HttpLabels {
+    fn new(method: Method, path: &'static str, status: StatusCode) -> Self {
+        Self {
+            method,
+            path,
+            status,
+        }
+    }
+}
+
+impl EncodeLabelSet for HttpLabels {
+    fn encode(
+        &self,
+        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
+    ) -> Result<(), fmt::Error> {
+        ("method", self.method.as_str()).encode(encoder.encode_label())?;
+        ("path", self.path).encode(encoder.encode_label())?;
+        ("status", self.status.as_str()).encode(encoder.encode_label())?;
+        Ok(())
+    }
 }
 
 async fn get_limits(state: AppState) -> Json<Limits> {
+    state.record_http_request(Method::GET, "/config/limits", StatusCode::OK);
     Json(state.limits())
 }
 
 async fn get_models(state: AppState) -> Json<ModelsFile> {
+    state.record_http_request(Method::GET, "/config/models", StatusCode::OK);
     Json(state.models())
 }
 
 async fn health(state: AppState) -> &'static str {
-    state.record_route("/health");
+    state.record_http_request(Method::GET, "/health", StatusCode::OK);
     "ok"
 }
 
 async fn metrics(state: AppState) -> impl IntoResponse {
-    state.record_route("/metrics");
     match state.encode_metrics() {
-        Ok(body) => (
-            StatusCode::OK,
-            [(
-                axum::http::header::CONTENT_TYPE,
-                "text/plain; version=0.0.4",
-            )],
-            body,
-        )
-            .into_response(),
-        Err(_err) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            [(
-                axum::http::header::CONTENT_TYPE,
-                "text/plain; version=0.0.4",
-            )],
-            "Internal server error".to_string(),
-        )
-            .into_response(),
+        Ok(body) => {
+            state.record_http_request(Method::GET, "/metrics", StatusCode::OK);
+            (
+                StatusCode::OK,
+                [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+                body,
+            )
+                .into_response()
+        }
+        Err(_err) => {
+            state.record_http_request(Method::GET, "/metrics", StatusCode::INTERNAL_SERVER_ERROR);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+                "Internal server error".to_string(),
+            )
+                .into_response()
+        }
     }
 }
 
@@ -213,8 +240,12 @@ mod tests {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let text = String::from_utf8(body.to_vec()).unwrap();
         assert!(
-            text.contains(r#"http_requests_total{route="/health"}"#),
-            "metrics missing labeled counter:\n{text}"
+            text.contains(r#"http_requests_total{method="GET",path="/health",status="200"}"#),
+            "metrics missing labeled health counter:\n{text}"
+        );
+        assert!(
+            text.contains(r#"http_requests_total{method="GET",path="/metrics",status="200"}"#),
+            "metrics missing labeled metrics counter:\n{text}"
         );
     }
 

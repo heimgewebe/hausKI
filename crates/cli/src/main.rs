@@ -76,10 +76,7 @@ fn main() -> anyhow::Result<()> {
         },
         Commands::Asr { cmd } => match cmd {
             AsrCmd::Transcribe { input, model, out } => {
-                println!(
-                    "(stub) asr transcribe {input} --model {:?} --out {:?}",
-                    model, out
-                )
+                println!("(stub) asr transcribe {input} --model {model:?} --out {out:?}")
             }
         },
         Commands::Audio { cmd } => match cmd {
@@ -158,9 +155,9 @@ fn print_models_table(file: &ModelsFile) {
     }
 
     let separator = build_separator(&widths);
-    println!("{}", separator);
+    println!("{separator}");
     println!("{}", format_row(HEADERS, &widths));
-    println!("{}", separator);
+    println!("{separator}");
 
     for row in &rows {
         println!(
@@ -178,6 +175,6 @@ fn print_models_table(file: &ModelsFile) {
     }
 
     if !rows.is_empty() {
-        println!("{}", separator);
+        println!("{separator}");
     }
 }
