@@ -29,3 +29,19 @@ jobs:
         run: cargo deny check
       - name: test
         run: cargo test --workspace -- --nocapture
+      - name: Run server (background)
+        run: |
+          cargo run -p hauski-core &
+          echo $! > server.pid
+          sleep 1
+      - name: k6 smoke (p95 gate)
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: ./observability/k6/health-smoke.js
+          flags: --summary-export=./observability/k6/summary.json
+      - name: Enforce p95 < 0.4s
+        run: |
+          jq -e '.metrics.http_req_duration.p(95) < 400' observability/k6/summary.json
+      - name: Stop server
+        if: always()
+        run: kill $(cat server.pid) || true
