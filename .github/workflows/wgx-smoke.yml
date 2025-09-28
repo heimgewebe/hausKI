@@ -18,12 +18,12 @@ jobs:
           cd -
           echo "/tmp/wgx" >> $GITHUB_PATH
       - name: Validate manifest
-        run: /tmp/wgx/wgx validate --profile .wgx/profile.yml
+        run: wgx validate --profile .wgx/profile.yml
       - name: List tasks (JSON)
-        run: /tmp/wgx/wgx tasks --json
+        run: wgx tasks --json
       - name: Doctor (optional)
         run: |
           set -euo pipefail
-          if /tmp/wgx/wgx tasks --json | jq -r '.tasks[].name' | grep -qx doctor; then
-            /tmp/wgx/wgx task doctor --json || true
+          if wgx tasks --json | jq -r '.tasks[].name' | grep -qx doctor; then
+            wgx task doctor --json || true
           fi
