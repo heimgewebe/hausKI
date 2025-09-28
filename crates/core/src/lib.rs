@@ -19,7 +19,7 @@ pub struct AppState {
     pub expose_config: bool,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HttpLabels {
     route: Cow<'static, str>,
 }
