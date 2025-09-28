@@ -106,34 +106,70 @@ struct ModelEntry {
 }
 
 fn print_models_table(file: &ModelsFile) {
-    use tabled::{Table, Tabled};
+    const HEADERS: [&str; 4] = ["ID", "Path", "VRAM Min", "Canary"];
 
-    #[derive(Tabled)]
-    struct Row<'a> {
-        id: &'a str,
-        path: &'a str,
-        #[tabled(rename = "VRAM Min")]
-        vram: String,
-        canary: String,
+    let mut rows: Vec<[String; 4]> = Vec::new();
+    let mut widths = [
+        HEADERS[0].len(),
+        HEADERS[1].len(),
+        HEADERS[2].len(),
+        HEADERS[3].len(),
+    ];
+
+    for model in &file.models {
+        let vram = model
+            .vram_min_gb
+            .map(|value| format!("{value} GB"))
+            .unwrap_or_default();
+        let canary = model
+            .canary
+            .map(|value| value.to_string())
+            .unwrap_or_default();
+
+        let row = [model.id.clone(), model.path.clone(), vram, canary];
+
+        for (idx, column) in row.iter().enumerate() {
+            widths[idx] = widths[idx].max(column.chars().count());
+        }
+
+        rows.push(row);
     }
 
-    let rows: Vec<Row> = file
-        .models
-        .iter()
-        .map(|model| Row {
-            id: &model.id,
-            path: &model.path,
-            vram: model
-                .vram_min_gb
-                .map(|value| format!("{value} GB"))
-                .unwrap_or_default(),
-            canary: model
-                .canary
-                .map(|value| value.to_string())
-                .unwrap_or_default(),
-        })
-        .collect();
+    fn build_separator(widths: &[usize; 4]) -> String {
+        let mut parts = Vec::with_capacity(widths.len());
+        for width in widths {
+            parts.push("-".repeat(width + 2));
+        }
+        format!("+{}+", parts.join("+"))
+    }
 
-    let table = Table::new(rows).to_string();
-    println!("{table}");
+    fn format_row(columns: [&str; 4], widths: &[usize; 4]) -> String {
+        let mut formatted = String::new();
+        formatted.push('|');
+        for (idx, column) in columns.iter().enumerate() {
+            let width = widths[idx];
+            formatted.push(' ');
+            formatted.push_str(column);
+            let padding = width.saturating_sub(column.chars().count());
+            formatted.push_str(&" ".repeat(padding + 1));
+            formatted.push('|');
+        }
+        formatted
+    }
+
+    let separator = build_separator(&widths);
+    println!("{separator}");
+    println!("{}", format_row(HEADERS, &widths));
+    println!("{separator}");
+
+    for row in rows {
+        println!(
+            "{}",
+            format_row([&row[0], &row[1], &row[2], &row[3],], &widths)
+        );
+    }
+
+    if !rows.is_empty() {
+        println!("{separator}");
+    }
 }
