@@ -1,4 +1,4 @@
-set shell := ["bash", "-uc"]
+set shell := ["bash", "-euc"]
 
 # Standard: Server starten (lokal)
 default: run
