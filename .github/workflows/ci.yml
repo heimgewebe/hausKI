@@ -118,7 +118,7 @@ jobs:
             git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
             FILES=$(git diff --name-only "$BASE"...HEAD || true)
           else
-            # merge_group / workflow_dispatch → keine Basis: falle auf Workspace zurück
+            # merge_group / workflow_dispatch → no base: fall back to workspace
             FILES=""
           fi
           echo "$FILES" > /tmp/changed.txt
