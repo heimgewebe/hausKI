@@ -1,10 +1,11 @@
 use axum::{
     extract::State,
-    http::{Method, StatusCode},
+    http::{header::CONTENT_TYPE, StatusCode},
+    response::IntoResponse,
     routing::get,
     Json, Router,
 };
-use std::{fmt, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -111,12 +112,33 @@ async fn main() -> anyhow::Result<()> {
         std::env::var("HAUSKI_MODELS").unwrap_or_else(|_| "./configs/models.yml".to_string());
     let limits = Arc::new(load_limits(&limits_path)?);
     let models = Arc::new(load_models(&models_path)?);
-    let app_state = AppState {
-        limits,
-        models,
-        registry: registry.clone(),
-        http_requests_total,
-    };
+    let app_state = AppState { limits, models };
+
+    let metrics = get(move || {
+        let registry = metrics_registry.clone();
+        async move {
+            match encode_metrics(&registry) {
+                Ok(body) => (
+                    StatusCode::OK,
+                    [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+                    body,
+                )
+                    .into_response(),
+                Err(error) => {
+                    tracing::error!(?error, "failed to encode metrics");
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+            }
+        }
+    });
+
+    let health_route = get(move || {
+        let counter = http_requests_total.clone();
+        async move {
+            counter.inc();
+            "ok"
+        }
+    });
 
     let app = Router::new()
         .route("/health", get(health))
@@ -131,4 +153,10 @@ async fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr).await?;
     axum::serve(listener, app.into_make_service()).await?;
     Ok(())
+}
+
+fn encode_metrics(registry: &Registry) -> Result<String, std::fmt::Error> {
+    let mut body = String::new();
+    encode(&mut body, registry)?;
+    Ok(body)
 }
