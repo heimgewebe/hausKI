@@ -16,7 +16,7 @@ pub struct AppState(Arc<AppStateInner>);
 struct AppStateInner {
     limits: Limits,
     models: ModelsFile,
-    http_requests_total: Family<HttpLabels, Counter<u64>>,
+    http_requests: Family<HttpLabels, Counter<u64>>,
     registry: Registry,
     /// Controls whether configuration endpoints are exposed.
     ///
@@ -33,17 +33,17 @@ impl AppState {
         build_info.get_or_create(&()).set(1);
         registry.register("hauski_build_info", "static 1", build_info);
 
-        let http_requests_total: Family<HttpLabels, Counter<u64>> = Family::default();
+        let http_requests: Family<HttpLabels, Counter<u64>> = Family::default();
         registry.register(
-            "http_requests_total",
+            "http_requests",
             "Total HTTP requests by route",
-            http_requests_total.clone(),
+            http_requests.clone(),
         );
 
         Self(Arc::new(AppStateInner {
             limits,
             models,
-            http_requests_total,
+            http_requests,
             registry,
             expose_config,
         }))
@@ -63,7 +63,7 @@ impl AppState {
 
     fn record_route(&self, route: &'static str) {
         self.0
-            .http_requests_total
+            .http_requests
             .get_or_create(&HttpLabels { route })
             .inc();
     }
@@ -213,7 +213,7 @@ mod tests {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let text = String::from_utf8(body.to_vec()).unwrap();
         assert!(
-            text.contains(r#"http_requests_total_total{route="/health"}"#),
+            text.contains(r#"http_requests_total{route="/health"}"#),
             "metrics missing labeled counter:\n{text}"
         );
     }
