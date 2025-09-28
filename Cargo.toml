@@ -24,4 +24,5 @@ axum = "0.7"
 clap = { version = "4", features = ["derive"] }
 prometheus-client = "0.22"
 walkdir = "2"
+dirs = "5"
 # sqlx bewusst nicht vorgezogen, bis erste DB-Crate existiert

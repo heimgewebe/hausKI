@@ -137,7 +137,7 @@ fn print_models_table(file: &ModelsFile) {
 
     fn build_separator(widths: &[usize; 4]) -> String {
         let mut parts = Vec::with_capacity(widths.len());
-        for width in widths {
+        for &width in widths {
             parts.push("-".repeat(width + 2));
         }
         format!("+{}+", parts.join("+"))
@@ -158,9 +158,9 @@ fn print_models_table(file: &ModelsFile) {
     }
 
     let separator = build_separator(&widths);
-    println!("{separator}");
+    println!("{}", separator);
     println!("{}", format_row(HEADERS, &widths));
-    println!("{separator}");
+    println!("{}", separator);
 
     for row in &rows {
         println!(
@@ -178,6 +178,6 @@ fn print_models_table(file: &ModelsFile) {
     }
 
     if !rows.is_empty() {
-        println!("{separator}");
+        println!("{}", separator);
     }
 }
