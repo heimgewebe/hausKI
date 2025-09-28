@@ -22,14 +22,66 @@ use crate::config::{load_limits, load_models, Limits, ModelsFile};
 struct AppState {
     limits: Arc<Limits>,
     models: Arc<ModelsFile>,
+    registry: Arc<Registry>,
+    http_requests_total: Family<HttpLabels, Counter>,
 }
 
 async fn get_limits(State(state): State<AppState>) -> Json<Limits> {
+    state.record_http_request(Method::GET, "/config/limits", StatusCode::OK);
     Json((*state.limits).clone())
 }
 
 async fn get_models(State(state): State<AppState>) -> Json<ModelsFile> {
+    state.record_http_request(Method::GET, "/config/models", StatusCode::OK);
     Json((*state.models).clone())
+}
+
+async fn health(State(state): State<AppState>) -> &'static str {
+    state.record_http_request(Method::GET, "/health", StatusCode::OK);
+    "ok"
+}
+
+async fn metrics(State(state): State<AppState>) -> String {
+    let mut body = String::new();
+    encode(&mut body, &*state.registry).expect("encode metrics");
+    state.record_http_request(Method::GET, "/metrics", StatusCode::OK);
+    body
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct HttpLabels {
+    method: Method,
+    path: &'static str,
+    status: StatusCode,
+}
+
+impl HttpLabels {
+    fn new(method: Method, path: &'static str, status: StatusCode) -> Self {
+        Self {
+            method,
+            path,
+            status,
+        }
+    }
+}
+
+impl prometheus_client::encoding::text::EncodeLabelSet for HttpLabels {
+    fn encode(
+        &self,
+        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
+    ) -> Result<(), fmt::Error> {
+        encoder.encode_label("method", self.method.as_str())?;
+        encoder.encode_label("path", self.path)?;
+        encoder.encode_label("status", self.status.as_str())?;
+        Ok(())
+    }
+}
+
+impl AppState {
+    fn record_http_request(&self, method: Method, path: &'static str, status: StatusCode) {
+        let labels = HttpLabels::new(method, path, status);
+        self.http_requests_total.get_or_create(&labels).inc();
+    }
 }
 
 #[allow(clippy::explicit_auto_deref)]
@@ -45,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
     build_info.get_or_create(&()).set(1);
     registry.register("hauski_build_info", "static 1", build_info);
 
-    let http_requests_total = Counter::<u64>::default();
+    let http_requests_total = Family::<HttpLabels, Counter>::default();
     registry.register(
         "http_requests_total",
         "Total number of HTTP requests received",
@@ -53,7 +105,6 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let registry = Arc::new(registry);
-    let metrics_registry = registry.clone();
 
     let limits_path =
         std::env::var("HAUSKI_LIMITS").unwrap_or_else(|_| "./policies/limits.yaml".to_string());
@@ -90,8 +141,8 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let app = Router::new()
-        .route("/health", health_route)
-        .route("/metrics", metrics)
+        .route("/health", get(health))
+        .route("/metrics", get(metrics))
         .route("/config/limits", get(get_limits))
         .route("/config/models", get(get_models))
         .with_state(app_state);
@@ -100,7 +151,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("listening on http://{addr}");
 
     let listener = TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.into_make_service()).await?;
     Ok(())
 }
 
