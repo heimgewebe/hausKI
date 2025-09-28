@@ -8,6 +8,10 @@
     "gpu": "optional"
   },
   "remoteUser": "vscode",
+  "containerEnv": {
+    "CARGO_REGISTRIES_CRATES_IO_PROTOCOL": "sparse",
+    "CARGO_NET_RETRY": "5"
+  },
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
       "username": "vscode",
