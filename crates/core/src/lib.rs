@@ -18,6 +18,10 @@ struct AppStateInner {
     models: ModelsFile,
     http_requests_total: Family<HttpLabels, Counter<u64>>,
     registry: Registry,
+    /// Controls whether configuration endpoints are exposed.
+    ///
+    /// WARNING: Enabling this may expose sensitive configuration information.
+    /// Only set to `true` if you understand the security implications.
     expose_config: bool,
 }
 
