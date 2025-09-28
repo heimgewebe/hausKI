@@ -30,9 +30,9 @@ jobs:
         shell: bash
         run: |
           labels="${{ github.event.pull_request.number && join(github.event.pull_request.labels.*.name, ' ') || '' }}"
-          # Heavy läuft, wenn:
-          #  - workflow_dispatch (immer), oder
-          #  - PR hat Label 'full-ci'
+          # Heavy runs when:
+          #  - workflow_dispatch (always), or
+          #  - PR has the label 'full-ci'
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "run_heavy=true" >> "$GITHUB_OUTPUT"
             matrix="${{ github.event.inputs.matrix }}"
