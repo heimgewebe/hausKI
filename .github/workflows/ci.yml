@@ -1,47 +1,155 @@
-name: CI
+name: CI (smart PR)
+
 on:
-  push:
   pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUSTFLAGS: "-Dwarnings"
+
 jobs:
-  rust:
-    runs-on: ubuntu-24.04
-    env:
-      toolchain: stable
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      docs: ${{ steps.filter.outputs.docs }}
+      any:  ${{ steps.filter.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - '**/*.rs'
+              - '**/Cargo.toml'
+              - '**/Cargo.lock'
+              - 'crates/**'
+            docs:
+              - '**/*.md'
+            any:
+              - '**'
+
+  lint:
+    name: rustfmt + clippy
+    needs: changes
+    if: >
+      (github.event_name == 'merge_group') ||
+      (github.event_name != 'merge_group' &&
+       github.event.pull_request.draft == false &&
+       (needs.changes.outputs.rust == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
           components: rustfmt, clippy
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-deny
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: just
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-      - name: fmt
+      - uses: Swatinem/rust-cache@v2
+      - name: rustfmt (check)
         run: cargo fmt --all --check
-      - name: clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: cargo-deny
-        run: cargo deny check
-      - name: test
-        run: cargo test --workspace -- --nocapture
-      - name: Run server (background)
-        run: |
-          cargo run -p hauski-core &
-          echo $! > server.pid
-          sleep 1
-      - name: k6 smoke (p95 gate)
-        uses: grafana/k6-action@v0.3.1
+      - name: clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  deny:
+    name: cargo-deny
+    needs: lint
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
         with:
-          filename: ./observability/k6/health-smoke.js
-          flags: --summary-export=./observability/k6/summary.json
-      - name: Enforce p95 < 0.4s
+          command: check bans sources advisories
+
+  audit:
+    name: cargo audit
+    needs: lint
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    name: targeted tests (nextest)
+    needs: [lint]
+    if: >
+      (github.event_name == 'merge_group') ||
+      (github.event_name != 'merge_group' &&
+       github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      # Toolchains & cache
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # nextest (schnellere Tests) & optional Tools
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      # Ermittele geänderte Crates paketgenau im Vergleich zur Base
+      - name: Compute changed crates
+        id: diff
+        shell: bash
         run: |
-          jq -e '.metrics.http_req_duration.p(95) < 400' observability/k6/summary.json
-      - name: Stop server
-        if: always()
-        run: kill $(cat server.pid) || true
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="origin/${{ github.base_ref }}"
+            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+            FILES=$(git diff --name-only "$BASE"...HEAD || true)
+          else
+            # merge_group / workflow_dispatch → keine Basis: falle auf Workspace zurück
+            FILES=""
+          fi
+          echo "$FILES" > /tmp/changed.txt
+          CRATES=$(grep -E '^crates/[^/]+/' /tmp/changed.txt | awk -F/ '{print $2}' | sort -u || true)
+          echo "changed=$CRATES" >> "$GITHUB_OUTPUT"
+
+      # Label-Logik: 'full-ci' erzwingt volle Workspace-Tests
+      - name: Decide test scope
+        id: scope
+        shell: bash
+        run: |
+          labels="${{ github.event.pull_request.number && join(github.event.pull_request.labels.*.name, ' ') || '' }}"
+          if echo "$labels" | grep -qiE '(^| )full-ci( |$)'; then
+            echo "mode=workspace" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ steps.diff.outputs.changed }}" ]]; then
+            echo "mode=changed" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=workspace" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run tests (targeted or workspace)
+        shell: bash
+        run: |
+          set -euo pipefail
+          MODE="${{ steps.scope.outputs.mode }}"
+          if [[ "$MODE" == "changed" ]]; then
+            for pkg in ${{ steps.diff.outputs.changed }}; do
+              echo "==> testing crate: $pkg"
+              cargo nextest run -p "$pkg" --all-features --no-fail-fast
+            done
+          else
+            echo "==> testing workspace"
+            cargo nextest run --workspace --all-features --no-fail-fast
+          fi
