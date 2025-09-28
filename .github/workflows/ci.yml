@@ -102,7 +102,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      # nextest (schnellere Tests) & optional Tools
+      # nextest (faster tests) & optional tools
       - uses: taiki-e/install-action@v2
         with:
           tool: nextest
