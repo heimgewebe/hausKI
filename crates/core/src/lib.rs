@@ -1,11 +1,11 @@
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use prometheus_client::{
-    encoding::{text::encode, EncodeLabelSet, LabelSetEncoder},
+    encoding::{text::encode, EncodeLabelSet},
     metrics::{counter::Counter, family::Family, gauge::Gauge},
     registry::Registry,
 };
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 mod config;
 pub use config::{load_limits, load_models, Limits, ModelsFile};
@@ -64,9 +64,7 @@ impl AppState {
     fn record_route(&self, route: &'static str) {
         self.0
             .http_requests_total
-            .get_or_create(&HttpLabels {
-                route: Cow::from(route),
-            })
+            .get_or_create(&HttpLabels { route })
             .inc();
     }
 
@@ -77,15 +75,9 @@ impl AppState {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, EncodeLabelSet, Serialize, Deserialize)]
 pub struct HttpLabels {
-    route: Cow<'static, str>,
-}
-
-impl EncodeLabelSet for HttpLabels {
-    fn encode(&self, encoder: LabelSetEncoder<'_>) -> Result<(), std::fmt::Error> {
-        [("route", self.route.as_ref())].encode(encoder)
-    }
+    route: &'static str,
 }
 
 async fn get_limits(state: AppState) -> Json<Limits> {
