@@ -107,7 +107,7 @@ jobs:
         with:
           tool: nextest
 
-      # Ermittele geänderte Crates paketgenau im Vergleich zur Base
+      # Determine changed crates by package compared to the base
       - name: Compute changed crates
         id: diff
         shell: bash
