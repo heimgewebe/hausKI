@@ -46,6 +46,8 @@ cargo test --workspace -- --nocapture
 - Empfohlene Extensions: rust-analyzer, direnv, Docker, GitLens, Markdown-Mermaid.
 - Vorgefertigte Tasks: `cargo: fmt`, `cargo: clippy`, `cargo: build`, `cargo: test`.
 - Just-Shortcuts: `just fmt`, `just lint`, `just build`, `just test`, `just run-core`.
+- Netzwerkzugriffe von Cargo nutzen standardmäßig den Sparse-Index (`CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse`), um strenge Proxies zu umgehen; `CARGO_NET_RETRY=5` sorgt für automatische Wiederholungen.
+- `cargo-deny` ist im Container global installiert und steht ohne zusätzliche Schritte bereit.
 
 ---
 
