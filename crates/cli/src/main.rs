@@ -165,7 +165,7 @@ fn print_models_table(file: &ModelsFile) {
     for row in rows {
         println!(
             "{}",
-            format_row([&row[0], &row[1], &row[2], &row[3],], &widths)
+            format_row([&row[0], &row[1], &row[2], &row[3]], &widths)
         );
     }
 
