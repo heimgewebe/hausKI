@@ -102,16 +102,27 @@ async fn health(state: AppState) -> &'static str {
 }
 
 async fn metrics(state: AppState) -> impl IntoResponse {
-    let body = state.encode_metrics();
     state.record_route("/metrics");
-    (
-        StatusCode::OK,
-        [(
-            axum::http::header::CONTENT_TYPE,
-            "text/plain; version=0.0.4",
-        )],
-        body,
-    )
+    match state.encode_metrics() {
+        Ok(body) => (
+            StatusCode::OK,
+            [(
+                axum::http::header::CONTENT_TYPE,
+                "text/plain; version=0.0.4",
+            )],
+            body,
+        )
+            .into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            [(
+                axum::http::header::CONTENT_TYPE,
+                "text/plain; version=0.0.4",
+            )],
+            format!("failed to encode metrics: {err}"),
+        )
+            .into_response(),
+    }
 }
 
 pub fn build_app(limits: Limits, models: ModelsFile, expose_config: bool) -> Router {
