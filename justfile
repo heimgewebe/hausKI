@@ -29,5 +29,8 @@ fmt:
 clippy:
     cargo clippy --all-targets --all-features -- -D warnings
 
+# Dependency vulnerability and license compliance check
+deny:
+    cargo deny check
 test:
     cargo test --workspace -- --nocapture
