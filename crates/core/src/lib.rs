@@ -70,10 +70,10 @@ impl AppState {
             .inc();
     }
 
-    fn encode_metrics(&self) -> String {
+    fn encode_metrics(&self) -> Result<String, std::fmt::Error> {
         let mut body = String::new();
-        encode(&mut body, &self.0.registry).expect("encode metrics");
-        body
+        encode(&mut body, &self.0.registry)?;
+        Ok(body)
     }
 }
 
