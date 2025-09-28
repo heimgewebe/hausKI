@@ -1,11 +1,11 @@
-data_dir: "/home/alex/.local/state/hauski"
+data_dir: "$HOME/.local/state/hauski"
 models_dir: "./models"
 
 server:
   port: 8080
 
 obsidian:
-  vault_path: "/home/alex/vault-gewebe"
+  vault_path: "$HOME/vault-gewebe"
 
 plugins:
   enabled:
