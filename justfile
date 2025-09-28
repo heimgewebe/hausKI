@@ -1,25 +1,33 @@
-set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+set shell := ["bash", "-uc"]
 
-default: build
+# Standard: Server starten (lokal)
+default: run
 
+# Server
+run:
+    cargo run -p hauski-cli -- serve
+
+# Systemcheck
+doctor:
+    cargo run -p hauski-cli -- doctor
+
+# Plugins
+plugins-list:
+    cargo run -p hauski-cli -- plugins list
+
+plugins-obsidian-once:
+    cargo run -p hauski-cli -- plugins run --id obsidian_index --once true
+
+# Logs
+logs:
+    cargo run -p hauski-cli -- logs --lines 200
+
+# Hygiene
 fmt:
     cargo fmt --all
 
-lint:
+clippy:
     cargo clippy --all-targets --all-features -- -D warnings
-    cargo deny check
-
-build:
-    cargo build --workspace
 
 test:
     cargo test --workspace -- --nocapture
-
-run-core:
-    cargo run -p hauski-core
-
-run-core-expose:
-    HAUSKI_EXPOSE_CONFIG=true cargo run -p hauski-core
-
-run-cli ARGS='':
-    cargo run -p hauski-cli -- {{ARGS}}
