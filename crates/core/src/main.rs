@@ -54,6 +54,7 @@ async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
         }
         Err(e) => {
             tracing::error!("Failed to encode metrics: {}", e);
+            state.record_http_request(Method::GET, "/metrics", StatusCode::INTERNAL_SERVER_ERROR);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
