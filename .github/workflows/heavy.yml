@@ -1,0 +1,93 @@
+name: CI (heavy on demand)
+
+on:
+  workflow_dispatch:
+    inputs:
+      matrix:
+        description: "Toolchain matrix (comma separated)"
+        required: false
+        default: "stable,beta"
+  pull_request:
+    types: [labeled, synchronize]
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      run_heavy: ${{ steps.flags.outputs.run_heavy }}
+      matrix: ${{ steps.flags.outputs.matrix }}
+    steps:
+      - name: Compute flags
+        id: flags
+        shell: bash
+        run: |
+          labels="${{ github.event.pull_request.number && join(github.event.pull_request.labels.*.name, ' ') || '' }}"
+          # Heavy runs when:
+          #  - workflow_dispatch (always), or
+          #  - PR has the label 'full-ci'
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "run_heavy=true" >> "$GITHUB_OUTPUT"
+            matrix="${{ github.event.inputs.matrix }}"
+          elif echo "$labels" | grep -qiE '(^| )full-ci( |$)'; then
+            echo "run_heavy=true" >> "$GITHUB_OUTPUT"
+            matrix="stable,beta"
+          else
+            echo "run_heavy=false" >> "$GITHUB_OUTPUT"
+            matrix="stable"
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  heavy:
+    needs: decide
+    if: needs.decide.outputs.run_heavy == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ${{ fromJSON(format('["{0}"]', join(split(needs.decide.outputs.matrix, ','), '","'))) }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          # we switch the toolchain explicitly via rustup in the next step
+          components: rustfmt, clippy
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: llvm-tools-preview
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Switch toolchain
+        run: rustup default ${{ matrix.toolchain }}
+
+      - name: Build (release)
+        run: cargo build --workspace --release --locked
+
+      - name: Tests (workspace, nextest)
+        run: cargo nextest run --workspace --all-features --no-fail-fast
+
+      - name: Coverage (llvm-cov, lcov)
+        run: |
+          cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
+        continue-on-error: true
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.toolchain }}
+          path: lcov.info
+          if-no-files-found: ignore
