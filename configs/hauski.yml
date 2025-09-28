@@ -1,0 +1,12 @@
+data_dir: "$HOME/.local/state/hauski"
+models_dir: "./models"
+
+server:
+  port: 8080
+
+obsidian:
+  vault_path: "$HOME/vault-gewebe"
+
+plugins:
+  enabled:
+    - "obsidian_index"
