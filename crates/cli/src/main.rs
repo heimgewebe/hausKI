@@ -162,10 +162,18 @@ fn print_models_table(file: &ModelsFile) {
     println!("{}", format_row(HEADERS, &widths));
     println!("{separator}");
 
-    for row in rows {
+    for row in &rows {
         println!(
             "{}",
-            format_row([&row[0], &row[1], &row[2], &row[3]], &widths)
+            format_row(
+                [
+                    row[0].as_str(),
+                    row[1].as_str(),
+                    row[2].as_str(),
+                    row[3].as_str(),
+                ],
+                &widths,
+            )
         );
     }
 
