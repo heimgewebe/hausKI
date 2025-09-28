@@ -1,0 +1,7 @@
+# Local developer overrides for wgx.
+# Copy to .wgx/profile.local.yml and adjust paths or env vars as needed.
+wgx:
+  envOverrides:
+    RUST_LOG: "info,hauski=trace"
+  dirs:
+    data: "~/Library/Application Support/hauski"

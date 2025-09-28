@@ -1,0 +1,29 @@
+name: wgx-smoke
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch wgx
+        run: |
+          # Pin to a specific commit hash or tag for security
+          WGX_COMMIT="c2e2b7e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2" # <-- Replace with desired commit hash or tag
+          git clone https://github.com/alexdermohr/wgx /tmp/wgx
+          cd /tmp/wgx
+          git checkout $WGX_COMMIT
+          cd -
+          echo "/tmp/wgx" >> $GITHUB_PATH
+      - name: Validate manifest
+        run: wgx validate --profile .wgx/profile.yml
+      - name: List tasks (JSON)
+        run: wgx tasks --json
+      - name: Doctor (optional)
+        run: |
+          set -euo pipefail
+          if wgx tasks --json | jq -r '.tasks[].name' | grep -qx doctor; then
+            wgx task doctor --json || true
+          fi
