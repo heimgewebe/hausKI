@@ -10,7 +10,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Fetch wgx
         run: |
-          git clone --depth=1 https://github.com/alexdermohr/wgx /tmp/wgx
+          # Pin to a specific commit hash or tag for security
+          WGX_COMMIT="c2e2b7e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2" # <-- Replace with desired commit hash or tag
+          git clone https://github.com/alexdermohr/wgx /tmp/wgx
+          cd /tmp/wgx
+          git checkout $WGX_COMMIT
+          cd -
           echo "/tmp/wgx" >> $GITHUB_PATH
       - name: Validate manifest
         run: /tmp/wgx/wgx validate --profile .wgx/profile.yml
