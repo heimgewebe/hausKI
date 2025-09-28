@@ -58,6 +58,8 @@ cargo run -p hauski-core
 just run-core
 ```
 
+> **Hinweis:** Setze `HAUSKI_EXPOSE_CONFIG=true`, um die Endpunkte unter `/config/*` freizugeben (nur für lokale Tests empfohlen).
+
 Verfügbare bzw. geplante API-Endpunkte:
 - `GET /health` → "ok"
 - `GET /metrics`

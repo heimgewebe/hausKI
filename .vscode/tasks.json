@@ -18,13 +18,22 @@
       "label": "cargo: build",
       "type": "shell",
       "command": "cargo build --workspace",
-      "problemMatcher": ["$rustc"]
+      "problemMatcher": [
+        "$rustc"
+      ]
     },
     {
       "label": "cargo: test",
       "type": "shell",
       "command": "cargo test --workspace -- --nocapture",
-      "problemMatcher": ["$rustc"]
+      "problemMatcher": [
+        "$rustc"
+      ]
+    },
+    {
+      "label": "hauski: run core (expose) & curl configs",
+      "type": "shell",
+      "command": "HAUSKI_EXPOSE_CONFIG=true RUST_LOG=info cargo run -p hauski-core & sleep 1 && curl -s http://127.0.0.1:8080/config/limits && echo && curl -s http://127.0.0.1:8080/config/models && echo"
     }
   ]
 }
