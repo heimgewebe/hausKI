@@ -1,4 +1,5 @@
 use axum::{
+    extract::State,
     http::{header::CONTENT_TYPE, Method, StatusCode},
     response::IntoResponse,
     routing::get,
@@ -18,6 +19,10 @@ use std::{fmt, sync::Arc, time::Instant};
 
 mod config;
 pub use config::{load_limits, load_models, Limits, ModelsFile};
+
+fn create_latency_histogram() -> Histogram {
+    Histogram::new(exponential_buckets(0.005, 2.0, 14))
+}
 
 #[derive(Clone)]
 pub struct AppState(Arc<AppStateInner>);
@@ -125,7 +130,7 @@ impl EncodeLabelSet for HttpLabels {
     }
 }
 
-async fn get_limits(state: AppState) -> Json<Limits> {
+async fn get_limits(State(state): State<AppState>) -> Json<Limits> {
     let started = Instant::now();
     let status = StatusCode::OK;
     let response = Json(state.limits());
@@ -137,7 +142,7 @@ async fn get_limits(state: AppState) -> Json<Limits> {
     response
 }
 
-async fn get_models(state: AppState) -> Json<ModelsFile> {
+async fn get_models(State(state): State<AppState>) -> Json<ModelsFile> {
     let started = Instant::now();
     let status = StatusCode::OK;
     let response = Json(state.models());
@@ -149,7 +154,7 @@ async fn get_models(state: AppState) -> Json<ModelsFile> {
     response
 }
 
-async fn health(state: AppState) -> &'static str {
+async fn health(State(state): State<AppState>) -> &'static str {
     let started = Instant::now();
     let status = StatusCode::OK;
     state.record_http_request(Method::GET, "/health", status);
@@ -160,7 +165,7 @@ async fn health(state: AppState) -> &'static str {
     "ok"
 }
 
-async fn metrics(state: AppState) -> impl IntoResponse {
+async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
     let started = Instant::now();
     let status = match state.encode_metrics() {
         Ok(_) => StatusCode::OK,
@@ -200,46 +205,17 @@ async fn metrics(state: AppState) -> impl IntoResponse {
 pub fn build_app(limits: Limits, models: ModelsFile, expose_config: bool) -> Router {
     let state = AppState::new(limits, models, expose_config);
 
-    let health_state = state.clone();
-    let metrics_state = state.clone();
-
     let mut app = Router::new()
-        .route(
-            "/health",
-            get(move || {
-                let state = health_state.clone();
-                async move { health(state).await }
-            }),
-        )
-        .route(
-            "/metrics",
-            get(move || {
-                let state = metrics_state.clone();
-                async move { metrics(state).await }
-            }),
-        );
+        .route("/health", get(health))
+        .route("/metrics", get(metrics));
 
     if state.expose_config() {
-        let limits_state = state.clone();
-        let models_state = state.clone();
         app = app
-            .route(
-                "/config/limits",
-                get(move || {
-                    let state = limits_state.clone();
-                    async move { get_limits(state).await }
-                }),
-            )
-            .route(
-                "/config/models",
-                get(move || {
-                    let state = models_state.clone();
-                    async move { get_models(state).await }
-                }),
-            );
+            .route("/config/limits", get(get_limits))
+            .route("/config/models", get(get_models));
     }
 
-    app
+    app.with_state(state)
 }
 
 #[cfg(test)]
@@ -279,6 +255,7 @@ mod tests {
     async fn health_ok_and_metrics_increment() {
         let app = demo_app(false);
 
+        // Hit /health to generate a metric.
         let res = app
             .clone()
             .oneshot(Request::get("/health").body(Body::empty()).unwrap())
@@ -286,19 +263,33 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
 
+        // Hit /metrics once. This will report the /health metric and increment its own counter.
+        let res = app
+            .clone()
+            .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let text_one = String::from_utf8(body.to_vec()).unwrap();
+
+        // Assert that the first /metrics call reported the /health call.
+        assert!(
+            text_one.contains(r#"http_requests_total{method="GET",path="/health",status="200"} 1"#),
+            "metrics missing labeled health counter:\n{text_one}"
+        );
+
+        // Hit /metrics a second time. This will report the metric from the first /metrics call.
         let res = app
             .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
             .await
             .unwrap();
         let body = res.into_body().collect().await.unwrap().to_bytes();
-        let text = String::from_utf8(body.to_vec()).unwrap();
+        let text_two = String::from_utf8(body.to_vec()).unwrap();
+
+        // Assert that the second /metrics call reported the first /metrics call.
         assert!(
-            text.contains(r#"http_requests_total{method="GET",path="/health",status="200"}"#),
-            "metrics missing labeled health counter:\n{text}"
-        );
-        assert!(
-            text.contains(r#"http_requests_total{method="GET",path="/metrics",status="200"}"#),
-            "metrics missing labeled metrics counter:\n{text}"
+            text_two.contains(r#"http_requests_total{method="GET",path="/metrics",status="200"} 1"#),
+            "metrics missing labeled metrics counter:\n{text_two}"
         );
     }
 
