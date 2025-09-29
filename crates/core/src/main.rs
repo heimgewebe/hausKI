@@ -43,7 +43,7 @@ fn resolve_bind_addr(expose_config: bool) -> anyhow::Result<SocketAddr> {
         std::net::IpAddr::V6(v6) => v6.is_loopback(),
     };
     if expose_config && !is_loopback {
-        anyhow::bail!("EXPOSE_CONFIG requires loopback bind; set HAUSKI_BIND=127.0.0.1:<port>");
+        anyhow::bail!("HAUSKI_EXPOSE_CONFIG requires loopback bind; set HAUSKI_BIND=127.0.0.1:<port>");
     }
     if !expose_config && !is_loopback {
         tracing::warn!(
