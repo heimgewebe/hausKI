@@ -27,5 +27,5 @@ If speech-recognition models are unavailable, pull them before starting the serv
 just run-cli -- models pull <model-id>
 ```
 
-Replace `<model-id>` with the identifier you need (for example `llama3.1-8b-q4`).
+Replace `<model-id>` with the identifier you need (for example `whisper-base.en`).
 
