@@ -56,7 +56,7 @@ impl AppState {
         );
 
         let http_latency: Family<HttpLabels, Histogram> =
-            Family::new_with_constructor(create_latency_histogram);
+            Family::new_with_constructor(|| Histogram::new(exponential_buckets(0.005, 2.0, 14)));
         registry.register(
             "http_request_duration_seconds",
             "HTTP request duration",
@@ -167,25 +167,9 @@ async fn health(State(state): State<AppState>) -> &'static str {
 
 async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
     let started = Instant::now();
-    let (status, response) = match state.encode_metrics() {
-        Ok(body) => (
-            StatusCode::OK,
-            (
-                StatusCode::OK,
-                [(CONTENT_TYPE, "text/plain; version=0.0.4")],
-                body,
-            )
-                .into_response(),
-        ),
-        Err(_err) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                [(CONTENT_TYPE, "text/plain; version=0.0.4")],
-                "Internal server error".to_string(),
-            )
-                .into_response(),
-        ),
+    let status = match state.encode_metrics() {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     };
 
     state.record_http_request(Method::GET, "/metrics", status);
@@ -194,7 +178,28 @@ async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
         started.elapsed().as_secs_f64(),
     );
 
-    response
+    match status {
+        StatusCode::OK => match state.encode_metrics() {
+            Ok(body) => (
+                StatusCode::OK,
+                [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+                body,
+            )
+                .into_response(),
+            Err(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+                "Internal server error".to_string(),
+            )
+                .into_response(),
+        },
+        _ => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+            "Internal server error".to_string(),
+        )
+            .into_response(),
+    }
 }
 
 pub fn build_app(limits: Limits, models: ModelsFile, expose_config: bool) -> Router {
