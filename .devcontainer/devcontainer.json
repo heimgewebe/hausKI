@@ -14,7 +14,6 @@
         "timonwong.shellcheck",
         "foxundermoon.shell-format",
         "serayuzgur.crates",
-        "matklad.rust-analyzer",
         "streetsidesoftware.code-spell-checker"
       ]
     }
