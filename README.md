@@ -136,6 +136,11 @@ hauski audio profile set <profile-name>
 - `scripts/bootstrap.sh` richtet `pre-commit` ein und erzwingt Format/Lint vor Commits.
 - Lizenzrichtlinien liegen in `deny.toml`.
 
+### Sprache
+- Primärsprache ist Deutsch (Du-Form, klare Sätze), Code-Kommentare und Log-Meldungen bleiben Englisch.
+- Gender-Sonderzeichen (`*`, `:`, `·`, `_`, Binnen-I) sind tabu; nutze neutrale Formulierungen.
+- Details und Prüfschritte findest du in [`docs/process/sprache.md`](docs/process/sprache.md); Vale läuft im CI sowie lokal über `vale .`.
+
 ---
 
 ## Weiterführende Dokumente
