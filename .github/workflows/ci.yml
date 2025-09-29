@@ -54,6 +54,16 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - name: Install Vale
+        run: |
+          set -euo pipefail
+          VALE_VERSION=3.6.0
+          curl -fsSL "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" -o /tmp/vale.tar.gz
+          tar -xzf /tmp/vale.tar.gz -C /tmp
+          sudo find /tmp -type f -name vale -exec mv {} /usr/local/bin/vale \;
+          sudo chmod +x /usr/local/bin/vale
+      - name: Prose lint (Vale)
+        run: vale .
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy

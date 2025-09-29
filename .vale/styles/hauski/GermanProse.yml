@@ -1,0 +1,11 @@
+extends: existence
+message: "Bitte verzichte auf Gender-Sonderzeichen; nutze neutrale Formulierungen."
+level: error
+scope: text
+ignorecase: true
+nonword: true
+tokens:
+  - "\w+[*:·_]\w+"
+  - "\\b\w+Innen\\b"
+  - "\\b\w+:innen\\b"
+  - "\\b\w+\(\w+in\)\\b"

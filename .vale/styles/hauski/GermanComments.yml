@@ -1,0 +1,9 @@
+extends: existence
+message: "Use English in code comments."
+level: error
+scope: comment
+ignorecase: true
+nonword: true
+tokens:
+  - "[ÄÖÜäöüß]"
+  - "(?<!\\w)(?:und|oder|nicht|kein|sollte|würde|könnte|muss|auf|für|mit|ohne|dass|des|der|die|das|wir|du|euer|ihr)(?!\\w)"
