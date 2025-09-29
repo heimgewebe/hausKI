@@ -167,9 +167,11 @@ async fn health(State(state): State<AppState>) -> &'static str {
 
 async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
     let started = Instant::now();
-    let status = match state.encode_metrics() {
-        Ok(_) => StatusCode::OK,
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    let encoded_metrics = state.encode_metrics();
+    let status = if encoded_metrics.is_ok() {
+        StatusCode::OK
+    } else {
+        StatusCode::INTERNAL_SERVER_ERROR
     };
 
     state.record_http_request(Method::GET, "/metrics", status);
@@ -178,22 +180,14 @@ async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
         started.elapsed().as_secs_f64(),
     );
 
-    match status {
-        StatusCode::OK => match state.encode_metrics() {
-            Ok(body) => (
-                StatusCode::OK,
-                [(CONTENT_TYPE, "text/plain; version=0.0.4")],
-                body,
-            )
-                .into_response(),
-            Err(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                [(CONTENT_TYPE, "text/plain; version=0.0.4")],
-                "Internal server error".to_string(),
-            )
-                .into_response(),
-        },
-        _ => (
+    match encoded_metrics {
+        Ok(body) => (
+            StatusCode::OK,
+            [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+            body,
+        )
+            .into_response(),
+        Err(_) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             [(CONTENT_TYPE, "text/plain; version=0.0.4")],
             "Internal server error".to_string(),
