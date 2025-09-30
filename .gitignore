@@ -4,3 +4,4 @@ target/
 **/*.log
 .wgx/profile.local.yml
 # NICHT .vscode/settings.json ignorieren – projektweite Settings sind beabsichtigt
+observability/k6/summary.json
