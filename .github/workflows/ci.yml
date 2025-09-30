@@ -25,6 +25,7 @@ jobs:
     outputs:
       rust: ${{ steps.filter.outputs.rust }}
       docs: ${{ steps.filter.outputs.docs }}
+      policy_limits: ${{ steps.filter.outputs.policy_limits }}
       any:  ${{ steps.filter.outputs.any }}
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +40,8 @@ jobs:
               - 'crates/**'
             docs:
               - '**/*.md'
+            policy_limits:
+              - 'policies/limits.yaml'
             any:
               - '**'
 
@@ -72,6 +75,68 @@ jobs:
         run: cargo fmt --all --check
       - name: clippy (deny warnings)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  smoke:
+    name: latency & error-budget (k6)
+    needs: [lint, changes]
+    if: >
+      (github.event_name == 'merge_group') ||
+      (github.event_name != 'merge_group' &&
+       github.event.pull_request.draft == false &&
+       (needs.changes.outputs.rust == 'true' || needs.changes.outputs.policy_limits == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build core (release)
+        run: cargo build -p hauski-core --release
+
+      - name: Run server (background) & wait for /health
+        shell: bash
+        run: |
+          ./target/release/hauski-core & echo $! > server.pid
+          for i in {1..150}; do
+            curl -fsS http://127.0.0.1:8080/health && break || true
+            sleep 0.1
+          done
+          curl -fsS http://127.0.0.1:8080/health
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Extract p95 budget from policies/limits.yaml
+        id: budget
+        shell: bash
+        run: |
+          # ohne yq: einfache robuste Extraktion
+          P95=$(awk '/llm_p95_ms:/ {print $2; exit}' policies/limits.yaml)
+          if [[ -z "$P95" ]]; then P95=400; fi
+          echo "p95=$P95" >> "$GITHUB_OUTPUT"
+          echo "Budget p95: $P95 ms"
+          echo "::notice::k6 budget p95 (ms): $P95"
+
+      - name: k6 smoke (export summary)
+        run: |
+          k6 run --summary-export=./observability/k6/summary.json ./observability/k6/health-smoke.js
+
+      - name: Enforce p95 & error-rate
+        shell: bash
+        run: |
+          # Node-k6 schreibt JSON; jq ist vorinstalliert
+          P95_ACTUAL=$(jq '.metrics."http_req_duration".percentiles."p(95)"' -r observability/k6/summary.json)
+          FAIL_RATE=$(jq '.metrics."http_req_failed".rate' -r observability/k6/summary.json)
+          echo "Actual p95: ${P95_ACTUAL} ms; Fail rate: ${FAIL_RATE}"
+          echo "::notice::p95 actual: ${P95_ACTUAL} ms; fail rate: ${FAIL_RATE}"
+          # Vergleiche gegen Budget aus limits.yaml (ms -> ms)
+          awk -v a="$P95_ACTUAL" -v b="${{ steps.budget.outputs.p95 }}" 'BEGIN{ if (a<=b) exit 0; else exit 1 }'
+          awk -v r="$FAIL_RATE" 'BEGIN{ if (r<0.01) exit 0; else exit 1 }'
+
+      - name: Stop server
+        if: always()
+        run: kill $(cat server.pid) || true
 
   deny:
     name: cargo-deny
