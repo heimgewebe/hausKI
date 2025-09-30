@@ -91,3 +91,24 @@ jobs:
           name: coverage-${{ matrix.toolchain }}
           path: lcov.info
           if-no-files-found: ignore
+
+  policy-gate:
+    needs: decide
+    if: needs.decide.outputs.run_heavy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate policy definitions
+        run: |
+          test -s policies/slo.yaml
+          test -s policies/perf.json
+          python - <<'PY'
+import json
+from pathlib import Path
+
+with Path("policies/perf.json").open() as handle:
+    json.load(handle)
+
+print("policies/perf.json is valid JSON")
+PY

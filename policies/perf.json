@@ -1,0 +1,10 @@
+{
+  "latency_ms": {
+    "tts_p95": 1500,
+    "asr_p95": 900
+  },
+  "resources": {
+    "max_vram_gb": 12,
+    "max_inference_time_s": 6
+  }
+}
