@@ -1,0 +1,6 @@
+latency_ms:
+  tts_p95_ms: 1500
+  asr_p95_ms: 900
+resources:
+  max_vram_gb: 12
+  max_inference_time_s: 6
