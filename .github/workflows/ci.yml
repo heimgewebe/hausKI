@@ -111,7 +111,7 @@ jobs:
         id: budget
         shell: bash
         run: |
-          # ohne yq: einfache robuste Extraktion
+          # without yq: simple robust extraction
           P95=$(awk '/llm_p95_ms:/ {print $2; exit}' policies/limits.yaml)
           if [[ -z "$P95" ]]; then P95=400; fi
           echo "p95=$P95" >> "$GITHUB_OUTPUT"
