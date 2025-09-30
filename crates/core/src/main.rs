@@ -1,4 +1,4 @@
-use hauski_core::{build_app, load_limits, load_models};
+use hauski_core::{build_app, load_limits, load_models, load_routing};
 use std::{env, net::SocketAddr};
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -12,6 +12,8 @@ async fn main() -> anyhow::Result<()> {
 
     let limits_path = env::var("HAUSKI_LIMITS").unwrap_or_else(|_| "./policies/limits.yaml".into());
     let models_path = env::var("HAUSKI_MODELS").unwrap_or_else(|_| "./configs/models.yml".into());
+    let routing_path =
+        env::var("HAUSKI_ROUTING").unwrap_or_else(|_| "./policies/routing.yaml".into());
     let expose_config = env::var("HAUSKI_EXPOSE_CONFIG")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
@@ -19,6 +21,7 @@ async fn main() -> anyhow::Result<()> {
     let app = build_app(
         load_limits(limits_path)?,
         load_models(models_path)?,
+        load_routing(routing_path)?,
         expose_config,
     );
 
@@ -43,7 +46,9 @@ fn resolve_bind_addr(expose_config: bool) -> anyhow::Result<SocketAddr> {
         std::net::IpAddr::V6(v6) => v6.is_loopback(),
     };
     if expose_config && !is_loopback {
-        anyhow::bail!("HAUSKI_EXPOSE_CONFIG requires loopback bind; set HAUSKI_BIND=127.0.0.1:<port>");
+        anyhow::bail!(
+            "HAUSKI_EXPOSE_CONFIG requires loopback bind; set HAUSKI_BIND=127.0.0.1:<port>"
+        );
     }
     if !expose_config && !is_loopback {
         tracing::warn!(
