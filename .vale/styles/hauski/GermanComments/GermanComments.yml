@@ -1,7 +1,7 @@
 extends: existence
 message: "Use English in code comments."
 level: error
-scope: comment
+scope: sentence
 ignorecase: true
 nonword: true
 tokens:
