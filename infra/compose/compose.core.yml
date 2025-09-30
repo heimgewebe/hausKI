@@ -1,0 +1,37 @@
+# Minimal-Stack nur für "Core": API + Mock-Services
+# Start mit:  docker compose -f infra/compose/compose.core.yml --profile core up --build
+name: hauski-core
+
+services:
+  # Mock-Service: lokaler Volume-Cache für Modelle (BusyBox hält das Volume "warm")
+  models-cache:
+    image: busybox:stable
+    command: ["sh", "-c", "mkdir -p /opt/models && tail -f /dev/null"]
+    volumes:
+      - models:/opt/models
+    profiles: ["core"]
+    restart: unless-stopped
+
+  # HausKI API (entwicklungsnaher Start über Cargo)
+  api:
+    image: rust:1.80-bookworm
+    working_dir: /app
+    command: [ "bash", "-lc", "cargo run -p hauski-cli -- serve" ]
+    ports:
+      - "${HAUSKI_API_PORT:-8080}:8080"   # Host-Port aus .env steuerbar
+    environment:
+      RUST_LOG: "${RUST_LOG:-info,hauski=debug}"
+      # Optional: Pfade/Configs via ENV übergeben (Repo-Defaults existieren bereits)
+      HAUSKI_MODELS: "${HAUSKI_MODELS:-./configs/models.yml}"
+    volumes:
+      - ./:/app
+      - models:/opt/models
+      - target:/app/target
+    depends_on:
+      - models-cache
+    profiles: ["core"]
+    restart: unless-stopped
+
+volumes:
+  models: {}
+  target: {}
