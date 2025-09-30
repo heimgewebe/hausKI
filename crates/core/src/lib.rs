@@ -18,7 +18,10 @@ use prometheus_client::{
 use std::{fmt, sync::Arc, time::Instant};
 
 mod config;
-pub use config::{load_limits, load_models, Limits, ModelsFile};
+pub use config::{
+    load_limits, load_models, load_routing, Limits, ModelEntry, ModelsFile, RoutingDecision,
+    RoutingPolicy, RoutingRule,
+};
 
 fn create_latency_histogram() -> Histogram {
     Histogram::new(exponential_buckets(0.005, 2.0, 14))
@@ -30,6 +33,7 @@ pub struct AppState(Arc<AppStateInner>);
 struct AppStateInner {
     limits: Limits,
     models: ModelsFile,
+    routing: RoutingPolicy,
     http_requests: Family<HttpLabels, Counter<u64>>,
     http_latency: Family<HttpLabels, Histogram>,
     registry: Registry,
@@ -41,7 +45,7 @@ struct AppStateInner {
 }
 
 impl AppState {
-    fn new(limits: Limits, models: ModelsFile, expose_config: bool) -> Self {
+    fn new(limits: Limits, models: ModelsFile, routing: RoutingPolicy, expose_config: bool) -> Self {
         let mut registry = Registry::default();
 
         let build_info = Family::<(), Gauge>::default();
@@ -56,7 +60,7 @@ impl AppState {
         );
 
         let http_latency: Family<HttpLabels, Histogram> =
-            Family::new_with_constructor(|| Histogram::new(exponential_buckets(0.005, 2.0, 14)));
+            Family::new_with_constructor(create_latency_histogram);
         registry.register(
             "http_request_duration_seconds",
             "HTTP request duration",
@@ -69,6 +73,7 @@ impl AppState {
             http_requests,
             http_latency,
             registry,
+            routing,
             expose_config,
         }))
     }
@@ -79,6 +84,11 @@ impl AppState {
 
     fn models(&self) -> ModelsFile {
         self.0.models.clone()
+    }
+
+    #[allow(dead_code)]
+    fn routing(&self) -> RoutingPolicy {
+        self.0.routing.clone()
     }
 
     fn expose_config(&self) -> bool {
@@ -196,8 +206,13 @@ async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
     }
 }
 
-pub fn build_app(limits: Limits, models: ModelsFile, expose_config: bool) -> Router {
-    let state = AppState::new(limits, models, expose_config);
+pub fn build_app(
+    limits: Limits,
+    models: ModelsFile,
+    routing: RoutingPolicy,
+    expose_config: bool,
+) -> Router {
+    let state = AppState::new(limits, models, routing, expose_config);
 
     let mut app = Router::new()
         .route("/health", get(health))
@@ -242,7 +257,11 @@ mod tests {
                 canary: Some(false),
             }],
         };
-        build_app(limits, models, expose)
+        let routing = RoutingPolicy {
+            default: RoutingDecision::Deny,
+            allow: vec![],
+        };
+        build_app(limits, models, routing, expose)
     }
 
     #[tokio::test]

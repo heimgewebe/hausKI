@@ -100,6 +100,7 @@ Verfügbare bzw. geplante API-Endpunkte:
 ## Policies & Budgets
 - Laufzeit- und Thermik-Grenzen liegen in `policies/limits.yaml` (z. B. `latency.llm_p95_ms`, `thermal.gpu_max_c`).
 - Netzwerk-Routing folgt einem Deny-by-default-Ansatz; Whitelists werden perspektivisch über `policies/routing.yaml` gepflegt.
+- Der Core-Service lädt die Routing-Policy über die Umgebungsvariable `HAUSKI_ROUTING` (Standard: `./policies/routing.yaml`).
 - CI verknüpft Formatierung, Lints (`cargo-deny`) und Tests; Budget-Checks für p95-Latenzen sind vorgesehen.
 
 ---

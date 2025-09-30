@@ -13,3 +13,10 @@ plugins:
     - obsidian_index
 YAML
 echo "bootstrap: configs/hauski.yml bereit."
+
+mkdir -p policies
+[[ -f policies/routing.yaml ]] || cat > policies/routing.yaml <<'YAML'
+default: deny
+allow: []
+YAML
+echo "bootstrap: policies/routing.yaml bereit."
