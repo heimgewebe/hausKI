@@ -130,7 +130,7 @@ jobs:
           FAIL_RATE=$(jq '.metrics."http_req_failed".rate' -r observability/k6/summary.json)
           echo "Actual p95: ${P95_ACTUAL} ms; Fail rate: ${FAIL_RATE}"
           echo "::notice::p95 actual: ${P95_ACTUAL} ms; fail rate: ${FAIL_RATE}"
-          # Vergleiche gegen Budget aus limits.yaml (ms -> ms)
+          # Compare against budget from limits.yaml (ms -> ms)
           awk -v a="$P95_ACTUAL" -v b="${{ steps.budget.outputs.p95 }}" 'BEGIN{ if (a<=b) exit 0; else exit 1 }'
           awk -v r="$FAIL_RATE" 'BEGIN{ if (r<0.01) exit 0; else exit 1 }'
 
