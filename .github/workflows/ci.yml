@@ -125,7 +125,7 @@ jobs:
       - name: Enforce p95 & error-rate
         shell: bash
         run: |
-          # Node-k6 schreibt JSON; jq ist vorinstalliert
+          # Node-k6 writes JSON; jq is pre-installed
           P95_ACTUAL=$(jq '.metrics."http_req_duration".percentiles."p(95)"' -r observability/k6/summary.json)
           FAIL_RATE=$(jq '.metrics."http_req_failed".rate' -r observability/k6/summary.json)
           echo "Actual p95: ${P95_ACTUAL} ms; Fail rate: ${FAIL_RATE}"
