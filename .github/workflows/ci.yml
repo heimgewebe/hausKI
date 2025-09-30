@@ -137,7 +137,7 @@ jobs:
           ' observability/k6/summary.json)
           if [[ -z "$P95_ACTUAL" ]]; then
             echo "::error::Unable to extract p95 from k6 summary"
-            cat observability/k6/summary.json
+            jq '{http_req_duration: .metrics."http_req_duration", http_req_failed: .metrics."http_req_failed"}' observability/k6/summary.json
             exit 1
           fi
           FAIL_RATE=$(jq '.metrics."http_req_failed".rate' -r observability/k6/summary.json)
