@@ -18,7 +18,10 @@ use prometheus_client::{
 use std::{fmt, sync::Arc, time::Instant};
 
 mod config;
-pub use config::{load_limits, load_models, Limits, ModelsFile};
+pub use config::{
+    load_limits, load_models, load_routing, Limits, ModelEntry, ModelsFile, RoutingDecision,
+    RoutingPolicy, RoutingRule,
+};
 
 fn create_latency_histogram() -> Histogram {
     Histogram::new(exponential_buckets(0.005, 2.0, 14))
@@ -30,6 +33,7 @@ pub struct AppState(Arc<AppStateInner>);
 struct AppStateInner {
     limits: Limits,
     models: ModelsFile,
+    routing: RoutingPolicy,
     http_requests: Family<HttpLabels, Counter<u64>>,
     http_latency: Family<HttpLabels, Histogram>,
     registry: Registry,
@@ -41,7 +45,12 @@ struct AppStateInner {
 }
 
 impl AppState {
-    fn new(limits: Limits, models: ModelsFile, expose_config: bool) -> Self {
+    fn new(
+        limits: Limits,
+        models: ModelsFile,
+        routing: RoutingPolicy,
+        expose_config: bool,
+    ) -> Self {
         let mut registry = Registry::default();
 
         let build_info = Family::<(), Gauge>::default();
@@ -66,6 +75,7 @@ impl AppState {
         Self(Arc::new(AppStateInner {
             limits,
             models,
+            routing,
             http_requests,
             http_latency,
             registry,
@@ -79,6 +89,10 @@ impl AppState {
 
     fn models(&self) -> ModelsFile {
         self.0.models.clone()
+    }
+
+    fn routing(&self) -> RoutingPolicy {
+        self.0.routing.clone()
     }
 
     fn expose_config(&self) -> bool {
@@ -154,6 +168,18 @@ async fn get_models(State(state): State<AppState>) -> Json<ModelsFile> {
     response
 }
 
+async fn get_routing(State(state): State<AppState>) -> Json<RoutingPolicy> {
+    let started = Instant::now();
+    let status = StatusCode::OK;
+    let response = Json(state.routing());
+    state.record_http_request(Method::GET, "/config/routing", status);
+    state.observe_http_latency(
+        &HttpLabels::new(Method::GET, "/config/routing", status),
+        started.elapsed().as_secs_f64(),
+    );
+    response
+}
+
 async fn health(State(state): State<AppState>) -> &'static str {
     let started = Instant::now();
     let status = StatusCode::OK;
@@ -196,8 +222,13 @@ async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
     }
 }
 
-pub fn build_app(limits: Limits, models: ModelsFile, expose_config: bool) -> Router {
-    let state = AppState::new(limits, models, expose_config);
+pub fn build_app(
+    limits: Limits,
+    models: ModelsFile,
+    routing: RoutingPolicy,
+    expose_config: bool,
+) -> Router {
+    let state = AppState::new(limits, models, routing, expose_config);
 
     let mut app = Router::new()
         .route("/health", get(health))
@@ -206,7 +237,8 @@ pub fn build_app(limits: Limits, models: ModelsFile, expose_config: bool) -> Rou
     if state.expose_config() {
         app = app
             .route("/config/limits", get(get_limits))
-            .route("/config/models", get(get_models));
+            .route("/config/models", get(get_models))
+            .route("/config/routing", get(get_routing));
     }
 
     app.with_state(state)
@@ -242,7 +274,14 @@ mod tests {
                 canary: Some(false),
             }],
         };
-        build_app(limits, models, expose)
+        let routing = RoutingPolicy {
+            default: RoutingDecision::Deny,
+            allow: vec![RoutingRule {
+                id: "loopback".into(),
+                description: Some("Allow loopback only".into()),
+            }],
+        };
+        build_app(limits, models, routing, expose)
     }
 
     #[tokio::test]
@@ -282,7 +321,8 @@ mod tests {
 
         // Assert that the second /metrics call reported the first /metrics call.
         assert!(
-            text_two.contains(r#"http_requests_total{method="GET",path="/metrics",status="200"} 1"#),
+            text_two
+                .contains(r#"http_requests_total{method="GET",path="/metrics",status="200"} 1"#),
             "metrics missing labeled metrics counter:\n{text_two}"
         );
     }
@@ -319,7 +359,14 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
         let res = app
+            .clone()
             .oneshot(Request::get("/config/models").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+        let res = app
+            .clone()
+            .oneshot(Request::get("/config/routing").body(Body::empty()).unwrap())
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
@@ -335,7 +382,13 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         let res = app
+            .clone()
             .oneshot(Request::get("/config/models").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let res = app
+            .oneshot(Request::get("/config/routing").body(Body::empty()).unwrap())
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);

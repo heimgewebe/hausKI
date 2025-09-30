@@ -99,6 +99,7 @@ Verfügbare bzw. geplante API-Endpunkte:
 
 ## Policies & Budgets
 - Laufzeit- und Thermik-Grenzen liegen in `policies/limits.yaml` (z. B. `latency.llm_p95_ms`, `thermal.gpu_max_c`).
+- Kann die Datei nicht gelesen werden, nutzt der Core sichere Defaults (LLM p95 = 400 ms, Index p95 = 60 ms, GPU-Max = 80 °C, dGPU-Power = 220 W, ASR WER = 10 %). So bleibt der Dienst lauffähig, selbst wenn Policies fehlen.
 - Netzwerk-Routing folgt einem Deny-by-default-Ansatz; Whitelists werden perspektivisch über `policies/routing.yaml` gepflegt.
 - CI verknüpft Formatierung, Lints (`cargo-deny`) und Tests; Budget-Checks für p95-Latenzen sind vorgesehen.
 
