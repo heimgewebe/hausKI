@@ -26,3 +26,4 @@ prometheus-client = "0.22"
 walkdir = "2"
 dirs = "5"
 # sqlx bewusst nicht vorgezogen, bis erste DB-Crate existiert
+tower-http = { version = "0.5", features = ["cors"] }

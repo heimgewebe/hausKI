@@ -38,6 +38,13 @@ pub struct ModelEntry {
     pub canary: Option<bool>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(transparent)]
+pub struct RoutingPolicy(pub serde_yaml::Value);
+
+pub type RoutingRule = serde_yaml::Value;
+pub type RoutingDecision = serde_yaml::Value;
+
 pub fn load_limits<P: AsRef<Path>>(path: P) -> anyhow::Result<Limits> {
     let content = fs::read_to_string(path)?;
     let limits = serde_yaml::from_str(&content)?;
@@ -48,4 +55,10 @@ pub fn load_models<P: AsRef<Path>>(path: P) -> anyhow::Result<ModelsFile> {
     let content = fs::read_to_string(path)?;
     let models = serde_yaml::from_str(&content)?;
     Ok(models)
+}
+
+pub fn load_routing<P: AsRef<Path>>(path: P) -> anyhow::Result<RoutingPolicy> {
+    let content = fs::read_to_string(path)?;
+    let routing = serde_yaml::from_str(&content)?;
+    Ok(routing)
 }
