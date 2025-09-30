@@ -59,13 +59,13 @@ impl AppState {
 
         let http_requests: Family<HttpLabels, Counter<u64>> = Family::default();
         registry.register(
-            "http_requests_total",
+            "http_requests",
             "Total number of HTTP requests received",
             http_requests.clone(),
         );
 
         let http_latency: Family<HttpLabels, Histogram> =
-            Family::new_with_constructor(|| Histogram::new(exponential_buckets(0.005, 2.0, 14)));
+            Family::new_with_constructor(create_latency_histogram);
         registry.register(
             "http_request_duration_seconds",
             "HTTP request duration",
