@@ -23,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let addr = resolve_bind_addr(expose_config)?;
-    tracing::info!("listening on http://{addr}");
+    tracing::info!(%addr, expose_config, "starting server");
     let listener = TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
