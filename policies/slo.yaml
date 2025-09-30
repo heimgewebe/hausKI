@@ -1,4 +1,4 @@
-latency:
+latency_ms:
   tts_p95_ms: 1500
   asr_p95_ms: 900
 resources:
