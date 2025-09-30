@@ -129,11 +129,11 @@ jobs:
           P95_ACTUAL=$(jq -r '
             .metrics."http_req_duration" as $metric
             | (
-                $metric.percentiles["p(95)"] //
-                $metric.percentiles["p95"] //
-                $metric.values["p(95)"] //
-                $metric.values["p95"]
-              )
+              $metric.percentiles["p(95)"]
+              // $metric.percentiles["p95"]
+              // $metric.values["p(95)"]
+              // $metric.values["p95"]
+            )
           ' observability/k6/summary.json)
           if [[ -z "$P95_ACTUAL" ]]; then
             echo "::error::Unable to extract p95 from k6 summary"
