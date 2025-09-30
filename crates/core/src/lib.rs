@@ -59,7 +59,7 @@ impl AppState {
 
         let http_requests: Family<HttpLabels, Counter<u64>> = Family::default();
         registry.register(
-            "http_requests",
+            "http_requests_total",
             "Total number of HTTP requests received",
             http_requests.clone(),
         );
