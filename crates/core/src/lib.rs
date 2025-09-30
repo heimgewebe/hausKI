@@ -86,7 +86,6 @@ impl AppState {
         self.0.models.clone()
     }
 
-    #[allow(dead_code)]
     fn routing(&self) -> RoutingPolicy {
         self.0.routing.clone()
     }
