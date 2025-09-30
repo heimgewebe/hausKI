@@ -217,8 +217,7 @@ mod tests {
 
         {
             let mut file = File::create(&path).unwrap();
-            writeln!(file, "default: deny\nallow: []\n").unwrap();
-            file.flush().unwrap();
+            writeln!(file, r#"default: deny
         }
 
         let routing = load_routing(&path).unwrap();
