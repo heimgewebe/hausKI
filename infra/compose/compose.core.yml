@@ -24,7 +24,7 @@ services:
       # Optional: Pfade/Configs via ENV übergeben (Repo-Defaults existieren bereits)
       HAUSKI_MODELS: "${HAUSKI_MODELS:-./configs/models.yml}"
     volumes:
-      - ./:/app:cached
+      - ./:/app
       - models:/opt/models
     depends_on:
       - models-cache
