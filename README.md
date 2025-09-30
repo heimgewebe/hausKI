@@ -66,12 +66,28 @@ cargo test --workspace -- --nocapture
 
 Den Core-Service lokal starten:
 ```bash
-cargo run -p hauski-core
-# Alternative über das Justfile
+cargo run -p hauski-cli -- serve
+# Alternative über das Justfile (ruft intern `cargo run -p hauski-core` auf)
 just run-core
 ```
 
 > **Hinweis:** Setze `HAUSKI_EXPOSE_CONFIG=true`, um die geschützten Routen unter `/config/*` bewusst freizugeben (nur für lokale Tests empfohlen).
+
+### Docker-Compose-Stack (Profil `core`)
+
+```bash
+# Build & Start (detached)
+docker compose -f infra/compose/compose.core.yml --profile core up --build -d
+
+# Logs verfolgen
+docker compose -f infra/compose/compose.core.yml logs -f api
+
+# Optionaler Health-Check (falls implementiert)
+curl http://localhost:${HAUSKI_API_PORT:-8080}/health
+
+# Stoppen und Ressourcen freigeben
+docker compose -f infra/compose/compose.core.yml --profile core down
+```
 
 Verfügbare bzw. geplante API-Endpunkte:
 - `GET /health` → "ok"
