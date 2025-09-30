@@ -106,12 +106,7 @@ fn print_models_table(file: &ModelsFile) {
     const HEADERS: [&str; 4] = ["ID", "Path", "VRAM Min", "Canary"];
 
     let mut rows: Vec<[String; 4]> = Vec::new();
-    let mut widths = [
-        HEADERS[0].len(),
-        HEADERS[1].len(),
-        HEADERS[2].len(),
-        HEADERS[3].len(),
-    ];
+    let mut widths = HEADERS.map(|header| header.chars().count());
 
     for model in &file.models {
         let vram = model
