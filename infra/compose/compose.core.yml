@@ -26,13 +26,12 @@ services:
     volumes:
       - ./:/app
       - models:/opt/models
+      - target:/app/target
     depends_on:
       - models-cache
     profiles: ["core"]
     restart: unless-stopped
-    # Schnellere Rebuilds:
-    tmpfs:
-      - /app/target
 
 volumes:
   models: {}
+  target: {}
