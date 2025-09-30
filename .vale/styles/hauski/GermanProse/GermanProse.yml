@@ -5,7 +5,7 @@ scope: text
 ignorecase: true
 nonword: true
 tokens:
-  - "\\w+[*:·_]\\w+"
-  - "\\b\\w+Innen\\b"
-  - "\\b\\w+:innen\\b"
-  - "\\b\\w+\(\\w+in\)\\b"
+  - '\w+[*:·_]\w+'
+  - '\b\w+Innen\b'
+  - '\b\w+:innen\b'
+  - '\b\w+\(\w+in\)\b'
