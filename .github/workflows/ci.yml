@@ -97,11 +97,37 @@ jobs:
       - name: Run server (background) & wait for /health
         shell: bash
         run: |
-          ./target/release/hauski-core & echo $! > server.pid
-          for i in {1..150}; do
-            curl -fsS http://127.0.0.1:8080/health && break || true
-            sleep 0.1
+          set -euo pipefail
+          nohup ./target/release/hauski-core >server.log 2>&1 &
+          echo $! > server.pid
+
+          ready=0
+          for _ in {1..30}; do
+            if curl -sf http://127.0.0.1:8080/health >/dev/null; then
+              ready=1
+              break
+            fi
+
+            if [ ! -f server.pid ]; then
+              # PID file not yet created, wait and retry
+              sleep 2
+              continue
+            fi
+            if ! kill -0 "$(cat server.pid)" 2>/dev/null; then
+              echo "::error::hauski-core terminated before becoming ready"
+              cat server.log || true
+              exit 1
+            fi
+
+            sleep 2
           done
+
+          if [[ "$ready" -ne 1 ]]; then
+            echo "::error::hauski-core failed to start within expected time"
+            cat server.log || true
+            exit 1
+          fi
+
           curl -fsS http://127.0.0.1:8080/health
 
       - name: Setup k6
