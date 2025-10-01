@@ -103,6 +103,24 @@ Verfügbare bzw. geplante API-Endpunkte:
 - *(geplant)* OpenAI-kompatible Routen (`/v1/chat/completions`, `/v1/embeddings`)
 - *(geplant)* Spezialendpunkte: `/asr/transcribe`, `/audio/profile`, `/obsidian/canvas/suggest`
 
+### Observability & Metriken
+
+Die API exportiert Prometheus-kompatible Kennzahlen unter `/metrics`:
+
+- `http_requests_total{method,path,status}` zählt eingehende HTTP-Requests pro Methode, Route und Statuscode.
+- `http_request_duration_seconds{method,path}` erfasst Latenzen als Histogramm mit den Standard-Buckets `0.005s` bis `1s`.
+
+Beispielabfragen für Dashboards oder die Prometheus-Konsole:
+
+- Erfolgs- vs. Fehlerraten:
+  ```promql
+  sum by (status) (rate(http_requests_total[5m]))
+  ```
+- 95%-Perzentil der Request-Latenz je Route:
+  ```promql
+  histogram_quantile(0.95, sum by (le, method, path) (rate(http_request_duration_seconds_bucket[5m])))
+  ```
+
 ---
 
 ## Policies & Budgets

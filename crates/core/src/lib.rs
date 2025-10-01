@@ -9,12 +9,7 @@ use axum::{
 };
 use prometheus_client::{
     encoding::{text::encode, EncodeLabel, EncodeLabelSet},
-    metrics::{
-        counter::Counter,
-        family::Family,
-        gauge::Gauge,
-        histogram::{exponential_buckets, Histogram},
-    },
+    metrics::{counter::Counter, family::Family, gauge::Gauge, histogram::Histogram},
     registry::Registry,
 };
 use std::{
@@ -32,8 +27,14 @@ pub use config::{
     RoutingPolicy, RoutingRule,
 };
 
+/// Creates a latency histogram with predefined buckets.
+///
+/// The bucket values [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0] (in seconds)
+/// were chosen to provide fine granularity for low-latency requests and broader
+/// coverage for higher latencies, matching typical HTTP request latency distributions.
+/// Adjust these values if your workload characteristics differ.
 fn create_latency_histogram() -> Histogram {
-    Histogram::new(exponential_buckets(0.005, 2.0, 14))
+    Histogram::new([0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0].into_iter())
 }
 
 #[derive(Clone)]
@@ -44,7 +45,7 @@ struct AppStateInner {
     models: ModelsFile,
     routing: RoutingPolicy,
     http_requests: Family<HttpLabels, Counter<u64>>,
-    http_latency: Family<HttpLabels, Histogram>,
+    http_latency: Family<HttpDurationLabels, Histogram>,
     registry: Registry,
     /// Controls whether configuration endpoints are exposed.
     ///
@@ -74,7 +75,7 @@ impl AppState {
             http_requests.clone(),
         );
 
-        let http_latency: Family<HttpLabels, Histogram> =
+        let http_latency: Family<HttpDurationLabels, Histogram> =
             Family::new_with_constructor(create_latency_histogram);
         registry.register(
             "http_request_duration_seconds",
@@ -110,34 +111,30 @@ impl AppState {
         self.0.expose_config
     }
 
-    fn record_http_request(&self, labels: &HttpLabels) {
-        self.0.http_requests.get_or_create(labels).inc();
-    }
-
-    fn observe_http_latency(&self, labels: &HttpLabels, secs: f64) {
-        self.0.http_latency.get_or_create(labels).observe(secs);
-    }
-
     fn encode_metrics(&self) -> Result<String, std::fmt::Error> {
         let mut body = String::new();
         encode(&mut body, &self.0.registry)?;
         Ok(body)
     }
 
-    /// Record request count and observe latency for a request that started at `started`.
-    fn finish_http_request(
+    fn record_http_observation(
         &self,
         method: Method,
-        path: &str,
+        path: &'static str,
         status: StatusCode,
         started: Instant,
     ) {
-        let labels = HttpLabels::new(method, path, status);
-        self.record_http_request(&labels);
-        self.observe_http_latency(&labels, started.elapsed().as_secs_f64());
+        let counter_labels = HttpLabels::new(method.clone(), path, status);
+        let duration_labels = HttpDurationLabels::new(method, path);
+        let elapsed = started.elapsed().as_secs_f64();
+        self.0.http_requests.get_or_create(&counter_labels).inc();
+        self.0
+            .http_latency
+            .get_or_create(&duration_labels)
+            .observe(elapsed);
     }
 
-    fn set_ready(&self) {
+    pub fn set_ready(&self) {
         self.0.ready.store(true, Ordering::Release);
     }
 
@@ -147,17 +144,40 @@ impl AppState {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct HttpDurationLabels {
+    method: Method,
+    path: &'static str,
+}
+
+impl HttpDurationLabels {
+    fn new(method: Method, path: &'static str) -> Self {
+        Self { method, path }
+    }
+}
+
+impl EncodeLabelSet for HttpDurationLabels {
+    fn encode(
+        &self,
+        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
+    ) -> Result<(), fmt::Error> {
+        ("method", self.method.as_str()).encode(encoder.encode_label())?;
+        ("path", self.path).encode(encoder.encode_label())?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HttpLabels {
     method: Method,
-    path: Arc<str>,
+    path: &'static str,
     status: StatusCode,
 }
 
 impl HttpLabels {
-    fn new(method: Method, path: impl Into<Arc<str>>, status: StatusCode) -> Self {
+    fn new(method: Method, path: &'static str, status: StatusCode) -> Self {
         Self {
             method,
-            path: path.into(),
+            path,
             status,
         }
     }
@@ -169,7 +189,7 @@ impl EncodeLabelSet for HttpLabels {
         mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("method", self.method.as_str()).encode(encoder.encode_label())?;
-        ("path", self.path.as_ref()).encode(encoder.encode_label())?;
+        ("path", self.path).encode(encoder.encode_label())?;
         ("status", self.status.as_str()).encode(encoder.encode_label())?;
         Ok(())
     }
@@ -179,7 +199,7 @@ async fn get_limits(State(state): State<AppState>) -> Json<Limits> {
     let started = Instant::now();
     let status = StatusCode::OK;
     let response = Json(state.limits());
-    state.finish_http_request(Method::GET, "/config/limits", status, started);
+    state.record_http_observation(Method::GET, "/config/limits", status, started);
     response
 }
 
@@ -187,7 +207,7 @@ async fn get_models(State(state): State<AppState>) -> Json<ModelsFile> {
     let started = Instant::now();
     let status = StatusCode::OK;
     let response = Json(state.models());
-    state.finish_http_request(Method::GET, "/config/models", status, started);
+    state.record_http_observation(Method::GET, "/config/models", status, started);
     response
 }
 
@@ -195,14 +215,14 @@ async fn get_routing(State(state): State<AppState>) -> Json<RoutingPolicy> {
     let started = Instant::now();
     let status = StatusCode::OK;
     let response = Json(state.routing());
-    state.finish_http_request(Method::GET, "/config/routing", status, started);
+    state.record_http_observation(Method::GET, "/config/routing", status, started);
     response
 }
 
 async fn health(State(state): State<AppState>) -> &'static str {
     let started = Instant::now();
     let status = StatusCode::OK;
-    state.finish_http_request(Method::GET, "/health", status, started);
+    state.record_http_observation(Method::GET, "/health", status, started);
     "ok"
 }
 
@@ -213,7 +233,7 @@ async fn ready(State(state): State<AppState>) -> (StatusCode, &'static str) {
     } else {
         (StatusCode::SERVICE_UNAVAILABLE, "starting")
     };
-    state.finish_http_request(Method::GET, "/ready", status, started);
+    state.record_http_observation(Method::GET, "/ready", status, started);
     (status, body)
 }
 
@@ -226,7 +246,7 @@ async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
         StatusCode::INTERNAL_SERVER_ERROR
     };
 
-    state.finish_http_request(Method::GET, "/metrics", status, started);
+    state.record_http_observation(Method::GET, "/metrics", status, started);
 
     match encoded_metrics {
         Ok(body) => (
@@ -266,12 +286,11 @@ pub fn build_app(
             .route("/config/routing", get(get_routing));
     }
 
-    // It is safe to mark the app as ready here because there is no additional
-    // asynchronous initialization required beyond building the router and state.
-    // If future changes introduce async setup, move this to after the server is listening.
-    state.set_ready();
-    app.with_state(state.clone())
-        .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware))
+    // The readiness flag is set by the caller once the listener is bound.
+    let app = app
+        .with_state(state.clone())
+        .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware));
+    (app, state)
 }
 
 type CorsState = Arc<HeaderValue>;
