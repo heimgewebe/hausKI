@@ -124,8 +124,8 @@ impl AppState {
         status: StatusCode,
         started: Instant,
     ) {
-        let counter_labels = HttpLabels::new(method.clone(), path, status);
-        let duration_labels = HttpDurationLabels::new(method, path);
+        let counter_labels = HttpLabels::new(&method, path, status);
+        let duration_labels = HttpDurationLabels::new(&method, path);
         let elapsed = started.elapsed().as_secs_f64();
         self.0.http_requests.get_or_create(&counter_labels).inc();
         self.0
