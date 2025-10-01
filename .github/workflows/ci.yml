@@ -108,6 +108,11 @@ jobs:
               break
             fi
 
+            if [ ! -f server.pid ]; then
+              # PID file not yet created, wait and retry
+              sleep 2
+              continue
+            fi
             if ! kill -0 "$(cat server.pid)" 2>/dev/null; then
               echo "::error::hauski-core terminated before becoming ready"
               cat server.log || true
