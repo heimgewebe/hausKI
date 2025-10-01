@@ -121,16 +121,10 @@ pub struct RoutingPolicy(pub serde_yaml::Value);
 pub type RoutingRule = serde_yaml::Value;
 pub type RoutingDecision = serde_yaml::Value;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct FeatureFlags {
     pub safe_mode: bool,
-}
-
-impl Default for FeatureFlags {
-    fn default() -> Self {
-        Self { safe_mode: false }
-    }
 }
 
 fn parse_env_bool(value: &str) -> Option<bool> {
