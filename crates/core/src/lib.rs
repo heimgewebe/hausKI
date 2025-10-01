@@ -261,13 +261,13 @@ async fn cors_middleware(
 
     if req.method() == Method::OPTIONS {
         if !origin_allowed {
-            return Ok(Response::builder()
+            return Response::builder()
                 .status(StatusCode::FORBIDDEN)
                 .body(Body::empty())
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?);
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
         }
 
-        return Ok(Response::builder()
+        return Response::builder()
             .status(StatusCode::NO_CONTENT)
             .header(
                 header::ACCESS_CONTROL_ALLOW_ORIGIN,
@@ -284,7 +284,7 @@ async fn cors_middleware(
             )
             .header(header::VARY, HeaderValue::from_static("Origin"))
             .body(Body::empty())
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?);
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     let mut response = next.run(req).await;
