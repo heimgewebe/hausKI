@@ -290,16 +290,10 @@ pub fn build_app_with_state(
     let state = AppState::new(limits, models, routing, expose_config);
     let allowed_origin = Arc::new(allowed_origin);
 
-    let mut app = Router::new()
-        .route("/health", get(health))
-        .route("/ready", get(ready))
-        .route("/metrics", get(metrics));
+    let mut app = core_routes();
 
     if state.expose_config() {
-        app = app
-            .route("/config/limits", get(get_limits))
-            .route("/config/models", get(get_models))
-            .route("/config/routing", get(get_routing));
+        app = app.merge(config_routes());
     }
 
     // The readiness flag is set by the caller once the listener is bound.
@@ -307,6 +301,20 @@ pub fn build_app_with_state(
         .with_state(state.clone())
         .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware));
     (app, state)
+}
+
+fn core_routes() -> Router<AppState> {
+    Router::new()
+        .route("/health", get(health))
+        .route("/ready", get(ready))
+        .route("/metrics", get(metrics))
+}
+
+fn config_routes() -> Router<AppState> {
+    Router::new()
+        .route("/config/limits", get(get_limits))
+        .route("/config/models", get(get_models))
+        .route("/config/routing", get(get_routing))
 }
 
 type CorsState = Arc<HeaderValue>;
