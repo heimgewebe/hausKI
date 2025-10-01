@@ -369,8 +369,9 @@ egress:
 "#,
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
-        let client = AllowlistedClient::new(Client::new(), guard);
-        let request = reqwest::Client::new()
+        let reqwest_client = Client::new();
+        let client = AllowlistedClient::new(reqwest_client.clone(), guard);
+        let request = reqwest_client
             .get("https://evil.example")
             .build()
             .unwrap();
