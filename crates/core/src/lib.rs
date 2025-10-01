@@ -281,7 +281,7 @@ pub fn build_app(
     let app = app
         .with_state(state.clone())
         .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware));
-    state.set_ready();
+    // state.set_ready(); // Set readiness after server is listening, not here.
     app
 }
 
