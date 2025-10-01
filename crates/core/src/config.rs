@@ -65,17 +65,9 @@ pub struct Asr {
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            latency: Latency {
-                llm_p95_ms: default_llm_p95_ms(),
-                index_topk20_ms: default_index_topk20_ms(),
-            },
-            thermal: Thermal {
-                gpu_max_c: default_gpu_max_c(),
-                dgpu_power_w: default_dgpu_power_w(),
-            },
-            asr: Asr {
-                wer_max_pct: default_wer_max_pct(),
-            },
+            latency: Latency::default(),
+            thermal: Thermal::default(),
+            asr: Asr::default(),
         }
     }
 }
