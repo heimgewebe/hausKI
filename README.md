@@ -89,8 +89,9 @@ docker compose -f infra/compose/compose.core.yml --profile core up --build -d
 # Logs verfolgen
 docker compose -f infra/compose/compose.core.yml logs -f api
 
-# Optionaler Health-Check (falls implementiert)
+# Optionaler Health- und Readiness-Check (falls implementiert)
 curl http://localhost:${HAUSKI_API_PORT:-8080}/health
+curl http://localhost:${HAUSKI_API_PORT:-8080}/ready
 
 # Stoppen und Ressourcen freigeben
 docker compose -f infra/compose/compose.core.yml --profile core down
