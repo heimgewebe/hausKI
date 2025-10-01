@@ -17,7 +17,14 @@ use prometheus_client::{
     },
     registry::Registry,
 };
-use std::{fmt, sync::Arc, time::Instant};
+use std::{
+    fmt,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Instant,
+};
 
 mod config;
 pub use config::{
@@ -44,6 +51,7 @@ struct AppStateInner {
     /// WARNING: Enabling this may expose sensitive configuration information.
     /// Only set to `true` if you understand the security implications.
     expose_config: bool,
+    ready: AtomicBool,
 }
 
 impl AppState {
@@ -82,6 +90,7 @@ impl AppState {
             http_latency,
             registry,
             expose_config,
+            ready: AtomicBool::new(false),
         }))
     }
 
@@ -114,6 +123,14 @@ impl AppState {
         let mut body = String::new();
         encode(&mut body, &self.0.registry)?;
         Ok(body)
+    }
+
+    fn set_ready(&self) {
+        self.0.ready.store(true, Ordering::Release);
+    }
+
+    fn is_ready(&self) -> bool {
+        self.0.ready.load(Ordering::Acquire)
     }
 }
 
@@ -193,6 +210,21 @@ async fn health(State(state): State<AppState>) -> &'static str {
     "ok"
 }
 
+async fn ready(State(state): State<AppState>) -> (StatusCode, &'static str) {
+    let started = Instant::now();
+    let (status, body) = if state.is_ready() {
+        (StatusCode::OK, "ok")
+    } else {
+        (StatusCode::SERVICE_UNAVAILABLE, "starting")
+    };
+    state.record_http_request(Method::GET, "/ready", status);
+    state.observe_http_latency(
+        &HttpLabels::new(Method::GET, "/ready", status),
+        started.elapsed().as_secs_f64(),
+    );
+    (status, body)
+}
+
 async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
     let started = Instant::now();
     let encoded_metrics = state.encode_metrics();
@@ -236,6 +268,7 @@ pub fn build_app(
 
     let mut app = Router::new()
         .route("/health", get(health))
+        .route("/ready", get(ready))
         .route("/metrics", get(metrics));
 
     if state.expose_config() {
@@ -245,8 +278,11 @@ pub fn build_app(
             .route("/config/routing", get(get_routing));
     }
 
-    app.with_state(state)
-        .layer(from_fn_with_state(allowed_origin, cors_middleware))
+    let app = app
+        .with_state(state.clone())
+        .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware));
+    state.set_ready();
+    app
 }
 
 type CorsState = Arc<HeaderValue>;
@@ -492,5 +528,15 @@ mod tests {
             .headers()
             .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn readiness_is_ok() {
+        let app = demo_app(false);
+        let res = app
+            .oneshot(Request::get("/ready").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
     }
 }
