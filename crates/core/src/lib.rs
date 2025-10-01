@@ -169,7 +169,7 @@ impl EncodeLabelSet for HttpLabels {
         mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("method", self.method.as_str()).encode(encoder.encode_label())?;
-        ("path", &*self.path).encode(encoder.encode_label())?;
+        ("path", self.path.as_ref()).encode(encoder.encode_label())?;
         ("status", self.status.as_str()).encode(encoder.encode_label())?;
         Ok(())
     }
