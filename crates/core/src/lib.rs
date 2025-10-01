@@ -336,10 +336,12 @@ pub fn build_app_with_state(
     (app, state)
 }
 
+// TODO: Implement plugin routes. This is a placeholder returning an empty router.
 fn plugin_routes() -> Router {
     Router::new()
 }
 
+// TODO: Implement cloud routes. This is a placeholder returning an empty router.
 fn cloud_routes() -> Router {
     Router::new()
 }
