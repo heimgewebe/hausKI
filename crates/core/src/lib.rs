@@ -285,7 +285,7 @@ pub fn build_app(
         .with_state(state.clone())
         .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware));
 
-    // In Prod setzt main() readiness, Tests können den State direkt nutzen.
+    // In production, main() sets readiness; tests can use the state directly.
     (app, state)
 }
 
