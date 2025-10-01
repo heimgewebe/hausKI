@@ -153,6 +153,11 @@ hauski audio profile set <profile-name>
 - `scripts/bootstrap.sh` richtet `pre-commit` ein und erzwingt Format/Lint vor Commits.
 - Lizenzrichtlinien liegen in `deny.toml`.
 
+### Cargo.lock-Workflow
+- `Cargo.lock` gilt als Build-Artefakt: Patches und PRs sollten die Datei zunächst ausschließen und sie erst nach einem lokalen `cargo update` committen.
+- Das Skript [`scripts/git-apply-nolock.sh`](scripts/git-apply-nolock.sh) nimmt ein Patch-File entgegen, wendet es ohne `Cargo.lock` an, führt `cargo update` aus und erstellt direkt einen Commit. So lassen sich Codex-Konflikte mit automatisch regenerierten Lockfiles vermeiden.
+- Für manuelle Flows: `git add . ':!Cargo.lock' && git commit …`, danach `cargo update`, `git add Cargo.lock` und einen separaten „refresh“-Commit anlegen.
+
 ### Sprache
 - Primärsprache ist Deutsch (Du-Form, klare Sätze), Code-Kommentare und Log-Meldungen bleiben Englisch.
 - Gender-Sonderzeichen (`*`, `:`, `·`, `_`, Binnen-I) sind tabu; nutze neutrale Formulierungen.
