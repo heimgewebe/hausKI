@@ -346,12 +346,12 @@ fn config_routes() -> Router<AppState> {
 
 // TODO: Implement plugin routes. This is a placeholder returning an empty router.
 fn plugin_routes() -> Router<AppState> {
-    Router::new()
+    Router::<AppState>::new()
 }
 
 // TODO: Implement cloud routes. This is a placeholder returning an empty router.
 fn cloud_routes() -> Router<AppState> {
-    Router::new()
+    Router::<AppState>::new()
 }
 
 type CorsState = Arc<HeaderValue>;
