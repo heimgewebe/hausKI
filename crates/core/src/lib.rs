@@ -1,7 +1,9 @@
 use axum::{
+    body::Body,
     extract::State,
-    http::{header::CONTENT_TYPE, Method, StatusCode},
-    response::IntoResponse,
+    http::{header, HeaderValue, Method, Request, StatusCode},
+    middleware::{from_fn_with_state, Next},
+    response::{IntoResponse, Response},
     routing::get,
     Json, Router,
 };
@@ -58,9 +60,6 @@ impl AppState {
         registry.register("hauski_build_info", "static 1", build_info);
 
         let http_requests: Family<HttpLabels, Counter<u64>> = Family::default();
-        // Counters automatically gain a `_total` suffix during exposition, so we
-        // register the metric without it here. The resulting Prometheus metric is
-        // `http_requests_total`.
         registry.register(
             "http_requests",
             "Total number of HTTP requests received",
@@ -212,13 +211,13 @@ async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
     match encoded_metrics {
         Ok(body) => (
             StatusCode::OK,
-            [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+            [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
             body,
         )
             .into_response(),
         Err(_) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            [(CONTENT_TYPE, "text/plain; version=0.0.4")],
+            [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
             "Internal server error".to_string(),
         )
             .into_response(),
@@ -230,8 +229,10 @@ pub fn build_app(
     models: ModelsFile,
     routing: RoutingPolicy,
     expose_config: bool,
+    allowed_origin: HeaderValue,
 ) -> Router {
     let state = AppState::new(limits, models, routing, expose_config);
+    let allowed_origin = Arc::new(allowed_origin);
 
     let mut app = Router::new()
         .route("/health", get(health))
@@ -245,6 +246,59 @@ pub fn build_app(
     }
 
     app.with_state(state)
+        .layer(from_fn_with_state(allowed_origin, cors_middleware))
+}
+
+type CorsState = Arc<HeaderValue>;
+
+async fn cors_middleware(
+    State(allowed_origin): State<CorsState>,
+    req: Request<Body>,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let origin = req.headers().get(header::ORIGIN).cloned();
+    let origin_allowed = origin.as_ref() == Some(allowed_origin.as_ref());
+
+    if req.method() == Method::OPTIONS {
+        if !origin_allowed {
+            return Ok(Response::builder()
+                .status(StatusCode::FORBIDDEN)
+                .body(Body::empty())
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?);
+        }
+
+        return Ok(Response::builder()
+            .status(StatusCode::NO_CONTENT)
+            .header(
+                header::ACCESS_CONTROL_ALLOW_ORIGIN,
+                allowed_origin.as_ref().clone(),
+            )
+            .header(header::ACCESS_CONTROL_ALLOW_METHODS, "GET, HEAD, OPTIONS")
+            .header(
+                header::ACCESS_CONTROL_ALLOW_HEADERS,
+                HeaderValue::from_static("*"),
+            )
+            .header(
+                header::ACCESS_CONTROL_MAX_AGE,
+                HeaderValue::from_static("600"),
+            )
+            .header(header::VARY, HeaderValue::from_static("Origin"))
+            .body(Body::empty())
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?);
+    }
+
+    let mut response = next.run(req).await;
+    if origin_allowed {
+        response.headers_mut().insert(
+            header::ACCESS_CONTROL_ALLOW_ORIGIN,
+            allowed_origin.as_ref().clone(),
+        );
+        response
+            .headers_mut()
+            .append(header::VARY, HeaderValue::from_static("Origin"));
+    }
+
+    Ok(response)
 }
 
 #[cfg(test)]
@@ -252,12 +306,16 @@ mod tests {
     use super::*;
     use axum::{
         body::Body,
-        http::{Request, StatusCode},
+        http::{header, HeaderValue, Request, StatusCode},
     };
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
     fn demo_app(expose: bool) -> axum::Router {
+        demo_app_with_origin(expose, HeaderValue::from_static("http://127.0.0.1:8080"))
+    }
+
+    fn demo_app_with_origin(expose: bool, origin: HeaderValue) -> axum::Router {
         let limits = Limits {
             latency: crate::config::Latency {
                 llm_p95_ms: 400,
@@ -277,14 +335,8 @@ mod tests {
                 canary: Some(false),
             }],
         };
-        let routing = RoutingPolicy {
-            default: RoutingDecision::Deny,
-            allow: vec![RoutingRule {
-                id: "loopback".into(),
-                description: Some("Allow loopback only".into()),
-            }],
-        };
-        build_app(limits, models, routing, expose)
+        let routing = RoutingPolicy::default();
+        build_app(limits, models, routing, expose, origin)
     }
 
     #[tokio::test]
@@ -395,5 +447,50 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn cors_allows_configured_origin() {
+        let origin = HeaderValue::from_static("http://127.0.0.1:8080");
+        let app = demo_app_with_origin(false, origin.clone());
+
+        let res = app
+            .oneshot(
+                Request::get("/health")
+                    .header(header::ORIGIN, origin.clone())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            res.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN),
+            Some(&origin)
+        );
+    }
+
+    #[tokio::test]
+    async fn cors_blocks_unconfigured_origin() {
+        let allowed_origin = HeaderValue::from_static("http://127.0.0.1:8080");
+        let app = demo_app_with_origin(false, allowed_origin);
+
+        let res = app
+            .oneshot(
+                Request::get("/health")
+                    .header(
+                        header::ORIGIN,
+                        HeaderValue::from_static("https://example.com"),
+                    )
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert!(res
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+            .is_none());
     }
 }

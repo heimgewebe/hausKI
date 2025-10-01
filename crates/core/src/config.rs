@@ -121,28 +121,12 @@ pub struct ModelEntry {
     pub canary: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RoutingPolicy {
-    pub default: RoutingDecision,
-    #[serde(default)]
-    pub allow: Vec<RoutingRule>,
-}
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(transparent)]
+pub struct RoutingPolicy(pub serde_yaml::Value);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum RoutingDecision {
-    Allow,
-    Deny,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RoutingRule {
-    pub id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-}
+pub type RoutingRule = serde_yaml::Value;
+pub type RoutingDecision = serde_yaml::Value;
 
 pub fn load_limits<P: AsRef<Path>>(path: P) -> anyhow::Result<Limits> {
     let path = path.as_ref();
@@ -234,8 +218,16 @@ mod tests {
         }
 
         let routing = load_routing(&path).unwrap();
-        assert!(matches!(routing.default, RoutingDecision::Deny));
-        assert!(routing.allow.is_empty());
+        let mapping = routing
+            .0
+            .as_mapping()
+            .expect("routing policy should be a mapping");
+        let default_key = serde_yaml::Value::String("default".into());
+        assert_eq!(
+            mapping.get(&default_key),
+            Some(&serde_yaml::Value::String("deny".into()))
+        );
+        assert!(!mapping.contains_key(&serde_yaml::Value::String("allow".into())));
         let _ = std::fs::remove_file(path);
     }
 }
