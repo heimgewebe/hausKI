@@ -27,6 +27,8 @@ pub use config::{
     RoutingPolicy, RoutingRule,
 };
 
+const LATENCY_BUCKETS: [f64; 8] = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0];
+
 /// Creates a latency histogram with predefined buckets.
 ///
 /// The bucket values [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0] (in seconds)
@@ -34,7 +36,7 @@ pub use config::{
 /// coverage for higher latencies, matching typical HTTP request latency distributions.
 /// Adjust these values if your workload characteristics differ.
 fn create_latency_histogram() -> Histogram {
-    Histogram::new([0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0].into_iter())
+    Histogram::new(LATENCY_BUCKETS.into_iter())
 }
 
 #[derive(Clone)]
