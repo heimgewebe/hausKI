@@ -110,9 +110,8 @@ impl AppState {
         self.0.expose_config
     }
 
-    fn record_http_request(&self, method: Method, path: &'static str, status: StatusCode) {
-        let labels = HttpLabels::new(method, path, status);
-        self.0.http_requests.get_or_create(&labels).inc();
+    fn record_http_request(&self, labels: &HttpLabels) {
+        self.0.http_requests.get_or_create(labels).inc();
     }
 
     fn observe_http_latency(&self, labels: &HttpLabels, secs: f64) {
@@ -129,15 +128,13 @@ impl AppState {
     fn finish_http_request(
         &self,
         method: Method,
-        path: &'static str,
+        path: &str,
         status: StatusCode,
         started: Instant,
     ) {
-        self.record_http_request(method.clone(), path, status);
-        self.observe_http_latency(
-            &HttpLabels::new(method, path, status),
-            started.elapsed().as_secs_f64(),
-        );
+        let labels = HttpLabels::new(method, path, status);
+        self.record_http_request(&labels);
+        self.observe_http_latency(&labels, started.elapsed().as_secs_f64());
     }
 
     fn set_ready(&self) {
@@ -152,15 +149,15 @@ impl AppState {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HttpLabels {
     method: Method,
-    path: &'static str,
+    path: Arc<str>,
     status: StatusCode,
 }
 
 impl HttpLabels {
-    fn new(method: Method, path: &'static str, status: StatusCode) -> Self {
+    fn new(method: Method, path: impl Into<Arc<str>>, status: StatusCode) -> Self {
         Self {
             method,
-            path,
+            path: path.into(),
             status,
         }
     }
@@ -172,7 +169,7 @@ impl EncodeLabelSet for HttpLabels {
         mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("method", self.method.as_str()).encode(encoder.encode_label())?;
-        ("path", self.path).encode(encoder.encode_label())?;
+        ("path", &*self.path).encode(encoder.encode_label())?;
         ("status", self.status.as_str()).encode(encoder.encode_label())?;
         Ok(())
     }
