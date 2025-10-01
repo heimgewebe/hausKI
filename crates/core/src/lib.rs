@@ -125,7 +125,22 @@ impl AppState {
         Ok(body)
     }
 
-    pub fn set_ready(&self) {
+    /// Record request count and observe latency for a request that started at `started`.
+    fn finish_http_request(
+        &self,
+        method: Method,
+        path: &'static str,
+        status: StatusCode,
+        started: Instant,
+    ) {
+        self.record_http_request(method.clone(), path, status);
+        self.observe_http_latency(
+            &HttpLabels::new(method, path, status),
+            started.elapsed().as_secs_f64(),
+        );
+    }
+
+    fn set_ready(&self) {
         self.0.ready.store(true, Ordering::Release);
     }
 
@@ -167,11 +182,7 @@ async fn get_limits(State(state): State<AppState>) -> Json<Limits> {
     let started = Instant::now();
     let status = StatusCode::OK;
     let response = Json(state.limits());
-    state.record_http_request(Method::GET, "/config/limits", status);
-    state.observe_http_latency(
-        &HttpLabels::new(Method::GET, "/config/limits", status),
-        started.elapsed().as_secs_f64(),
-    );
+    state.finish_http_request(Method::GET, "/config/limits", status, started);
     response
 }
 
@@ -179,11 +190,7 @@ async fn get_models(State(state): State<AppState>) -> Json<ModelsFile> {
     let started = Instant::now();
     let status = StatusCode::OK;
     let response = Json(state.models());
-    state.record_http_request(Method::GET, "/config/models", status);
-    state.observe_http_latency(
-        &HttpLabels::new(Method::GET, "/config/models", status),
-        started.elapsed().as_secs_f64(),
-    );
+    state.finish_http_request(Method::GET, "/config/models", status, started);
     response
 }
 
@@ -191,22 +198,14 @@ async fn get_routing(State(state): State<AppState>) -> Json<RoutingPolicy> {
     let started = Instant::now();
     let status = StatusCode::OK;
     let response = Json(state.routing());
-    state.record_http_request(Method::GET, "/config/routing", status);
-    state.observe_http_latency(
-        &HttpLabels::new(Method::GET, "/config/routing", status),
-        started.elapsed().as_secs_f64(),
-    );
+    state.finish_http_request(Method::GET, "/config/routing", status, started);
     response
 }
 
 async fn health(State(state): State<AppState>) -> &'static str {
     let started = Instant::now();
     let status = StatusCode::OK;
-    state.record_http_request(Method::GET, "/health", status);
-    state.observe_http_latency(
-        &HttpLabels::new(Method::GET, "/health", status),
-        started.elapsed().as_secs_f64(),
-    );
+    state.finish_http_request(Method::GET, "/health", status, started);
     "ok"
 }
 
@@ -217,11 +216,7 @@ async fn ready(State(state): State<AppState>) -> (StatusCode, &'static str) {
     } else {
         (StatusCode::SERVICE_UNAVAILABLE, "starting")
     };
-    state.record_http_request(Method::GET, "/ready", status);
-    state.observe_http_latency(
-        &HttpLabels::new(Method::GET, "/ready", status),
-        started.elapsed().as_secs_f64(),
-    );
+    state.finish_http_request(Method::GET, "/ready", status, started);
     (status, body)
 }
 
@@ -234,11 +229,7 @@ async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
         StatusCode::INTERNAL_SERVER_ERROR
     };
 
-    state.record_http_request(Method::GET, "/metrics", status);
-    state.observe_http_latency(
-        &HttpLabels::new(Method::GET, "/metrics", status),
-        started.elapsed().as_secs_f64(),
-    );
+    state.finish_http_request(Method::GET, "/metrics", status, started);
 
     match encoded_metrics {
         Ok(body) => (
@@ -278,10 +269,12 @@ pub fn build_app(
             .route("/config/routing", get(get_routing));
     }
 
-    let app = app
-        .with_state(state.clone())
-        .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware));
-    (app, state)
+    // It is safe to mark the app as ready here because there is no additional
+    // asynchronous initialization required beyond building the router and state.
+    // If future changes introduce async setup, move this to after the server is listening.
+    state.set_ready();
+    app.with_state(state.clone())
+        .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware))
 }
 
 type CorsState = Arc<HeaderValue>;
