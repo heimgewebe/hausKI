@@ -53,12 +53,14 @@ jobs:
       fail-fast: false
       matrix:
         toolchain: ${{ fromJSON(format('["{0}"]', join(split(needs.decide.outputs.matrix, ','), '","'))) }}
+    env:
+      toolchain: ${{ matrix.toolchain }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: ${{ env.toolchain }}
           # we switch the toolchain explicitly via rustup in the next step
           components: rustfmt, clippy
       - uses: taiki-e/install-action@v2
