@@ -114,7 +114,7 @@ pub struct ModelEntry {
     pub canary: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(transparent)]
 pub struct RoutingPolicy(pub serde_yaml::Value);
 
