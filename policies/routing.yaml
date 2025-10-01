@@ -1,6 +1,7 @@
 egress:
   default: deny
   allow:
+    # Example URL; replace with your actual API endpoint as needed
     - https://api.matrix.example
 routing:
   prefer_local: true
