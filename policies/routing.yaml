@@ -1,0 +1,17 @@
+egress:
+  default: deny
+  allow:
+    # Example URL; replace with your actual API endpoint as needed
+    - https://api.matrix.example
+routing:
+  prefer_local: true
+  quality_target: balanced
+  cloud_fallback:
+    enabled: false
+    # Conditional expressions use Python-like boolean syntax.
+    # Available variables:
+    #   - task: the name of the current task (string)
+    #   - size_mb: the size of the input in megabytes (number)
+    # Example: "task == 'ocr' && size_mb > 200"
+    only_if:
+      - "task == 'ocr' && size_mb > 200"
