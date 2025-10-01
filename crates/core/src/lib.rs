@@ -276,7 +276,7 @@ async fn cors_middleware(
             .header(header::ACCESS_CONTROL_ALLOW_METHODS, "GET, HEAD, OPTIONS")
             .header(
                 header::ACCESS_CONTROL_ALLOW_HEADERS,
-                HeaderValue::from_static("*"),
+                HeaderValue::from_static("Content-Type, Authorization"),
             )
             .header(
                 header::ACCESS_CONTROL_MAX_AGE,
