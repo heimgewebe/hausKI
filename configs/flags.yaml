@@ -1,0 +1,6 @@
+# Feature flags controlling optional integrations and safeguards.
+#
+# safe_mode disables plugins and external cloud integrations to keep HausKI
+# self-contained. This is intended for local/offline usage or hardening
+# scenarios. Overrides via HAUSKI_SAFE_MODE take precedence over this file.
+safe_mode: false

@@ -121,6 +121,26 @@ pub struct RoutingPolicy(pub serde_yaml::Value);
 pub type RoutingRule = serde_yaml::Value;
 pub type RoutingDecision = serde_yaml::Value;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct FeatureFlags {
+    pub safe_mode: bool,
+}
+
+impl Default for FeatureFlags {
+    fn default() -> Self {
+        Self { safe_mode: false }
+    }
+}
+
+fn parse_env_bool(value: &str) -> Option<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Some(true),
+        "0" | "false" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
 pub fn load_limits<P: AsRef<Path>>(path: P) -> anyhow::Result<Limits> {
     let path = path.as_ref();
     match fs::read_to_string(path) {
@@ -196,9 +216,51 @@ pub fn load_routing<P: AsRef<Path>>(path: P) -> anyhow::Result<RoutingPolicy> {
     }
 }
 
+pub fn load_flags<P: AsRef<Path>>(path: P) -> anyhow::Result<FeatureFlags> {
+    let path = path.as_ref();
+    let mut flags = match fs::read_to_string(path) {
+        Ok(content) => match serde_yaml::from_str(&content) {
+            Ok(flags) => flags,
+            Err(err) => {
+                tracing::warn!(
+                    path = %path.display(),
+                    error = %err,
+                    "failed to parse flags YAML, falling back to defaults"
+                );
+                FeatureFlags::default()
+            }
+        },
+        Err(err) => {
+            tracing::warn!(
+                path = %path.display(),
+                error = %err,
+                "failed to read flags YAML, falling back to defaults"
+            );
+            FeatureFlags::default()
+        }
+    };
+
+    if let Ok(value) = std::env::var("HAUSKI_SAFE_MODE") {
+        match parse_env_bool(&value) {
+            Some(parsed) => {
+                flags.safe_mode = parsed;
+            }
+            None => {
+                tracing::warn!(
+                    invalid_value = %value,
+                    "invalid boolean for HAUSKI_SAFE_MODE, keeping configured value"
+                );
+            }
+        }
+    }
+
+    Ok(flags)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::fs::File;
     use std::io::Write;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -295,5 +357,73 @@ mod tests {
         let routing = load_routing(&path).unwrap();
         assert_eq!(routing, RoutingPolicy::default());
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn missing_flags_file_defaults_to_safe_mode_off() {
+        let flags = load_flags("/does/not/exist-flags.yaml").unwrap();
+        assert!(!flags.safe_mode);
+    }
+
+    #[serial]
+    #[test]
+    fn env_override_wins_over_file() {
+        let path = std::env::temp_dir().join(format!(
+            "hauski-test-flags-{}.yaml",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        {
+            let mut file = File::create(&path).unwrap();
+            writeln!(file, "safe_mode: false").unwrap();
+        }
+
+        std::env::set_var("HAUSKI_SAFE_MODE", "true");
+        let flags = load_flags(&path).unwrap();
+        assert!(flags.safe_mode);
+        std::env::remove_var("HAUSKI_SAFE_MODE");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[serial]
+    #[test]
+    fn invalid_env_override_keeps_config() {
+        let path = std::env::temp_dir().join(format!(
+            "hauski-test-flags-invalid-env-{}.yaml",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        {
+            let mut file = File::create(&path).unwrap();
+            writeln!(file, "safe_mode: true").unwrap();
+        }
+
+        std::env::set_var("HAUSKI_SAFE_MODE", "definitely-not-a-bool");
+        let flags = load_flags(&path).unwrap();
+        assert!(flags.safe_mode);
+        std::env::remove_var("HAUSKI_SAFE_MODE");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn parse_env_bool_accepts_common_truthy_and_falsy_values() {
+        for truthy in ["1", "true", "TRUE", " yes ", "On"] {
+            assert_eq!(parse_env_bool(truthy), Some(true), "truthy: {truthy:?}");
+        }
+
+        for falsy in ["0", "false", "FALSE", " no ", "off"] {
+            assert_eq!(parse_env_bool(falsy), Some(false), "falsy: {falsy:?}");
+        }
+    }
+
+    #[test]
+    fn parse_env_bool_rejects_invalid_values() {
+        for invalid in ["", "maybe", "10", "enable"] {
+            assert_eq!(parse_env_bool(invalid), None, "invalid: {invalid:?}");
+        }
     }
 }
