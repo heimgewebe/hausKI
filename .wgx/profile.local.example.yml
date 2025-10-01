@@ -1,5 +1,5 @@
-# Local developer overrides for wgx.
-# Copy to .wgx/profile.local.yml and adjust paths or env vars as needed.
+# Lokale Entwickler-Overrides für wgx.
+# Kopiere die Datei zu .wgx/profile.local.yml und passe Pfade bzw. Umgebungsvariablen an.
 wgx:
   envOverrides:
     RUST_LOG: "info,hauski=trace"
