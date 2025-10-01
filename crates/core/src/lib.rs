@@ -58,6 +58,9 @@ impl AppState {
         registry.register("hauski_build_info", "static 1", build_info);
 
         let http_requests: Family<HttpLabels, Counter<u64>> = Family::default();
+        // Counters automatically gain a `_total` suffix during exposition, so we
+        // register the metric without it here. The resulting Prometheus metric is
+        // `http_requests_total`.
         registry.register(
             "http_requests",
             "Total number of HTTP requests received",
