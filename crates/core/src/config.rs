@@ -57,12 +57,25 @@ pub struct Asr {
     pub wer_max_pct: u64,
 }
 
+// NOTE: We keep a manual `Default` implementation here instead of using
+// `#[derive(Default)]`. All nested structs provide custom defaults and we want
+// this type to stay resilient even if new fields that lack `Default`
+// derivations are introduced in the future. The explicit construction also
+// makes the intended baseline configuration obvious to readers.
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            latency: Latency::default(),
-            thermal: Thermal::default(),
-            asr: Asr::default(),
+            latency: Latency {
+                llm_p95_ms: default_llm_p95_ms(),
+                index_topk20_ms: default_index_topk20_ms(),
+            },
+            thermal: Thermal {
+                gpu_max_c: default_gpu_max_c(),
+                dgpu_power_w: default_dgpu_power_w(),
+            },
+            asr: Asr {
+                wer_max_pct: default_wer_max_pct(),
+            },
         }
     }
 }
