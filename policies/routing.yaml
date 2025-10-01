@@ -1,0 +1,11 @@
+egress:
+  default: deny
+  allow:
+    - https://api.matrix.example
+routing:
+  prefer_local: true
+  quality_target: balanced
+  cloud_fallback:
+    enabled: false
+    only_if:
+      - "task == 'ocr' && size_mb > 200"
