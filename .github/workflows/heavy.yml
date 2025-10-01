@@ -58,6 +58,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: stable
           # we switch the toolchain explicitly via rustup in the next step
           components: rustfmt, clippy
       - uses: taiki-e/install-action@v2

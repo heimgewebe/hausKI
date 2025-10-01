@@ -62,6 +62,7 @@ pub struct Asr {
 // this type to stay resilient even if new fields that lack `Default`
 // derivations are introduced in the future. The explicit construction also
 // makes the intended baseline configuration obvious to readers.
+#[allow(clippy::derivable_impls)]
 impl Default for Limits {
     fn default() -> Self {
         Self {
@@ -215,11 +216,12 @@ mod tests {
             .as_mapping()
             .expect("routing policy should be a mapping");
         let default_key = serde_yaml::Value::String("default".into());
+        let allow_key = serde_yaml::Value::String("allow".into());
         assert_eq!(
             mapping.get(&default_key),
             Some(&serde_yaml::Value::String("deny".into()))
         );
-        assert!(!mapping.contains_key(&serde_yaml::Value::String("allow".into())));
+        assert!(!mapping.contains_key(&allow_key));
         let _ = std::fs::remove_file(path);
     }
 }
