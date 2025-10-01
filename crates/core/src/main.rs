@@ -1,5 +1,5 @@
 use axum::http::HeaderValue;
-use hauski_core::{build_app, load_limits, load_models, load_routing};
+use hauski_core::{build_app_with_state, load_limits, load_models, load_routing};
 use std::{env, net::SocketAddr};
 use tokio::{net::TcpListener, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
         anyhow::anyhow!("invalid HAUSKI_ALLOWED_ORIGIN '{}': {}", allowed_origin, e)
     })?;
 
-    let (app, state) = build_app(
+    let (app, state) = build_app_with_state(
         load_limits(limits_path)?,
         load_models(models_path)?,
         load_routing(routing_path)?,

@@ -270,6 +270,16 @@ pub fn build_app(
     routing: RoutingPolicy,
     expose_config: bool,
     allowed_origin: HeaderValue,
+) -> Router {
+    build_app_with_state(limits, models, routing, expose_config, allowed_origin).0
+}
+
+pub fn build_app_with_state(
+    limits: Limits,
+    models: ModelsFile,
+    routing: RoutingPolicy,
+    expose_config: bool,
+    allowed_origin: HeaderValue,
 ) -> (Router, AppState) {
     let state = AppState::new(limits, models, routing, expose_config);
     let allowed_origin = Arc::new(allowed_origin);
@@ -380,7 +390,7 @@ mod tests {
             }],
         };
         let routing = RoutingPolicy::default();
-        let (app, state) = build_app(limits, models, routing, expose, origin);
+        let (app, state) = build_app_with_state(limits, models, routing, expose, origin);
         state.set_ready();
         app
     }

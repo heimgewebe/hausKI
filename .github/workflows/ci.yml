@@ -172,9 +172,13 @@ jobs:
             )
           ' observability/k6/summary.json)
 
+          debug_summary() {
+            jq '{http_req_duration: .metrics."http_req_duration", http_req_failed: .metrics."http_req_failed"}' observability/k6/summary.json
+          }
+
           if [[ -z "$P95_ACTUAL" || "$P95_ACTUAL" == "null" ]]; then
             echo "::error::Unable to extract p95 from k6 summary"
-            jq '{http_req_duration: .metrics."http_req_duration", http_req_failed: .metrics."http_req_failed"}' observability/k6/summary.json
+            debug_summary
             exit 1
           fi
 
@@ -188,7 +192,7 @@ jobs:
 
           if [[ -z "$FAIL_RATE" || "$FAIL_RATE" == "null" ]]; then
             echo "::error::Unable to extract fail rate from k6 summary"
-            jq '{http_req_duration: .metrics."http_req_duration", http_req_failed: .metrics."http_req_failed"}' observability/k6/summary.json
+            debug_summary
             exit 1
           fi
 
