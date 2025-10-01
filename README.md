@@ -73,6 +73,13 @@ just run-core
 
 > **Hinweis:** Setze `HAUSKI_EXPOSE_CONFIG=true`, um die geschützten Routen unter `/config/*` bewusst freizugeben (nur für lokale Tests empfohlen).
 
+### CORS & Frontend-Integration
+
+- Standardmäßig akzeptiert der Core nur Browser-Anfragen vom Ursprung `http://127.0.0.1:8080`.
+- Setze `HAUSKI_ALLOWED_ORIGIN=<https://dein-frontend.example>` im Environment, um einen anderen Origin explizit freizuschalten.
+- Preflight-Requests (`OPTIONS`) werden nur beantwortet, wenn der angefragte Origin erlaubt ist; alle anderen Ursprünge erhalten `403 Forbidden`.
+- Die Antwort-Header enthalten `Access-Control-Allow-Origin` und `Vary: Origin`, sobald der Request vom freigegebenen Ursprung kommt.
+
 ### Docker-Compose-Stack (Profil `core`)
 
 ```bash

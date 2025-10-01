@@ -1,3 +1,4 @@
+use axum::http::HeaderValue;
 use hauski_core::{build_app, load_limits, load_models, load_routing};
 use std::{env, net::SocketAddr};
 use tokio::net::TcpListener;
@@ -18,11 +19,18 @@ async fn main() -> anyhow::Result<()> {
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
 
+    let allowed_origin =
+        env::var("HAUSKI_ALLOWED_ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:8080".into());
+    let allowed_origin_header = HeaderValue::from_str(&allowed_origin).map_err(|e| {
+        anyhow::anyhow!("invalid HAUSKI_ALLOWED_ORIGIN '{}': {}", allowed_origin, e)
+    })?;
+
     let app = build_app(
         load_limits(limits_path)?,
         load_models(models_path)?,
         load_routing(routing_path)?,
         expose_config,
+        allowed_origin_header,
     );
 
     let addr = resolve_bind_addr(expose_config)?;
