@@ -269,6 +269,9 @@ pub fn build_app(
             .route("/config/routing", get(get_routing));
     }
 
+    // It is safe to mark the app as ready here because there is no additional
+    // asynchronous initialization required beyond building the router and state.
+    // If future changes introduce async setup, move this to after the server is listening.
     state.set_ready();
     app.with_state(state.clone())
         .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware))
