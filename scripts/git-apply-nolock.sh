@@ -17,4 +17,4 @@ cargo update
 # Stage all changes produced by the patch and cargo update.
 git add -u
 
-echo "✅ Patch angewendet (ohne Cargo.lock). Lockfile neu generiert."
+echo "✅ Patch applied (without Cargo.lock). Lockfile regenerated."
