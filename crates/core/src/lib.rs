@@ -253,7 +253,7 @@ pub fn build_app(
     routing: RoutingPolicy,
     expose_config: bool,
     allowed_origin: HeaderValue,
-) -> Router {
+) -> (Router, AppState) {
     let state = AppState::new(limits, models, routing, expose_config);
     let allowed_origin = Arc::new(allowed_origin);
 
@@ -364,7 +364,9 @@ mod tests {
             }],
         };
         let routing = RoutingPolicy::default();
-        build_app(limits, models, routing, expose, origin)
+        let (app, state) = build_app(limits, models, routing, expose, origin);
+        state.set_ready();
+        app
     }
 
     #[tokio::test]

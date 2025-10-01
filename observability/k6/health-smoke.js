@@ -6,7 +6,7 @@ export const options = {
   duration: '5s',
   thresholds: {
     // Base threshold; CI additionally reads the actual budget from policies/limits.yaml
-    'http_req_duration{p(95)}': ['<400'],
+    http_req_duration: ['p(95)<400'],
     'http_req_failed': ['rate<0.01'],
   },
 };
