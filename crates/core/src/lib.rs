@@ -24,8 +24,8 @@ use std::{
 mod config;
 mod egress;
 pub use config::{
-    load_limits, load_models, load_routing, Limits, ModelEntry, ModelsFile, RoutingDecision,
-    RoutingPolicy, RoutingRule,
+    load_flags, load_limits, load_models, load_routing, FeatureFlags, Limits, ModelEntry,
+    ModelsFile, RoutingDecision, RoutingPolicy, RoutingRule,
 };
 pub use egress::{
     AllowlistedClient, EgressGuard, EgressGuardError, GuardError, GuardedRequestError,
@@ -50,6 +50,7 @@ struct AppStateInner {
     limits: Limits,
     models: ModelsFile,
     routing: RoutingPolicy,
+    flags: FeatureFlags,
     http_requests: Family<HttpLabels, Counter<u64>>,
     http_latency: Family<HttpDurationLabels, Histogram>,
     registry: Registry,
@@ -66,6 +67,7 @@ impl AppState {
         limits: Limits,
         models: ModelsFile,
         routing: RoutingPolicy,
+        flags: FeatureFlags,
         expose_config: bool,
     ) -> Self {
         let mut registry = Registry::default();
@@ -93,6 +95,7 @@ impl AppState {
             limits,
             models,
             routing,
+            flags,
             http_requests,
             http_latency,
             registry,
@@ -111,6 +114,14 @@ impl AppState {
 
     fn routing(&self) -> RoutingPolicy {
         self.0.routing.clone()
+    }
+
+    pub fn flags(&self) -> FeatureFlags {
+        self.0.flags.clone()
+    }
+
+    pub fn safe_mode(&self) -> bool {
+        self.0.flags.safe_mode
     }
 
     fn expose_config(&self) -> bool {
@@ -274,20 +285,30 @@ pub fn build_app(
     limits: Limits,
     models: ModelsFile,
     routing: RoutingPolicy,
+    flags: FeatureFlags,
     expose_config: bool,
     allowed_origin: HeaderValue,
 ) -> Router {
-    build_app_with_state(limits, models, routing, expose_config, allowed_origin).0
+    build_app_with_state(
+        limits,
+        models,
+        routing,
+        flags,
+        expose_config,
+        allowed_origin,
+    )
+    .0
 }
 
 pub fn build_app_with_state(
     limits: Limits,
     models: ModelsFile,
     routing: RoutingPolicy,
+    flags: FeatureFlags,
     expose_config: bool,
     allowed_origin: HeaderValue,
 ) -> (Router, AppState) {
-    let state = AppState::new(limits, models, routing, expose_config);
+    let state = AppState::new(limits, models, routing, flags, expose_config);
     let allowed_origin = Arc::new(allowed_origin);
 
     let mut app = Router::new()
@@ -302,11 +323,27 @@ pub fn build_app_with_state(
             .route("/config/routing", get(get_routing));
     }
 
+    if state.safe_mode() {
+        tracing::info!("SAFE-MODE active: plugins and cloud routes disabled");
+    } else {
+        app = app.merge(plugin_routes()).merge(cloud_routes());
+    }
+
     // The readiness flag is set by the caller once the listener is bound.
     let app = app
         .with_state(state.clone())
         .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware));
     (app, state)
+}
+
+// TODO: Implement plugin routes. This is a placeholder returning an empty router.
+fn plugin_routes() -> Router {
+    Router::new()
+}
+
+// TODO: Implement cloud routes. This is a placeholder returning an empty router.
+fn cloud_routes() -> Router {
+    Router::new()
 }
 
 type CorsState = Arc<HeaderValue>;
@@ -372,10 +409,23 @@ mod tests {
     use tower::ServiceExt;
 
     fn demo_app(expose: bool) -> axum::Router {
-        demo_app_with_origin(expose, HeaderValue::from_static("http://127.0.0.1:8080"))
+        demo_app_with_origin_and_flags(
+            expose,
+            FeatureFlags::default(),
+            HeaderValue::from_static("http://127.0.0.1:8080"),
+        )
+        .0
     }
 
     fn demo_app_with_origin(expose: bool, origin: HeaderValue) -> axum::Router {
+        demo_app_with_origin_and_flags(expose, FeatureFlags::default(), origin).0
+    }
+
+    fn demo_app_with_origin_and_flags(
+        expose: bool,
+        flags: FeatureFlags,
+        origin: HeaderValue,
+    ) -> (axum::Router, AppState) {
         let limits = Limits {
             latency: crate::config::Latency {
                 llm_p95_ms: 400,
@@ -396,9 +446,9 @@ mod tests {
             }],
         };
         let routing = RoutingPolicy::default();
-        let (app, state) = build_app_with_state(limits, models, routing, expose, origin);
+        let (app, state) = build_app_with_state(limits, models, routing, flags, expose, origin);
         state.set_ready();
-        app
+        (app, state)
     }
 
     #[tokio::test]
@@ -564,5 +614,16 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn safe_mode_flag_is_reflected_in_state() {
+        let (_app, state) = demo_app_with_origin_and_flags(
+            false,
+            FeatureFlags { safe_mode: true },
+            HeaderValue::from_static("http://127.0.0.1:8080"),
+        );
+        assert!(state.safe_mode());
+        assert!(state.flags().safe_mode);
     }
 }

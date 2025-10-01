@@ -371,10 +371,7 @@ egress:
         let guard = EgressGuard::from_policy(&policy).unwrap();
         let reqwest_client = Client::new();
         let client = AllowlistedClient::new(reqwest_client.clone(), guard);
-        let request = reqwest_client
-            .get("https://evil.example")
-            .build()
-            .unwrap();
+        let request = reqwest_client.get("https://evil.example").build().unwrap();
         let err = client.execute(request).await.unwrap_err();
         match err {
             GuardedRequestError::Guard(GuardError::HostDenied { host }) => {

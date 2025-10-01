@@ -1,5 +1,5 @@
 use axum::http::HeaderValue;
-use hauski_core::{build_app_with_state, load_limits, load_models, load_routing};
+use hauski_core::{build_app_with_state, load_flags, load_limits, load_models, load_routing};
 use std::{env, net::SocketAddr};
 use tokio::{net::TcpListener, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -15,6 +15,7 @@ async fn main() -> anyhow::Result<()> {
     let models_path = env::var("HAUSKI_MODELS").unwrap_or_else(|_| "./configs/models.yml".into());
     let routing_path =
         env::var("HAUSKI_ROUTING").unwrap_or_else(|_| "./policies/routing.yaml".into());
+    let flags_path = env::var("HAUSKI_FLAGS").unwrap_or_else(|_| "./configs/flags.yaml".into());
     let expose_config = env::var("HAUSKI_EXPOSE_CONFIG")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
@@ -29,6 +30,7 @@ async fn main() -> anyhow::Result<()> {
         load_limits(limits_path)?,
         load_models(models_path)?,
         load_routing(routing_path)?,
+        load_flags(flags_path)?,
         expose_config,
         allowed_origin_header,
     );
