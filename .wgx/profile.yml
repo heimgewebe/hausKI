@@ -12,6 +12,8 @@ wgx:
     data: ".local/state/hauski"
   tasks:
     doctor:
+      desc: "Sanity-Checks"
+      safe: true
       cmd: cargo
       args:
         - run
@@ -20,6 +22,7 @@ wgx:
         - --
         - doctor
     serve:
+      desc: "Entwicklungsserver"
       cmd: cargo
       args:
         - run
@@ -28,6 +31,8 @@ wgx:
         - --
         - serve
     test:
+      desc: "Workspace-Tests"
+      safe: true
       cmd: cargo
       args:
         - test
@@ -35,11 +40,13 @@ wgx:
         - --
         - --nocapture
     fmt:
+      desc: "Formatierung"
       cmd: cargo
       args:
         - fmt
         - --all
     clippy:
+      desc: "Clippy-Lints"
       cmd: cargo
       args:
         - clippy

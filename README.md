@@ -23,7 +23,7 @@ HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-
 
 ---
 
-## Quickstart
+## Schnellstart
 
 **Voraussetzungen lokal (Pop!_OS, Rust stable):**
 ```bash
@@ -62,7 +62,7 @@ cargo test --workspace -- --nocapture
 
 ---
 
-## Build, Test & Run
+## Build, Test & Ausführung
 
 Den Core-Service lokal starten:
 ```bash
