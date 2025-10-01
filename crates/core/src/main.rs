@@ -1,6 +1,6 @@
 use hauski_core::{build_app, load_limits, load_models, load_routing};
 use std::{env, net::SocketAddr};
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -28,7 +28,9 @@ async fn main() -> anyhow::Result<()> {
     let addr = resolve_bind_addr(expose_config)?;
     tracing::info!(%addr, expose_config, "starting server");
     let listener = TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     Ok(())
 }
 
@@ -57,6 +59,32 @@ fn resolve_bind_addr(expose_config: bool) -> anyhow::Result<SocketAddr> {
         );
     }
     Ok(addr)
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    tracing::info!("shutdown signal received");
 }
 
 #[cfg(test)]
