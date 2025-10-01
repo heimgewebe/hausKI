@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
         anyhow::anyhow!("invalid HAUSKI_ALLOWED_ORIGIN '{}': {}", allowed_origin, e)
     })?;
 
-    let app = build_app(
+    let (app, state) = build_app(
         load_limits(limits_path)?,
         load_models(models_path)?,
         load_routing(routing_path)?,
@@ -36,6 +36,7 @@ async fn main() -> anyhow::Result<()> {
     let addr = resolve_bind_addr(expose_config)?;
     tracing::info!(%addr, expose_config, "starting server");
     let listener = TcpListener::bind(addr).await?;
+    state.set_ready();
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;

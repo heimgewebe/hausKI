@@ -125,7 +125,7 @@ impl AppState {
         Ok(body)
     }
 
-    fn set_ready(&self) {
+    pub fn set_ready(&self) {
         self.0.ready.store(true, Ordering::Release);
     }
 
@@ -262,7 +262,7 @@ pub fn build_app(
     routing: RoutingPolicy,
     expose_config: bool,
     allowed_origin: HeaderValue,
-) -> Router {
+) -> (Router, AppState) {
     let state = AppState::new(limits, models, routing, expose_config);
     let allowed_origin = Arc::new(allowed_origin);
 
@@ -281,8 +281,7 @@ pub fn build_app(
     let app = app
         .with_state(state.clone())
         .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware));
-    // state.set_ready(); // Set readiness after server is listening, not here.
-    app
+    (app, state)
 }
 
 type CorsState = Arc<HeaderValue>;
@@ -372,7 +371,9 @@ mod tests {
             }],
         };
         let routing = RoutingPolicy::default();
-        build_app(limits, models, routing, expose, origin)
+        let (app, state) = build_app(limits, models, routing, expose, origin);
+        state.set_ready();
+        app
     }
 
     #[tokio::test]

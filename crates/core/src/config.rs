@@ -99,7 +99,7 @@ impl Default for Asr {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ModelsFile {
     pub models: Vec<ModelEntry>,
@@ -114,7 +114,7 @@ pub struct ModelEntry {
     pub canary: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(transparent)]
 pub struct RoutingPolicy(pub serde_yaml::Value);
 
@@ -147,15 +147,53 @@ pub fn load_limits<P: AsRef<Path>>(path: P) -> anyhow::Result<Limits> {
 }
 
 pub fn load_models<P: AsRef<Path>>(path: P) -> anyhow::Result<ModelsFile> {
-    let content = fs::read_to_string(path)?;
-    let models = serde_yaml::from_str(&content)?;
-    Ok(models)
+    let path = path.as_ref();
+    match fs::read_to_string(path) {
+        Ok(content) => match serde_yaml::from_str(&content) {
+            Ok(models) => Ok(models),
+            Err(err) => {
+                tracing::warn!(
+                    path = %path.display(),
+                    error = %err,
+                    "failed to parse models YAML, falling back to defaults"
+                );
+                Ok(ModelsFile::default())
+            }
+        },
+        Err(err) => {
+            tracing::warn!(
+                path = %path.display(),
+                error = %err,
+                "failed to read models YAML, falling back to defaults"
+            );
+            Ok(ModelsFile::default())
+        }
+    }
 }
 
 pub fn load_routing<P: AsRef<Path>>(path: P) -> anyhow::Result<RoutingPolicy> {
-    let content = fs::read_to_string(path)?;
-    let routing = serde_yaml::from_str(&content)?;
-    Ok(routing)
+    let path = path.as_ref();
+    match fs::read_to_string(path) {
+        Ok(content) => match serde_yaml::from_str(&content) {
+            Ok(routing) => Ok(routing),
+            Err(err) => {
+                tracing::warn!(
+                    path = %path.display(),
+                    error = %err,
+                    "failed to parse routing YAML, falling back to defaults"
+                );
+                Ok(RoutingPolicy::default())
+            }
+        },
+        Err(err) => {
+            tracing::warn!(
+                path = %path.display(),
+                error = %err,
+                "failed to read routing YAML, falling back to defaults"
+            );
+            Ok(RoutingPolicy::default())
+        }
+    }
 }
 
 #[cfg(test)]
@@ -223,5 +261,39 @@ mod tests {
         );
         assert!(!mapping.contains_key(&allow_key));
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn missing_models_file_falls_back_to_empty_list() {
+        let models = load_models("/does/not/exist/models.yaml").unwrap();
+        assert!(models.models.is_empty());
+    }
+
+    #[test]
+    fn invalid_models_yaml_falls_back_to_defaults() {
+        let path = std::env::temp_dir().join("hauski-test-invalid-models.yaml");
+        {
+            let mut file = File::create(&path).unwrap();
+            writeln!(file, "models: not-a-list").unwrap();
+            file.flush().unwrap();
+        }
+
+        let models = load_models(&path).unwrap();
+        assert!(models.models.is_empty());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn invalid_routing_yaml_falls_back_to_defaults() {
+        let path = std::env::temp_dir().join("hauski-test-invalid-routing.yaml");
+        {
+            let mut file = File::create(&path).unwrap();
+            write!(file, "routing: [invalid").unwrap();
+            file.flush().unwrap();
+        }
+
+        let routing = load_routing(&path).unwrap();
+        assert_eq!(routing, RoutingPolicy::default());
+        let _ = std::fs::remove_file(&path);
     }
 }
