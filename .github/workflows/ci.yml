@@ -54,6 +54,8 @@ jobs:
        github.event.pull_request.draft == false &&
        (needs.changes.outputs.rust == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
     runs-on: ubuntu-latest
+    env:
+      toolchain: stable
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +71,7 @@ jobs:
         run: vale .
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: ${{ env.toolchain }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: rustfmt (check)
@@ -86,12 +88,14 @@ jobs:
        github.event.pull_request.draft == false &&
        (needs.changes.outputs.rust == 'true' || needs.changes.outputs.policy_limits == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
     runs-on: ubuntu-latest
+    env:
+      toolchain: stable
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: ${{ env.toolchain }}
       - uses: Swatinem/rust-cache@v2
 
       - name: Build core (release)
@@ -238,6 +242,8 @@ jobs:
       (github.event_name != 'merge_group' &&
        github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
+    env:
+      toolchain: stable
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -245,7 +251,7 @@ jobs:
       # Toolchains & cache
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: ${{ env.toolchain }}
       - uses: Swatinem/rust-cache@v2
 
       # nextest (faster tests) & optional tools
