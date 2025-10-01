@@ -154,6 +154,13 @@ jobs:
       - name: Enforce p95 & error-rate
         shell: bash
         run: |
+          set -euo pipefail
+
+          if [[ ! -f observability/k6/summary.json ]]; then
+            echo "::error::k6 summary.json not found"
+            exit 1
+          fi
+
           # Node-k6 writes JSON; jq is pre-installed
           P95_ACTUAL=$(jq -r '
             .metrics."http_req_duration" as $metric
@@ -164,12 +171,27 @@ jobs:
               // $metric.values["p95"]
             )
           ' observability/k6/summary.json)
-          if [[ -z "$P95_ACTUAL" ]]; then
+
+          if [[ -z "$P95_ACTUAL" || "$P95_ACTUAL" == "null" ]]; then
             echo "::error::Unable to extract p95 from k6 summary"
             jq '{http_req_duration: .metrics."http_req_duration", http_req_failed: .metrics."http_req_failed"}' observability/k6/summary.json
             exit 1
           fi
-          FAIL_RATE=$(jq '.metrics."http_req_failed".rate' -r observability/k6/summary.json)
+
+          FAIL_RATE=$(jq -r '
+            .metrics."http_req_failed" as $metric
+            | (
+              $metric.rate
+              // $metric.values.rate
+            )
+          ' observability/k6/summary.json)
+
+          if [[ -z "$FAIL_RATE" || "$FAIL_RATE" == "null" ]]; then
+            echo "::error::Unable to extract fail rate from k6 summary"
+            jq '{http_req_duration: .metrics."http_req_duration", http_req_failed: .metrics."http_req_failed"}' observability/k6/summary.json
+            exit 1
+          fi
+
           echo "Actual p95: ${P95_ACTUAL} ms; Fail rate: ${FAIL_RATE}"
           echo "::notice::p95 actual: ${P95_ACTUAL} ms; fail rate: ${FAIL_RATE}"
           # Compare against budget from limits.yaml (ms -> ms)
