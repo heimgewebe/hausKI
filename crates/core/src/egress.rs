@@ -114,7 +114,7 @@ impl EgressGuard {
             None => return Ok(Self::allow_all()),
         };
 
-        let Some(egress_value) = mapping.get(&serde_yaml::Value::from(KEY_EGRESS)) else {
+        let Some(egress_value) = mapping.get(serde_yaml::Value::from(KEY_EGRESS)) else {
             return Ok(Self::allow_all());
         };
 
@@ -123,7 +123,7 @@ impl EgressGuard {
             .ok_or(EgressGuardError::InvalidEgressSection)?;
 
         let default_action = egress_map
-            .get(&serde_yaml::Value::from(KEY_DEFAULT))
+            .get(serde_yaml::Value::from(KEY_DEFAULT))
             .and_then(|value| value.as_str())
             .unwrap_or("allow")
             .to_ascii_lowercase();
@@ -135,7 +135,7 @@ impl EgressGuard {
         };
 
         let mut allowed = HashSet::new();
-        if let Some(allow_value) = egress_map.get(&serde_yaml::Value::from(KEY_ALLOW)) {
+        if let Some(allow_value) = egress_map.get(serde_yaml::Value::from(KEY_ALLOW)) {
             let allow_seq = allow_value
                 .as_sequence()
                 .ok_or(EgressGuardError::InvalidAllowList)?;
