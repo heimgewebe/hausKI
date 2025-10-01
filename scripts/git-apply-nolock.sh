@@ -26,6 +26,6 @@ cargo update
 # Stage all changes produced by the patch and cargo update.
 git add -u
 
-git commit -m "Apply patch (excluding Cargo.lock) and refresh lock"
+git commit -m "Apply patch '$patchfile' (excluding Cargo.lock) and refresh lock"
 
 echo "✅ Patch applied (without Cargo.lock). Lockfile regenerated and committed."
