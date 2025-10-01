@@ -26,6 +26,8 @@ prometheus-client = "0.22"
 walkdir = "2"
 dirs = "5"
 # sqlx bewusst nicht vorgezogen, bis erste DB-Crate existiert
+reqwest = { version = "0.12", features = ["json"] }
+url = "2"
 
 [patch.crates-io]
 signal-hook-registry = { path = "vendor/signal-hook-registry" }

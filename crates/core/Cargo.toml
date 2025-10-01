@@ -19,6 +19,8 @@ serde_yaml.workspace = true
 prometheus-client.workspace = true
 walkdir.workspace = true
 dirs.workspace = true
+reqwest.workspace = true
+url.workspace = true
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
