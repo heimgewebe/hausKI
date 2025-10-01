@@ -24,7 +24,7 @@ git apply --reject --whitespace=fix --exclude=Cargo.lock "$patchfile"
 cargo update
 
 # Stage all changes produced by the patch and cargo update.
-git add -A
+git add -u
 
 git commit -m "Apply patch (excluding Cargo.lock) and refresh lock"
 
