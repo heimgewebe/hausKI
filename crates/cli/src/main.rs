@@ -4,6 +4,8 @@ use serde::Deserialize;
 use std::path::PathBuf;
 use url::Url;
 
+use hauski_core::{load_models, ModelsFile};
+
 #[derive(Parser, Debug)]
 #[command(name = "hauski", version, about = "HausKI CLI")]
 struct Cli {
@@ -86,8 +88,7 @@ fn main() -> Result<()> {
             ModelsCmd::Ls => {
                 let path = std::env::var("HAUSKI_MODELS")
                     .unwrap_or_else(|_| "./configs/models.yml".to_string());
-                let content = std::fs::read_to_string(&path)?;
-                let file: ModelsFile = serde_yaml::from_str(&content)?;
+                let file = load_models(&path)?;
                 print_models_table(&file);
             }
             ModelsCmd::Pull { id } => println!("(stub) models pull {id}"),
@@ -112,48 +113,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug, Deserialize)]
-struct ModelsFile {
-    models: Vec<ModelEntry>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ModelEntry {
-    id: String,
-    path: String,
-    vram_min_gb: Option<u64>,
-    canary: Option<bool>,
-}
-
-#[derive(Debug, Deserialize)]
-struct HauskiConfig {
-    index: Option<IndexConfig>,
-    budgets: Option<BudgetsConfig>,
-    plugins: Option<PluginsConfig>,
-}
-
-#[derive(Debug, Deserialize)]
-struct IndexConfig {
-    path: String,
-    provider: ProviderConfig,
-}
-
-#[derive(Debug, Deserialize)]
-struct ProviderConfig {
-    embedder: String,
-    model: String,
-    url: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct BudgetsConfig {
-    index_topk20_ms: Option<u64>,
-}
-
-#[derive(Debug, Deserialize)]
-struct PluginsConfig {
-    enabled: Option<Vec<String>>,
-}
+// ---- Modelle (nutzt hauski_core::ModelsFile) ----
 
 fn print_models_table(file: &ModelsFile) {
     const HEADERS: [&str; 4] = ["ID", "Path", "VRAM Min", "Canary"];
@@ -225,6 +185,38 @@ fn print_models_table(file: &ModelsFile) {
     if !rows.is_empty() {
         println!("{separator}");
     }
+}
+
+// ---- Konfiguration (YAML) ----
+
+#[derive(Debug, Deserialize)]
+struct HauskiConfig {
+    index: Option<IndexConfig>,
+    budgets: Option<BudgetsConfig>,
+    plugins: Option<PluginsConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+struct IndexConfig {
+    path: String,
+    provider: ProviderConfig,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProviderConfig {
+    embedder: String,
+    model: String,
+    url: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct BudgetsConfig {
+    index_topk20_ms: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PluginsConfig {
+    enabled: Option<Vec<String>>,
 }
 
 fn validate_config(file: String) -> Result<()> {

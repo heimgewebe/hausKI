@@ -171,8 +171,12 @@ jobs:
             | (
               $metric.percentiles["p(95)"]
               // $metric.percentiles["p95"]
+              // $metric.percentiles["95"]
+              // $metric.percentiles["0.95"]
               // $metric.values["p(95)"]
               // $metric.values["p95"]
+              // $metric.values["95"]
+              // $metric.values["0.95"]
             )
           ' observability/k6/summary.json)
 
