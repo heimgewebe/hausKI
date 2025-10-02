@@ -14,6 +14,7 @@ HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-
 - [Quickstart](#quickstart)
 - [Entwicklung im Devcontainer](#entwicklung-im-devcontainer)
 - [Build, Test & Run](#build-test--run)
+- [Memory & semantische Suche](#memory--semantische-suche)
 - [Policies & Budgets](#policies--budgets)
 - [Modelle & Speicherorte](#modelle--speicherorte)
 - [Architektur & Verzeichnisse](#architektur--verzeichnisse)
@@ -120,6 +121,12 @@ Beispielabfragen für Dashboards oder die Prometheus-Konsole:
   ```promql
   histogram_quantile(0.95, sum by (le, method, path) (rate(http_request_duration_seconds_bucket[5m])))
   ```
+
+---
+
+## Memory & semantische Suche
+
+HausKI bringt mit [semantAH](docs/semantah.md) eine semantische Gedächtnisschicht mit. Der Bootstrap enthält Dokumentation, Konfiguration, Skripte und Rust-Scaffolds für Index, Graph und Related-Blöcke. Starte mit dem Quickstart in `docs/semantah.md`, um Ollama einzubinden, Seeds zu laden und die `/index`-Endpunkte zu testen.
 
 ---
 

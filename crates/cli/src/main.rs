@@ -1,5 +1,8 @@
+use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
+use std::path::PathBuf;
+use url::Url;
 
 #[derive(Parser, Debug)]
 #[command(name = "hauski", version, about = "HausKI CLI")]
@@ -29,6 +32,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: AudioCmd,
     },
+    /// Konfigurationswerkzeuge
+    Config {
+        #[command(subcommand)]
+        cmd: ConfigCmd,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -57,7 +65,17 @@ enum AudioCmd {
     ProfileSet { profile: String },
 }
 
-fn main() -> anyhow::Result<()> {
+#[derive(Subcommand, Debug)]
+enum ConfigCmd {
+    /// Validiert die HausKI-Konfiguration
+    Validate {
+        /// Pfad zur YAML-Datei
+        #[arg(long, default_value = "./configs/hauski.yml")]
+        file: String,
+    },
+}
+
+fn main() -> Result<()> {
     let cli = Cli::parse();
     if cli.verbose {
         eprintln!("verbose on");
@@ -84,6 +102,11 @@ fn main() -> anyhow::Result<()> {
                 println!("(stub) audio profile set {profile}")
             }
         },
+        Commands::Config { cmd } => match cmd {
+            ConfigCmd::Validate { file } => {
+                validate_config(file)?;
+            }
+        },
     }
 
     Ok(())
@@ -100,6 +123,36 @@ struct ModelEntry {
     path: String,
     vram_min_gb: Option<u64>,
     canary: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+struct HauskiConfig {
+    index: Option<IndexConfig>,
+    budgets: Option<BudgetsConfig>,
+    plugins: Option<PluginsConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+struct IndexConfig {
+    path: String,
+    provider: ProviderConfig,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProviderConfig {
+    embedder: String,
+    model: String,
+    url: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct BudgetsConfig {
+    index_topk20_ms: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PluginsConfig {
+    enabled: Option<Vec<String>>,
 }
 
 fn print_models_table(file: &ModelsFile) {
@@ -172,4 +225,85 @@ fn print_models_table(file: &ModelsFile) {
     if !rows.is_empty() {
         println!("{separator}");
     }
+}
+
+fn validate_config(file: String) -> Result<()> {
+    let expanded_path = shellexpand::full(&file)?;
+    let path = PathBuf::from(expanded_path.as_ref());
+    if !path.exists() {
+        bail!("Konfigurationsdatei {} existiert nicht", path.display());
+    }
+
+    let content = std::fs::read_to_string(&path).with_context(|| {
+        format!(
+            "Konfigurationsdatei {} konnte nicht gelesen werden",
+            path.display()
+        )
+    })?;
+    let config: HauskiConfig = serde_yaml::from_str(&content)
+        .context("Konfiguration konnte nicht als YAML geparst werden")?;
+
+    let index = config
+        .index
+        .as_ref()
+        .ok_or_else(|| anyhow!("index-Block fehlt"))?;
+
+    if index.path.trim().is_empty() {
+        bail!("index.path darf nicht leer sein");
+    }
+
+    let expanded_index_path = shellexpand::full(&index.path)?;
+    let index_path = PathBuf::from(expanded_index_path.as_ref());
+    if !index_path.is_absolute() {
+        bail!("index.path muss ein absoluter Pfad sein (nach Expansion)");
+    }
+
+    if let Some(parent) = index_path.parent() {
+        if !parent.exists() {
+            eprintln!(
+                "warn: Index-Verzeichnis {} existiert noch nicht (wird bei erstem Lauf erstellt)",
+                parent.display()
+            );
+        }
+    }
+
+    Url::parse(&index.provider.url).context("index.provider.url ist keine gültige URL")?;
+
+    if index.provider.embedder.trim().is_empty() {
+        bail!("index.provider.embedder darf nicht leer sein");
+    }
+
+    if index.provider.model.trim().is_empty() {
+        bail!("index.provider.model darf nicht leer sein");
+    }
+
+    if let Some(budgets) = &config.budgets {
+        if budgets.index_topk20_ms.is_none() {
+            eprintln!("warn: budgets.index_topk20_ms ist nicht gesetzt");
+        }
+    } else {
+        eprintln!("warn: budgets-Block fehlt");
+    }
+
+    if let Some(plugins) = &config.plugins {
+        let enabled = plugins
+            .enabled
+            .as_ref()
+            .ok_or_else(|| anyhow!("plugins.enabled fehlt"))?;
+        if !enabled.iter().any(|entry| entry == "obsidian_index") {
+            bail!("plugins.enabled muss obsidian_index enthalten");
+        }
+    } else {
+        bail!("plugins-Block fehlt");
+    }
+
+    println!(
+        "Konfiguration gültig: {}\n  index.path: {}\n  provider: {} ({})",
+        path.display(),
+        index_path.display(),
+        index.provider.embedder,
+        index.provider.model
+    );
+
+    Ok(())
 }

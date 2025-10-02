@@ -2,6 +2,8 @@
 members = [
   "crates/core",
   "crates/cli",
+  "crates/embeddings",
+  "crates/indexd",
   # weitere später: indexd, llm, asr, tts, audio, memory, commentary, bridge, observability, security, adapters/*
 ]
 resolver = "2"

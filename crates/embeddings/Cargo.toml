@@ -1,14 +1,11 @@
 [package]
-name = "hauski-cli"
+name = "hauski-embeddings"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
 
 [dependencies]
 anyhow.workspace = true
-clap.workspace = true
 serde.workspace = true
-serde_yaml.workspace = true
-hauski-core = { path = "../core", version = "0.1.0" }
+serde_json.workspace = true
 url.workspace = true
-shellexpand = "3"

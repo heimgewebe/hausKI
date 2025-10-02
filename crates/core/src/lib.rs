@@ -1,12 +1,13 @@
 use axum::{
     body::Body,
-    extract::State,
+    extract::{FromRef, State},
     http::{header, HeaderValue, Method, Request, StatusCode},
     middleware::{from_fn_with_state, Next},
     response::{IntoResponse, Response},
     routing::get,
     Json, Router,
 };
+use hauski_indexd::{router as index_router, IndexState};
 use prometheus_client::{
     encoding::{text::encode, EncodeLabel, EncodeLabelSet},
     metrics::{counter::Counter, family::Family, gauge::Gauge, histogram::Histogram},
@@ -33,6 +34,8 @@ pub use egress::{
 
 const LATENCY_BUCKETS: [f64; 8] = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0];
 
+type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
+
 /// Creates a latency histogram with predefined buckets.
 ///
 /// The bucket values are defined in the `LATENCY_BUCKETS` constant (in seconds).
@@ -53,6 +56,9 @@ struct AppStateInner {
     flags: FeatureFlags,
     http_requests: Family<HttpLabels, Counter<u64>>,
     http_latency: Family<HttpDurationLabels, Histogram>,
+    metrics_recorder: Arc<MetricsCallback>,
+    index: IndexState,
+    build_info: Family<BuildInfoLabels, Gauge>,
     registry: Registry,
     /// Controls whether configuration endpoints are exposed.
     ///
@@ -60,6 +66,21 @@ struct AppStateInner {
     /// Only set to `true` if you understand the security implications.
     expose_config: bool,
     ready: AtomicBool,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct BuildInfoLabels {
+    service: &'static str,
+}
+
+impl EncodeLabelSet for BuildInfoLabels {
+    fn encode(
+        &self,
+        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
+    ) -> Result<(), fmt::Error> {
+        ("service", self.service).encode(encoder.encode_label())?;
+        Ok(())
+    }
 }
 
 impl AppState {
@@ -72,13 +93,18 @@ impl AppState {
     ) -> Self {
         let mut registry = Registry::default();
 
-        let build_info = Family::<(), Gauge>::default();
-        build_info.get_or_create(&()).set(1);
-        registry.register("hauski_build_info", "static 1", build_info);
+        let build_info = Family::<BuildInfoLabels, Gauge>::default();
+        build_info
+            .get_or_create(&BuildInfoLabels { service: "core" })
+            .set(1);
+        build_info
+            .get_or_create(&BuildInfoLabels { service: "indexd" })
+            .set(1);
+        registry.register("build_info", "Build info per service", build_info.clone());
 
         let http_requests: Family<HttpLabels, Counter<u64>> = Family::default();
         registry.register(
-            "http_requests",
+            "http_requests_total",
             "Total number of HTTP requests received",
             http_requests.clone(),
         );
@@ -91,6 +117,22 @@ impl AppState {
             http_latency.clone(),
         );
 
+        let metrics_recorder: Arc<MetricsCallback> = {
+            let http_requests = http_requests.clone();
+            let http_latency = http_latency.clone();
+            Arc::new(move |method, path, status, started| {
+                let counter_labels = HttpLabels::new(method.clone(), path, status);
+                let duration_labels = HttpDurationLabels::new(method, path);
+                let elapsed = started.elapsed().as_secs_f64();
+                http_requests.get_or_create(&counter_labels).inc();
+                http_latency
+                    .get_or_create(&duration_labels)
+                    .observe(elapsed);
+            })
+        };
+
+        let index = IndexState::new(limits.latency.index_topk20_ms, metrics_recorder.clone());
+
         Self(Arc::new(AppStateInner {
             limits,
             models,
@@ -98,6 +140,9 @@ impl AppState {
             flags,
             http_requests,
             http_latency,
+            metrics_recorder,
+            index,
+            build_info,
             registry,
             expose_config,
             ready: AtomicBool::new(false),
@@ -120,6 +165,10 @@ impl AppState {
         self.0.flags.clone()
     }
 
+    pub fn index(&self) -> IndexState {
+        self.0.index.clone()
+    }
+
     pub fn safe_mode(&self) -> bool {
         self.0.flags.safe_mode
     }
@@ -134,21 +183,14 @@ impl AppState {
         Ok(body)
     }
 
-    fn record_http_observation(
+    pub fn record_http_observation(
         &self,
         method: Method,
         path: &'static str,
         status: StatusCode,
         started: Instant,
     ) {
-        let counter_labels = HttpLabels::new(method.clone(), path, status);
-        let duration_labels = HttpDurationLabels::new(method, path);
-        let elapsed = started.elapsed().as_secs_f64();
-        self.0.http_requests.get_or_create(&counter_labels).inc();
-        self.0
-            .http_latency
-            .get_or_create(&duration_labels)
-            .observe(elapsed);
+        (self.0.metrics_recorder)(method, path, status, started);
     }
 
     pub fn set_ready(&self) {
@@ -209,6 +251,12 @@ impl EncodeLabelSet for HttpLabels {
         ("path", self.path).encode(encoder.encode_label())?;
         ("status", self.status.as_str()).encode(encoder.encode_label())?;
         Ok(())
+    }
+}
+
+impl FromRef<AppState> for IndexState {
+    fn from_ref(state: &AppState) -> Self {
+        state.index()
     }
 }
 
@@ -311,7 +359,9 @@ pub fn build_app_with_state(
     let state = AppState::new(limits, models, routing, flags, expose_config);
     let allowed_origin = Arc::new(allowed_origin);
 
-    let mut app = core_routes();
+    let mut app = Router::new()
+        .merge(core_routes())
+        .nest("/index", index_router());
 
     if state.expose_config() {
         app = app.merge(config_routes());
@@ -414,6 +464,7 @@ mod tests {
         http::{header, HeaderValue, Request, StatusCode},
     };
     use http_body_util::BodyExt;
+    use serde_json::json;
     use tower::ServiceExt;
 
     fn demo_app(expose: bool) -> axum::Router {
@@ -499,6 +550,103 @@ mod tests {
             text_two
                 .contains(r#"http_requests_total{method="GET",path="/metrics",status="200"} 1"#),
             "metrics missing labeled metrics counter:\n{text_two}"
+        );
+    }
+
+    #[tokio::test]
+    async fn index_routes_accept_requests() {
+        let app = demo_app(false);
+
+        let upsert_payload = json!({
+            "doc_id": "doc-42",
+            "namespace": "default",
+            "chunks": [
+                {"chunk_id": "doc-42#0", "text": "Hallo Welt", "embedding": []}
+            ],
+            "meta": {"kind": "markdown"}
+        });
+
+        let upsert_res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/index/upsert")
+                    .method("POST")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(upsert_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(upsert_res.status(), StatusCode::OK);
+
+        let search_payload = json!({"query": "Hallo", "k": 5, "namespace": "default"});
+        let search_res = app
+            .oneshot(
+                Request::builder()
+                    .uri("/index/search")
+                    .method("POST")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(search_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(search_res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn metrics_include_index_search() {
+        let app = demo_app(false);
+
+        let upsert_payload = json!({
+            "doc_id": "metrics-demo",
+            "namespace": "default",
+            "chunks": [
+                {"chunk_id": "metrics-demo#0", "text": "Metrics Demo", "embedding": []}
+            ],
+            "meta": {"kind": "markdown"}
+        });
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/index/upsert")
+                    .method("POST")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(upsert_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let search_payload = json!({"query": "metrics", "k": 1, "namespace": "default"});
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/index/search")
+                    .method("POST")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(search_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let res = app
+            .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+
+        assert!(
+            text.contains(
+                r#"http_requests_total{method="POST",path="/index/search",status="200"} 1"#
+            ),
+            "metrics missing index/search counter:\n{text}"
         );
     }
 
