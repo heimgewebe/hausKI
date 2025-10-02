@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use serde::Deserialize;
+use hauski_core::{load_models, ModelsFile};
 
 #[derive(Parser, Debug)]
 #[command(name = "hauski", version, about = "HausKI CLI")]
@@ -68,8 +68,7 @@ fn main() -> anyhow::Result<()> {
             ModelsCmd::Ls => {
                 let path = std::env::var("HAUSKI_MODELS")
                     .unwrap_or_else(|_| "./configs/models.yml".to_string());
-                let content = std::fs::read_to_string(&path)?;
-                let file: ModelsFile = serde_yaml::from_str(&content)?;
+                let file = load_models(&path)?;
                 print_models_table(&file);
             }
             ModelsCmd::Pull { id } => println!("(stub) models pull {id}"),
@@ -87,19 +86,6 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-#[derive(Debug, Deserialize)]
-struct ModelsFile {
-    models: Vec<ModelEntry>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ModelEntry {
-    id: String,
-    path: String,
-    vram_min_gb: Option<u64>,
-    canary: Option<bool>,
 }
 
 fn print_models_table(file: &ModelsFile) {
