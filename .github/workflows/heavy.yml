@@ -72,8 +72,9 @@ jobs:
             -d '{"query":"hi","k":1,"namespace":"default"}' | tee search.txt
 
           curl -sf "http://127.0.0.1:8080/metrics" -o metrics.txt
-          awk '/http_request_duration_seconds_bucket/ && /path="\/index\/search"/ {print}' metrics.txt | head -n 5
-          first_bucket=$(awk '/http_request_duration_seconds_bucket/ && /path="\/index\/search"/ {print; exit}' metrics.txt)
+          search_histogram_pattern='/http_request_duration_seconds_bucket/ && /path="\/index\/search"/ {print}'
+          awk "$search_histogram_pattern" metrics.txt | head -n 5
+          first_bucket=$(awk "$search_histogram_pattern {exit}" metrics.txt)
           if [ -n "$first_bucket" ]; then
             echo "::notice::index search histogram sample: $first_bucket"
           fi
