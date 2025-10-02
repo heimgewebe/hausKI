@@ -17,6 +17,7 @@ concurrency:
 
 env:
   RUSTFLAGS: "-Dwarnings"
+  toolchain: stable
 
 jobs:
   changes:
