@@ -38,7 +38,13 @@ fn parse_allow_entry(entry: &str) -> Result<AllowedTarget, AllowEntryError> {
     }
 
     if let Ok(url) = Url::parse(trimmed) {
-        return allowed_target_from_url(&url);
+        if url.host_str().is_some() {
+            return allowed_target_from_url(&url);
+        }
+
+        if trimmed.contains("://") {
+            return Err(AllowEntryError::MissingHost);
+        }
     }
 
     let fallback = format!("http://{trimmed}");
