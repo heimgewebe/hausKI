@@ -24,6 +24,8 @@ jobs:
       sh:    ${{ steps.filter.outputs.sh }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -47,6 +49,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Markdownlint
         run: |
           npm i -g markdownlint-cli@0.41.0
@@ -71,6 +75,8 @@ jobs:
       RUSTFLAGS: -Dwarnings
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - uses: dtolnay/rust-toolchain@stable
