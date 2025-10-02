@@ -55,5 +55,29 @@ wgx:
         - --
         - -D
         - warnings
+    'run semantah:all':
+      desc: "SemantAH-Pipeline (Index, Graph, Related)"
+      cmd: make
+      args:
+        - -C
+        - tools/semantah
+        - all
+    'run semantah:related':
+      desc: "Nur Related-Writer ausführen"
+      cmd: make
+      args:
+        - -C
+        - tools/semantah
+        - related
+    'guard semantah':
+      desc: "Config validieren & Related-Writer Dry-Run"
+      safe: true
+      cmd: bash
+      args:
+        - -c
+        - |
+          set -euo pipefail
+          cargo run -p hauski-cli -- config validate
+          make -C tools/semantah related CHECK=1
   envDefaults:
     RUST_LOG: "info,hauski=debug"

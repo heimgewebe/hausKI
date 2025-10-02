@@ -1,0 +1,30 @@
+{
+  "nodes": [
+    {
+      "id": "welcome",
+      "type": "file",
+      "file": "notes/welcome.md",
+      "x": 0,
+      "y": 0,
+      "width": 380,
+      "height": 200
+    },
+    {
+      "id": "ideas",
+      "type": "file",
+      "file": "notes/ideas.md",
+      "x": 420,
+      "y": 0,
+      "width": 380,
+      "height": 200
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-welcome-ideas",
+      "fromNode": "welcome",
+      "toNode": "ideas",
+      "label": "inspiriert"
+    }
+  ]
+}

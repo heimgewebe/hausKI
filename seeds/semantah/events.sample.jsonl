@@ -1,0 +1,2 @@
+{"id": "2024-09-01-launch", "timestamp": "2024-09-01T09:00:00Z", "title": "semantAH Bootstrap gestartet", "kind": "milestone", "details": "Dokumentation, WGX-Recipes und Rust-Scaffolds wurden eingespielt."}
+{"id": "2024-09-15-sync", "timestamp": "2024-09-15T18:30:00Z", "title": "WGX Related-Update", "kind": "run", "details": "wgx run semantah:related aktualisiert die Seeds-Notizen."}

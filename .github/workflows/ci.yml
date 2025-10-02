@@ -214,6 +214,21 @@ jobs:
         if: always()
         run: kill $(cat server.pid) || true
 
+  index-budget-gate:
+    name: index budget gate
+    needs: [changes]
+    if: >
+      (github.event_name == 'merge_group') ||
+      (github.event_name != 'merge_group' &&
+       github.event.pull_request.draft == false &&
+       (needs.changes.outputs.rust == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Emit TODO notice
+        run: |
+          echo "::warning::index-budget-gate placeholder – TODO: hook up vegeta/k6 export once available"
+          echo "Skipping enforcement for now."
+
   deny:
     name: cargo-deny
     needs: lint
