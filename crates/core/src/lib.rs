@@ -95,10 +95,10 @@ impl AppState {
 
         let build_info = Family::<BuildInfoLabels, Gauge>::default();
         build_info
-            .get_or_create(&BuildInfoLabels { service: "core" })
+            .get_or_create(&BuildInfoLabels { service: CORE_SERVICE_NAME })
             .set(1);
         build_info
-            .get_or_create(&BuildInfoLabels { service: "indexd" })
+            .get_or_create(&BuildInfoLabels { service: INDEXD_SERVICE_NAME })
             .set(1);
         registry.register("build_info", "Build info per service", build_info.clone());
 
