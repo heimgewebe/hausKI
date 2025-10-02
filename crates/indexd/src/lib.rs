@@ -235,8 +235,8 @@ mod tests {
         assert_eq!(res.status(), StatusCode::OK);
 
         let search_payload = serde_json::json!({"query": "Hallo", "k": 1, "namespace": "default"});
-        let res = router()
-            .with_state(IndexState::new(60, Arc::new(|_, _, _, _| {})))
+        let res = app
+            .clone()
             .oneshot(
                 Request::builder()
                     .uri("/search")
