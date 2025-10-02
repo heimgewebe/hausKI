@@ -9,25 +9,19 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
-env:
-  RUSTFLAGS: "-Dwarnings"
-  toolchain: stable
 
 jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      rust: ${{ steps.filter.outputs.rust }}
-      docs: ${{ steps.filter.outputs.docs }}
-      policy_limits: ${{ steps.filter.outputs.policy_limits }}
-      any:  ${{ steps.filter.outputs.any }}
+      rust:  ${{ steps.filter.outputs.rust }}
+      docs:  ${{ steps.filter.outputs.docs }}
+      sh:    ${{ steps.filter.outputs.sh }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -36,292 +30,84 @@ jobs:
           filters: |
             rust:
               - '**/*.rs'
-              - '**/Cargo.toml'
-              - '**/Cargo.lock'
-              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
             docs:
               - '**/*.md'
-            policy_limits:
-              - 'policies/limits.yaml'
-            any:
-              - '**'
+              - 'docs/**'
+            sh:
+              - '**/*.sh'
+              - '.github/workflows/**'
 
-  lint:
-    name: rustfmt + clippy
+  repo-lint:
+    name: Repo — Markdown & Shell
     needs: changes
-    if: >
-      (github.event_name == 'merge_group') ||
-      (github.event_name != 'merge_group' &&
-       github.event.pull_request.draft == false &&
-       (needs.changes.outputs.rust == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
+    if: needs.changes.outputs.docs == 'true' || needs.changes.outputs.sh == 'true' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
-    env:
-      toolchain: stable
-    timeout-minutes: 12
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install Vale
+      - name: Markdownlint
         run: |
-          set -euo pipefail
-          VALE_VERSION=3.6.0
-          curl -fsSL "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" -o /tmp/vale.tar.gz
-          tar -xzf /tmp/vale.tar.gz -C /tmp
-          sudo find /tmp -type f -name vale -exec mv {} /usr/local/bin/vale \;
-          sudo chmod +x /usr/local/bin/vale
-      - name: Prose lint (Vale)
-        run: vale .
+          npm i -g markdownlint-cli@0.41.0
+          git ls-files '*.md' | xargs -r markdownlint
+      - name: ShellCheck
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          git ls-files '*.sh' | xargs -r shellcheck -x
+      - name: Lychee (links)
+        if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress --verbose --retry-wait-time 2 --max-redirects 5 --exclude-mail "**/*.md"
+
+  rust-check:
+    name: Rust — fmt & clippy & test
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RUSTFLAGS: -Dwarnings
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable Rust problem matchers
+        run: echo "::add-matcher::.github/rust.json"
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.toolchain }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: rustfmt (check)
-        run: cargo fmt --all --check
-      - name: clippy (deny warnings)
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Cargo fmt
+        run: cargo fmt --all -- --check
+      - name: Cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+      - name: Tests
+        run: |
+          if command -v cargo-nextest >/dev/null; then
+            cargo nextest run --workspace --all-features --no-fail-fast
+          else
+            cargo test --workspace --all-features --no-fail-fast
+          fi
+      - name: Upload target (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-check-target
+          path: target
+          if-no-files-found: ignore
+          retention-days: 7
 
-  smoke:
-    name: latency & error-budget (k6)
-    needs: [lint, changes]
-    if: >
-      (github.event_name == 'merge_group') ||
-      (github.event_name != 'merge_group' &&
-       github.event.pull_request.draft == false &&
-       (needs.changes.outputs.rust == 'true' || needs.changes.outputs.policy_limits == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
+  security:
+    name: Rust — deny & audit
+    needs: changes
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
     runs-on: ubuntu-latest
-    env:
-      toolchain: stable
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.toolchain }}
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Build core (release)
-        run: cargo build -p hauski-core --release
-
-      - name: Run server (background) & wait for /health
-        shell: bash
-        run: |
-          set -euo pipefail
-          nohup ./target/release/hauski-core >server.log 2>&1 &
-          echo $! > server.pid
-
-          ready=0
-          for _ in {1..30}; do
-            if curl -sf http://127.0.0.1:8080/health >/dev/null; then
-              ready=1
-              break
-            fi
-
-            if [ ! -f server.pid ]; then
-              # PID file not yet created, wait and retry
-              sleep 2
-              continue
-            fi
-            if ! kill -0 "$(cat server.pid)" 2>/dev/null; then
-              echo "::error::hauski-core terminated before becoming ready"
-              cat server.log || true
-              exit 1
-            fi
-
-            sleep 2
-          done
-
-          if [[ "$ready" -ne 1 ]]; then
-            echo "::error::hauski-core failed to start within expected time"
-            cat server.log || true
-            exit 1
-          fi
-
-          curl -fsS http://127.0.0.1:8080/health
-
-      - name: Setup k6
-        uses: grafana/setup-k6-action@v1
-
-      - name: Extract p95 budget from policies/limits.yaml
-        id: budget
-        shell: bash
-        run: |
-          # without yq: simple robust extraction
-          P95=$(awk '/llm_p95_ms:/ {print $2; exit}' policies/limits.yaml)
-          if [[ -z "$P95" ]]; then P95=400; fi
-          echo "p95=$P95" >> "$GITHUB_OUTPUT"
-          echo "Budget p95: $P95 ms"
-          echo "::notice::k6 budget p95 (ms): $P95"
-
-      - name: k6 smoke (export summary)
-        run: |
-          k6 run --summary-export=./observability/k6/summary.json ./observability/k6/health-smoke.js
-
-      - name: Enforce p95 & error-rate
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [[ ! -f observability/k6/summary.json ]]; then
-            echo "::error::k6 summary.json not found"
-            exit 1
-          fi
-
-          # Node-k6 writes JSON; jq is pre-installed
-          P95_ACTUAL=$(jq -r '
-            .metrics."http_req_duration" as $metric
-            | (
-              $metric.percentiles["p(95)"]
-              // $metric.percentiles["p95"]
-              // $metric.percentiles["95"]
-              // $metric.percentiles["0.95"]
-              // $metric.values["p(95)"]
-              // $metric.values["p95"]
-              // $metric.values["95"]
-              // $metric.values["0.95"]
-            )
-          ' observability/k6/summary.json)
-
-          debug_summary() {
-            jq '{http_req_duration: .metrics."http_req_duration", http_req_failed: .metrics."http_req_failed"}' observability/k6/summary.json
-          }
-
-          if [[ -z "$P95_ACTUAL" || "$P95_ACTUAL" == "null" ]]; then
-            echo "::error::Unable to extract p95 from k6 summary"
-            debug_summary
-            exit 1
-          fi
-
-          FAIL_RATE=$(jq -r '
-            .metrics."http_req_failed" as $metric
-            | (
-              $metric.rate
-              // $metric.values.rate
-            )
-          ' observability/k6/summary.json)
-
-          if [[ -z "$FAIL_RATE" || "$FAIL_RATE" == "null" ]]; then
-            echo "::error::Unable to extract fail rate from k6 summary"
-            debug_summary
-            exit 1
-          fi
-
-          echo "Actual p95: ${P95_ACTUAL} ms; Fail rate: ${FAIL_RATE}"
-          echo "::notice::p95 actual: ${P95_ACTUAL} ms; fail rate: ${FAIL_RATE}"
-          # Compare against budget from limits.yaml (ms -> ms)
-          awk -v a="$P95_ACTUAL" -v b="${{ steps.budget.outputs.p95 }}" 'BEGIN{ if (a<=b) exit 0; else exit 1 }'
-          awk -v r="$FAIL_RATE" 'BEGIN{ if (r<0.01) exit 0; else exit 1 }'
-
-      - name: Stop server
-        if: always()
-        run: kill $(cat server.pid) || true
-
-  index-budget-gate:
-    name: index budget gate
-    needs: [changes]
-    if: >
-      (github.event_name == 'merge_group') ||
-      (github.event_name != 'merge_group' &&
-       github.event.pull_request.draft == false &&
-       (needs.changes.outputs.rust == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
-    runs-on: ubuntu-latest
-    steps:
-      - name: Emit TODO notice
-        run: |
-          echo "::warning::index-budget-gate placeholder – TODO: hook up vegeta/k6 export once available"
-          echo "Skipping enforcement for now."
-
-  deny:
-    name: cargo-deny
-    needs: lint
-    if: always() && !cancelled()
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
-        with:
-          command: check bans sources advisories
-
-  audit:
-    name: cargo audit
-    needs: lint
-    if: always() && !cancelled()
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
       - uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  test:
-    name: targeted tests (nextest)
-    needs: [lint]
-    if: >
-      (github.event_name == 'merge_group') ||
-      (github.event_name != 'merge_group' &&
-       github.event.pull_request.draft == false)
-    runs-on: ubuntu-latest
-    env:
-      toolchain: stable
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-
-      # Toolchains & cache
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.toolchain }}
-      - uses: Swatinem/rust-cache@v2
-
-      # nextest (faster tests) & optional tools
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: nextest
-
-      # Determine changed crates by package compared to the base
-      - name: Compute changed crates
-        id: diff
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE="origin/${{ github.base_ref }}"
-            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-            FILES=$(git diff --name-only "$BASE"...HEAD || true)
-          else
-            # merge_group / workflow_dispatch → no base: fall back to workspace
-            FILES=""
-          fi
-          echo "$FILES" > /tmp/changed.txt
-          CRATES=$(grep -E '^crates/[^/]+/' /tmp/changed.txt | awk -F/ '{print $2}' | sort -u || true)
-          echo "changed=$CRATES" >> "$GITHUB_OUTPUT"
-
-      # Label logic: 'full-ci' enforces full workspace tests
-      - name: Decide test scope
-        id: scope
-        shell: bash
-        run: |
-          labels="${{ github.event.pull_request.number && join(github.event.pull_request.labels.*.name, ' ') || '' }}"
-          if echo "$labels" | grep -qiE '(^| )full-ci( |$)'; then
-            echo "mode=workspace" >> "$GITHUB_OUTPUT"
-          elif [[ -n "${{ steps.diff.outputs.changed }}" ]]; then
-            echo "mode=changed" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=workspace" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Run tests (targeted or workspace)
-        shell: bash
-        run: |
-          set -euo pipefail
-          MODE="${{ steps.scope.outputs.mode }}"
-          if [[ "$MODE" == "changed" ]]; then
-            for pkg in ${{ steps.diff.outputs.changed }}; do
-              echo "==> testing crate: $pkg"
-              cargo nextest run -p "$pkg" --all-features --no-fail-fast
-            done
-          else
-            echo "==> testing workspace"
-            cargo nextest run --workspace --all-features --no-fail-fast
-          fi

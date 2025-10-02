@@ -1,0 +1,49 @@
+name: release
+on:
+  push:
+    tags: ['v*.*.*']
+jobs:
+  publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build (release, locked)
+        run: cargo build --workspace --release --locked
+      - name: Package binaries
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          suffix="${{ matrix.os }}"
+          tag="${GITHUB_REF_NAME:-}"
+          if [ -z "$tag" ]; then
+            tag="${GITHUB_REF##*/}"
+            if [ -z "$tag" ]; then
+              tag="unknown"
+            fi
+          fi
+          for bin in hauski-core hauski-cli; do
+            src="target/release/$bin"
+            if [ -f "$src" ]; then
+              out="dist/${bin}-${tag}-${suffix}"
+              cp "$src" "$out"
+              strip "$out" || true
+            fi
+          done
+          if [ "$(ls -A dist)" ]; then
+            if command -v sha256sum >/dev/null; then
+              (cd dist && sha256sum * > "SHA256SUMS-${tag}-${suffix}.txt")
+            else
+              (cd dist && shasum -a 256 * > "SHA256SUMS-${tag}-${suffix}.txt")
+            fi
+          fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
