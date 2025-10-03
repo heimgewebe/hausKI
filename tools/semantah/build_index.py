@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Stub zum Erzeugen von semantAH-Indexartefakten."""
+
 from __future__ import annotations
 
 import argparse
@@ -15,11 +16,19 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="semantAH Index-Stub")
     parser.add_argument(
         "--index-path",
-        default=os.environ.get("HAUSKI_INDEX_PATH", os.path.expandvars("$HOME/.local/state/hauski/index")),
+        default=os.environ.get(
+            "HAUSKI_INDEX_PATH", os.path.expandvars("$HOME/.local/state/hauski/index")
+        ),
         help="Basisverzeichnis für den Index",
     )
-    parser.add_argument("--namespace", default=DEFAULT_NAMESPACE, help="Namespace (z. B. default oder obsidian)")
-    parser.add_argument("--chunks", nargs="*", help="Optional: Pfade zu Markdown- oder Canvas-Dateien")
+    parser.add_argument(
+        "--namespace",
+        default=DEFAULT_NAMESPACE,
+        help="Namespace (z. B. default oder obsidian)",
+    )
+    parser.add_argument(
+        "--chunks", nargs="*", help="Optional: Pfade zu Markdown- oder Canvas-Dateien"
+    )
     return parser.parse_args()
 
 
@@ -46,7 +55,9 @@ def write_embeddings(gewebe: Path, chunks: List[Path]) -> None:
         )
 
     parquet.write_text("placeholder for embeddings parquet\n", encoding="utf-8")
-    manifest.write_text(json.dumps(manifest_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    manifest.write_text(
+        json.dumps(manifest_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
 def write_report(gewebe: Path, chunks: List[Path]) -> None:
