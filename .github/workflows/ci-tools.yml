@@ -1,0 +1,58 @@
+name: CI (tools)
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '**/*.py'
+      - 'docs/**'
+      - '.github/workflows/ci-tools.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Sync dev deps
+        run: uv sync --group dev
+
+      - name: Ruff check
+        run: uv run ruff check .
+
+      - name: Pytests
+        run: |
+          if [ -f "pytest.ini" ] || [ -d "tests" ] || ls tests_*.py 1> /dev/null 2>&1; then
+            uv run pytest -q
+          else
+            echo "No Python tests – skipping."
+          fi
+
+      - name: Build docs
+        run: |
+          if [ -f "mkdocs.yml" ]; then
+            uv run mkdocs build --clean
+          else
+            echo "No mkdocs.yml – skipping."
+          fi

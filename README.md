@@ -54,7 +54,7 @@ cargo test --workspace -- --nocapture
 ---
 
 ## Entwicklung im Devcontainer
-- Basis-Tooling: Rust, Node, Python sowie optionale CUDA-Runtime.
+- Basis-Tooling: Rust, Node, Python, uv sowie optionale CUDA-Runtime.
 - Empfohlene Extensions: rust-analyzer, direnv, Docker, GitLens, Markdown-Mermaid.
 - Vorgefertigte Tasks: `cargo: fmt`, `cargo: clippy`, `cargo: build`, `cargo: test`.
 - Just-Shortcuts: `just fmt`, `just lint`, `just build`, `just test`, `just run-core`.
@@ -121,6 +121,17 @@ Beispielabfragen für Dashboards oder die Prometheus-Konsole:
   ```promql
   histogram_quantile(0.95, sum by (le, method, path) (rate(http_request_duration_seconds_bucket[5m])))
   ```
+
+## Lint & Tests
+- Formatierung: `cargo fmt --all`.
+- Lints: `cargo clippy --all-targets --all-features -- -D warnings` und `cargo deny check`.
+- Tests: `cargo test --workspace -- --nocapture`.
+- **Python-Tooling (optional):**
+  - Setup: `just py-init`
+  - Lint: `just py-lint`
+  - Format: `just py-fmt`
+  - Tests: `just py-test`
+  - Docs lokal: `just py-docs-serve`
 
 ---
 

@@ -1,0 +1,24 @@
+[project]
+name = "hauski-tools"
+version = "0.0.1"
+description = "Local tooling for HausKI (docs, lint, scripts) via uv"
+requires-python = ">=3.10"
+readme = "README.md"
+
+[tool.uv]
+managed = true
+
+[dependency-groups]
+dev = [
+  "ruff>=0.6",
+  "pre-commit>=3.8",
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+  "pytest>=8.3",
+  "rich>=13.9"
+]
+
+[scripts]
+lint = "ruff check ."
+fmt = "ruff format ."
+test = "pytest -q"

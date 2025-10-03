@@ -18,3 +18,7 @@ RUN set -e; \
     sha256sum -c "$ARCHIVE.sha256"; \
     tar -xJ --strip-components=1 -C /usr/local/bin "$ARCHIVE" "cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl/cargo-deny"; \
     rm "$ARCHIVE" "$ARCHIVE.sha256"
+# Install uv (astral)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && install -m 0755 /root/.cargo/bin/uv /usr/local/bin/uv
+
