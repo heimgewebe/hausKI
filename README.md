@@ -127,11 +127,18 @@ Beispielabfragen für Dashboards oder die Prometheus-Konsole:
 - Lints: `cargo clippy --all-targets --all-features -- -D warnings` und `cargo deny check`.
 - Tests: `cargo test --workspace -- --nocapture`.
 - **Python-Tooling (optional):**
-  - Setup: `just py-init`
+  - Setup:
+    ```bash
+    uv sync --group dev
+    uv run pre-commit install
+    ```
+  - Init: `just py-init`
   - Lint: `just py-lint`
   - Format: `just py-fmt`
   - Tests: `just py-test`
   - Docs lokal: `just py-docs-serve`
+  - Docs strikt: `just py-docs-build`
+  - Hooks lokal prüfen: `just py-pre-commit`
 
 ---
 
