@@ -43,7 +43,7 @@ jobs:
 
       - name: Pytests
         run: |
-          if [ -f "pytest.ini" ] || [ -d "tests" ]; then
+          if [ -f "pytest.ini" ] || [ -d "tests" ] || ls tests_*.py 1> /dev/null 2>&1; then
             uv run pytest -q
           else
             echo "No Python tests – skipping."
