@@ -1,7 +1,7 @@
 name: CI (smart PR)
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [ main ]
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group: {}
@@ -44,11 +44,54 @@ jobs:
   repo-lint:
     name: Repo — Markdown & Shell
     needs: changes
-    if: needs.changes.outputs.docs == 'true' || needs.changes.outputs.sh == 'true' || github.event_name == 'merge_group'
+    if: >
+      (github.event_name == 'merge_group') ||
+      (github.event_name != 'merge_group' &&
+       github.event.pull_request.draft == false &&
+       (needs.changes.outputs.rust == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
+    runs-on: ubuntu-latest
+    env:
+      toolchain: stable
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install Vale
+        run: |
+          set -euo pipefail
+          VALE_VERSION=3.6.0
+          curl -fsSL "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" -o /tmp/vale.tar.gz
+          tar -xzf /tmp/vale.tar.gz -C /tmp
+          sudo find /tmp -type f -name vale -exec mv {} /usr/local/bin/vale \;
+          sudo chmod +x /usr/local/bin/vale
+      - name: Prose lint (Vale)
+        run: vale .
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.toolchain }}
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: rustfmt (check)
+        run: cargo fmt --all --check
+      - name: clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  smoke:
+    name: latency & error-budget (k6)
+    needs: [lint, changes]
+    if: >
+      (github.event_name == 'merge_group') ||
+      (github.event_name != 'merge_group' &&
+       github.event.pull_request.draft == false &&
+       (needs.changes.outputs.rust == 'true' || needs.changes.outputs.policy_limits == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: dtolnay/rust-toolchain@stable
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Markdownlint
