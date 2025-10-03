@@ -25,7 +25,7 @@ Diese Richtlinie beschreibt Tonalität, Wortwahl und Formatkonventionen für das
 
 ## Durchsetzung & Tools
 
-Vale prüft sowohl Prosa als auch Kommentare. Die Konfiguration liegt in [.vale.ini](../../.vale.ini).
+Vale prüft sowohl Prosa als auch Kommentare. Die Konfiguration liegt in einer lokalen `.vale.ini` (Datei fehlt derzeit).
 
 - `vale .` lokal ausführen oder den entsprechenden CI-Schritt abwarten.
 - Markdown-Dateien unterliegen dem Style `hauski/GermanProse` (Deutsch erlaubt, Gender-Sonderzeichen verboten).
