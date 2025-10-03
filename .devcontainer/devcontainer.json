@@ -4,8 +4,12 @@
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/devcontainers/features/rust:1": { "profile": "default" },
-    "ghcr.io/devcontainers/features/node:1": { "version": "20" }
+    "ghcr.io/devcontainers/features/rust:1": {
+      "profile": "default"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    }
   },
   "customizations": {
     "vscode": {
@@ -19,5 +23,5 @@
     }
   },
   "remoteUser": "vscode",
-  "postCreateCommand": ".devcontainer/setup.sh"
+  "postCreateCommand": ".devcontainer/setup.sh && (command -v just >/dev/null 2>&1 && just py-init || true)"
 }
