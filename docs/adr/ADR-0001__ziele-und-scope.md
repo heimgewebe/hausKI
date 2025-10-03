@@ -5,7 +5,7 @@
 
 ## Kontext
 
-Die HausKI soll als integriertes System für Smart-Home-Assistenten entstehen. Das Zielbild wird in der [HausKI-Skizze](../../hauski-skizze.md) beschrieben und dient als Grundlage für Architektur- und Produktentscheidungen.
+Die HausKI soll als integriertes System für Smart-Home-Assistenten entstehen. Das Zielbild wird in der HausKI-Skizze (Datei fehlt derzeit) beschrieben und dient als Grundlage für Architektur- und Produktentscheidungen.
 
 ## Entscheidung
 
