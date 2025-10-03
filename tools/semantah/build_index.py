@@ -7,7 +7,7 @@ import argparse
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 DEFAULT_NAMESPACE = "default"
 
@@ -39,10 +39,10 @@ def ensure_dirs(base: Path) -> Path:
     return gewebe
 
 
-def write_embeddings(gewebe: Path, chunks: List[Path]) -> None:
+def write_embeddings(gewebe: Path, chunks: list[Path]) -> None:
     parquet = gewebe / "embeddings.parquet"
     manifest = gewebe / "chunks.json"
-    manifest_data: List[Dict[str, Any]] = []
+    manifest_data: list[dict[str, Any]] = []
 
     for chunk_path in chunks:
         manifest_data.append(
@@ -60,7 +60,7 @@ def write_embeddings(gewebe: Path, chunks: List[Path]) -> None:
     )
 
 
-def write_report(gewebe: Path, chunks: List[Path]) -> None:
+def write_report(gewebe: Path, chunks: list[Path]) -> None:
     reports = gewebe / "reports"
     reports.mkdir(exist_ok=True)
     report_path = reports / "index_report.md"
