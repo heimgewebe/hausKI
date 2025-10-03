@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Stub zum Erzeugen eines semantAH-Graphen."""
+
 from __future__ import annotations
 
 import argparse
@@ -15,7 +16,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="semantAH Graph-Stub")
     parser.add_argument(
         "--index-path",
-        default=os.environ.get("HAUSKI_INDEX_PATH", os.path.expandvars("$HOME/.local/state/hauski/index")),
+        default=os.environ.get(
+            "HAUSKI_INDEX_PATH", os.path.expandvars("$HOME/.local/state/hauski/index")
+        ),
         help="Basisverzeichnis für den Index",
     )
     parser.add_argument("--namespace", default=DEFAULT_NAMESPACE, help="Namespace")
@@ -78,7 +81,9 @@ def write_graph(gewebe: Path, namespace: str) -> None:
 
     report = gewebe / "reports"
     report.mkdir(exist_ok=True)
-    (report / "graph_report.md").write_text("# semantAH Graph Report (Stub)\n", encoding="utf-8")
+    (report / "graph_report.md").write_text(
+        "# semantAH Graph Report (Stub)\n", encoding="utf-8"
+    )
 
 
 def main() -> None:

@@ -5,6 +5,7 @@ Der Writer ersetzt den Block `<!-- related:auto:start --> … <!-- related:auto:
 idempotent. Er nutzt die stubhaften Graph-Artefakte und erzeugt deterministische
 Ausgaben. Mit `--check` wird nur ein Diff erzeugt.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -19,7 +20,9 @@ from typing import Dict, Iterable, List, Tuple
 DEFAULT_NAMESPACE = "default"
 MARKER_START = "<!-- related:auto:start -->"
 MARKER_END = "<!-- related:auto:end -->"
-BLOCK_PATTERN = re.compile(r"<!-- related:auto:start -->.*?<!-- related:auto:end -->", re.DOTALL)
+BLOCK_PATTERN = re.compile(
+    r"<!-- related:auto:start -->.*?<!-- related:auto:end -->", re.DOTALL
+)
 
 
 @dataclass
@@ -46,7 +49,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="semantAH Related Writer")
     parser.add_argument(
         "--index-path",
-        default=os.environ.get("HAUSKI_INDEX_PATH", os.path.expandvars("$HOME/.local/state/hauski/index")),
+        default=os.environ.get(
+            "HAUSKI_INDEX_PATH", os.path.expandvars("$HOME/.local/state/hauski/index")
+        ),
         help="Basisverzeichnis für den Index",
     )
     parser.add_argument("--namespace", default=DEFAULT_NAMESPACE, help="Namespace")
@@ -55,8 +60,14 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("HAUSKI_OBSIDIAN_VAULT", "seeds/obsidian.sample"),
         help="Pfad zum Obsidian-Vault",
     )
-    parser.add_argument("--note", help="Nur eine spezifische Note aktualisieren (relativer Pfad)")
-    parser.add_argument("--check", action="store_true", help="Nur Diff anzeigen, keine Dateien schreiben")
+    parser.add_argument(
+        "--note", help="Nur eine spezifische Note aktualisieren (relativer Pfad)"
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Nur Diff anzeigen, keine Dateien schreiben",
+    )
     return parser.parse_args()
 
 
@@ -101,7 +112,9 @@ def load_edges(path: Path) -> List[Edge]:
     return edges
 
 
-def build_related_map(nodes: Dict[str, Node], edges: Iterable[Edge]) -> Dict[str, RelatedBlock]:
+def build_related_map(
+    nodes: Dict[str, Node], edges: Iterable[Edge]
+) -> Dict[str, RelatedBlock]:
     related: Dict[str, RelatedBlock] = {}
 
     for edge in edges:
@@ -157,7 +170,12 @@ def upsert_block(content: str, rendered: str) -> Tuple[str, bool]:
     return new_content, True
 
 
-def update_notes(vault: Path, related_map: Dict[str, RelatedBlock], check_only: bool, single_note: str | None) -> None:
+def update_notes(
+    vault: Path,
+    related_map: Dict[str, RelatedBlock],
+    check_only: bool,
+    single_note: str | None,
+) -> None:
     for relative_path, block in sorted(related_map.items()):
         if single_note and relative_path != single_note:
             continue
