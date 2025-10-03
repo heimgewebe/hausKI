@@ -52,7 +52,7 @@ jobs:
       - name: Build docs
         run: |
           if [ -f "mkdocs.yml" ]; then
-            uv run mkdocs build --clean
+            uv run mkdocs build --strict --clean
           else
             echo "No mkdocs.yml – skipping."
           fi
