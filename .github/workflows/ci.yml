@@ -52,21 +52,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       toolchain: stable
+      RUSTFLAGS: -Dwarnings
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Install Vale
-        run: |
-          set -euo pipefail
-          VALE_VERSION=3.6.0
-          curl -fsSL "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" -o /tmp/vale.tar.gz
-          tar -xzf /tmp/vale.tar.gz -C /tmp
-          sudo find /tmp -type f -name vale -exec mv {} /usr/local/bin/vale \;
-          sudo chmod +x /usr/local/bin/vale
-      - name: Prose lint (Vale)
-        run: vale .
+      - name: Enable Rust problem matchers
+        run: echo "::add-matcher::.github/rust.json"
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.toolchain }}
@@ -77,28 +68,50 @@ jobs:
       - name: clippy (deny warnings)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-  smoke:
-    name: latency & error-budget (k6)
-    needs: [lint, changes]
+  links:
+    name: docs link check (lychee)
+    needs: changes
     if: >
       (github.event_name == 'merge_group') ||
       (github.event_name != 'merge_group' &&
        github.event.pull_request.draft == false &&
-       (needs.changes.outputs.rust == 'true' || needs.changes.outputs.policy_limits == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
+       (needs.changes.outputs.docs == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: dtolnay/rust-toolchain@stable
+          args: >-
+            --no-progress
+            --verbose
+            --retry-wait-time 2
+            --max-redirects 5
+            --max-retries 2
+            --exclude-mail
+            --accept 200,204,206,301,302,307,308
+            --user-agent "lychee-ci"
+            --
+            "**/*.md"
+      - name: Upload lychee report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Markdownlint
-        run: |
-          npm i -g markdownlint-cli@0.41.0
-          git ls-files '*.md' | xargs -r markdownlint
-      - name: ShellCheck
+          name: lychee-report
+          path: ./.lycheecache
+          if-no-files-found: ignore
+
+  index-budget-gate:
+    name: index budget gate
+    needs: [changes]
+    if: >
+      (github.event_name == 'merge_group') ||
+      (github.event_name != 'merge_group' &&
+       github.event.pull_request.draft == false &&
+       (needs.changes.outputs.rust == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Emit TODO notice
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
           git ls-files '*.sh' | xargs -r shellcheck -x

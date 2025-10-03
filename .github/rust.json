@@ -1,32 +1,42 @@
 {
   "problemMatcher": [
     {
-      "owner": "rustc",
+      "owner": "rustc-error",
       "pattern": [
         {
-          "regexp": "^error\[[^\]]+\]: (.*)$",
-          "message": 1
+          "regexp": "^(error)(\\[[^\\]]+\\])?:\\s+(.*)$",
+          "message": 3,
+          "severity": "error"
         },
         {
-          "regexp": "^ *--> ([^:]+):(\d+):(\d+)$",
+          "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
           "file": 1,
           "line": 2,
           "column": 3
+        },
+        {
+          "regexp": "^\\s*\|.*$",
+          "loop": true
         }
       ]
     },
     {
-      "owner": "clippy",
+      "owner": "rustc-warning",
       "pattern": [
         {
-          "regexp": "^error: (.*)$",
-          "message": 1
+          "regexp": "^(warning)(\\[[^\\]]+\\])?:\\s+(.*)$",
+          "message": 3,
+          "severity": "warning"
         },
         {
-          "regexp": "^ *--> ([^:]+):(\d+):(\d+)$",
+          "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
           "file": 1,
           "line": 2,
           "column": 3
+        },
+        {
+          "regexp": "^\\s*\|.*$",
+          "loop": true
         }
       ]
     }
