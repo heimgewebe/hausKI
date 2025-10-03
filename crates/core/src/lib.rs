@@ -33,6 +33,7 @@ pub use egress::{
 };
 
 const LATENCY_BUCKETS: [f64; 8] = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0];
+const CORE_SERVICE_NAME: &str = "core";
 
 type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
 
@@ -361,7 +362,7 @@ pub fn build_app_with_state(
 
     let mut app = Router::new()
         .merge(core_routes())
-        .nest("/index", index_router());
+        .nest("/index", index_router::<AppState>());
 
     if state.expose_config() {
         app = app.merge(config_routes());
