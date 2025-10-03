@@ -89,7 +89,6 @@ jobs:
             --retry-wait-time 2
             --max-redirects 5
             --max-retries 2
-            --exclude-mail
             --accept 200,204,206,301,302,307,308
             --user-agent "lychee-ci"
             --
@@ -120,7 +119,7 @@ jobs:
         if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --no-progress --verbose --retry-wait-time 2 --max-redirects 5 --exclude-mail "**/*.md"
+          args: --no-progress --verbose --retry-wait-time 2 --max-redirects 5 -- "**/*.md"
 
   rust-check:
     name: Rust — fmt & clippy & test
