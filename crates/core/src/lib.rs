@@ -1,12 +1,13 @@
 use axum::{
     body::Body,
-    extract::{FromRef, State},
+    extract::State,
     http::{header, HeaderValue, Method, Request, StatusCode},
     middleware::{from_fn_with_state, Next},
     response::{IntoResponse, Response},
     routing::get,
     Json, Router,
 };
+use axum::extract::FromRef;
 use hauski_indexd::{router as index_router, IndexState};
 use prometheus_client::{
     encoding::{text::encode, EncodeLabel, EncodeLabelSet},
