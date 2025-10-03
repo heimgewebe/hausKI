@@ -1,0 +1,34 @@
+{
+  "problemMatcher": [
+    {
+      "owner": "rustc",
+      "pattern": [
+        {
+          "regexp": "^error\[[^\]]+\]: (.*)$",
+          "message": 1
+        },
+        {
+          "regexp": "^ *--> ([^:]+):(\d+):(\d+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3
+        }
+      ]
+    },
+    {
+      "owner": "clippy",
+      "pattern": [
+        {
+          "regexp": "^error: (.*)$",
+          "message": 1
+        },
+        {
+          "regexp": "^ *--> ([^:]+):(\d+):(\d+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3
+        }
+      ]
+    }
+  ]
+}
