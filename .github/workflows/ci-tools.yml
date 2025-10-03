@@ -36,7 +36,7 @@ jobs:
             ${{ runner.os }}-uv-
 
       - name: Sync dev deps
-        run: uv sync --group dev
+        run: uv sync --group dev --frozen
 
       - name: Ruff check
         run: uv run ruff check .
