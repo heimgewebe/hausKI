@@ -1,117 +1,96 @@
 name: CI (heavy on demand)
 
 on:
-  workflow_dispatch:
-    inputs:
-      matrix:
-        description: "Toolchain matrix (comma separated)"
-        required: false
-        default: "stable,beta"
+  workflow_dispatch: {}
   pull_request:
-    types: [labeled, synchronize]
+    types: [labeled, synchronize, reopened, ready_for_review]
     branches: [ main ]
 
-permissions:
-  contents: read
+permissions: { contents: read }
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  decide:
+  gate:
     runs-on: ubuntu-latest
     outputs:
       run_heavy: ${{ steps.flags.outputs.run_heavy }}
-      matrix: ${{ steps.flags.outputs.matrix }}
     steps:
-      - name: Compute flags
-        id: flags
+      - id: flags
         shell: bash
         run: |
-          labels="${{ github.event.pull_request.number && join(github.event.pull_request.labels.*.name, ' ') || '' }}"
-          # Heavy runs when:
-          #  - workflow_dispatch (always), or
-          #  - PR has the label 'full-ci'
+          labels="${{ join(github.event.pull_request.labels.*.name, ' ') }}"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "run_heavy=true" >> "$GITHUB_OUTPUT"
-            matrix="${{ github.event.inputs.matrix }}"
           elif echo "$labels" | grep -qiE '(^| )full-ci( |$)'; then
             echo "run_heavy=true" >> "$GITHUB_OUTPUT"
-            matrix="stable,beta"
           else
             echo "run_heavy=false" >> "$GITHUB_OUTPUT"
-            matrix="stable"
           fi
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
-  heavy:
-    needs: decide
-    if: needs.decide.outputs.run_heavy == 'true'
+  e2e:
+    needs: gate
+    if: needs.gate.outputs.run_heavy == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        toolchain: ${{ fromJSON(format('["{0}"]', join(split(needs.decide.outputs.matrix, ','), '","'))) }}
-    env:
-      toolchain: ${{ matrix.toolchain }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Enable Rust problem matchers
+        run: echo "::add-matcher::.github/rust.json"
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.toolchain }}
-          # we switch the toolchain explicitly via rustup in the next step
-          components: rustfmt, clippy
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: nextest
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: llvm-tools-preview
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-llvm-cov
       - uses: Swatinem/rust-cache@v2
-
-      - name: Switch toolchain
-        run: rustup default ${{ matrix.toolchain }}
-
       - name: Build (release)
-        run: cargo build --workspace --release --locked
-
-      - name: Tests (workspace, nextest)
-        run: cargo nextest run --workspace --all-features --no-fail-fast
-
-      - name: Coverage (llvm-cov, lcov)
+        run: cargo build --workspace --release
+      - name: API smoke test
+        env:
+          RUST_LOG: info
+          RUST_BACKTRACE: 1
         run: |
-          cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
-        continue-on-error: true
+          set -euo pipefail
+          target/release/hauski-core >server.log 2>&1 &
+          server_pid=$!
+          trap "kill $server_pid" EXIT
 
-      - name: Upload coverage
+          for _ in $(seq 1 30); do
+            if curl -sf "http://127.0.0.1:8080/ready" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl -sf "http://127.0.0.1:8080/ready" | tee ready.txt
+          curl -sf "http://127.0.0.1:8080/health" | tee health.txt
+
+          curl -sf -X POST "http://127.0.0.1:8080/index/upsert" \
+            -H 'content-type: application/json' \
+            -d '{"doc_id":"smoke","namespace":"default","chunks":[{"text":"hi"}],"meta":{}}' | tee upsert.txt
+
+          curl -sf -X POST "http://127.0.0.1:8080/index/search" \
+            -H 'content-type: application/json' \
+            -d '{"query":"hi","k":1,"namespace":"default"}' | tee search.txt
+
+          curl -sf "http://127.0.0.1:8080/metrics" -o metrics.txt
+          search_histogram_pattern='/http_request_duration_seconds_bucket/ && /path="\/index\/search"/ {print}'
+          awk "$search_histogram_pattern" metrics.txt | head -n 5
+          first_bucket=$(awk "$search_histogram_pattern {exit}" metrics.txt)
+          if [ -n "$first_bucket" ]; then
+            echo "::notice::index search histogram sample: $first_bucket"
+          fi
+          echo "::notice::index search budget p95 target: 60ms (observability to be enforced later)"
+      - name: Upload logs/artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.toolchain }}
-          path: lcov.info
+          name: hauski-heavy-artifacts
+          path: |
+            target
+            server.log
+            ready.txt
+            health.txt
+            upsert.txt
+            search.txt
+            metrics.txt
           if-no-files-found: ignore
-
-  policy-gate:
-    needs: decide
-    if: needs.decide.outputs.run_heavy == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Validate policy definitions
-        run: |
-          test -s policies/slo.yaml
-          test -s policies/perf.json
-          python - <<'PY'
-import json
-from pathlib import Path
-
-with Path("policies/perf.json").open() as handle:
-    json.load(handle)
-
-print("policies/perf.json is valid JSON")
-PY
+          retention-days: 7

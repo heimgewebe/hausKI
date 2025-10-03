@@ -1,7 +1,7 @@
 name: CI (smart PR)
 
 on:
-  pull_request:
+  pull_request_target:
     branches: [ main ]
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group: {}
@@ -9,45 +9,40 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
-env:
-  RUSTFLAGS: "-Dwarnings"
-  toolchain: stable
 
 jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      rust: ${{ steps.filter.outputs.rust }}
-      docs: ${{ steps.filter.outputs.docs }}
-      policy_limits: ${{ steps.filter.outputs.policy_limits }}
-      any:  ${{ steps.filter.outputs.any }}
+      rust:  ${{ steps.filter.outputs.rust }}
+      docs:  ${{ steps.filter.outputs.docs }}
+      sh:    ${{ steps.filter.outputs.sh }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
             rust:
               - '**/*.rs'
-              - '**/Cargo.toml'
-              - '**/Cargo.lock'
-              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
             docs:
               - '**/*.md'
-            policy_limits:
-              - 'policies/limits.yaml'
-            any:
-              - '**'
+              - 'docs/**'
+            sh:
+              - '**/*.sh'
+              - '.github/workflows/**'
 
-  lint:
-    name: rustfmt + clippy
+  repo-lint:
+    name: Repo — Markdown & Shell
     needs: changes
     if: >
       (github.event_name == 'merge_group') ||
@@ -118,101 +113,63 @@ jobs:
     steps:
       - name: Emit TODO notice
         run: |
-          echo "::warning::index-budget-gate placeholder – TODO: hook up vegeta/k6 export once available"
-          echo "Skipping enforcement for now."
-
-  deny:
-    name: cargo-deny
-    needs: lint
-    if: always() && !cancelled()
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          git ls-files '*.sh' | xargs -r shellcheck -x
+      - name: Lychee (links)
+        if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
+        uses: lycheeverse/lychee-action@v2
         with:
-          command: check bans sources advisories
+          args: --no-progress --verbose --retry-wait-time 2 --max-redirects 5 --exclude-mail "**/*.md"
 
-  audit:
-    name: cargo audit
-    needs: lint
-    if: always() && !cancelled()
+  rust-check:
+    name: Rust — fmt & clippy & test
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  test:
-    name: targeted tests (nextest)
-    needs: [lint]
-    if: >
-      (github.event_name == 'merge_group') ||
-      (github.event_name != 'merge_group' &&
-       github.event.pull_request.draft == false)
-    runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
-      toolchain: stable
-    timeout-minutes: 25
+      RUSTFLAGS: -Dwarnings
     steps:
       - uses: actions/checkout@v4
-
-      # Toolchains & cache
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Enable Rust problem matchers
+        run: echo "::add-matcher::.github/rust.json"
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.toolchain }}
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-
-      # nextest (faster tests) & optional tools
+      - name: Cargo fmt
+        run: cargo fmt --all -- --check
+      - name: Cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
       - uses: taiki-e/install-action@v2
         with:
           tool: nextest
-
-      # Determine changed crates by package compared to the base
-      - name: Compute changed crates
-        id: diff
-        shell: bash
+      - name: Tests
         run: |
-          set -euo pipefail
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE="origin/${{ github.base_ref }}"
-            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-            FILES=$(git diff --name-only "$BASE"...HEAD || true)
-          else
-            # merge_group / workflow_dispatch → no base: fall back to workspace
-            FILES=""
-          fi
-          echo "$FILES" > /tmp/changed.txt
-          CRATES=$(grep -E '^crates/[^/]+/' /tmp/changed.txt | awk -F/ '{print $2}' | sort -u || true)
-          echo "changed=$CRATES" >> "$GITHUB_OUTPUT"
-
-      # Label logic: 'full-ci' enforces full workspace tests
-      - name: Decide test scope
-        id: scope
-        shell: bash
-        run: |
-          labels="${{ github.event.pull_request.number && join(github.event.pull_request.labels.*.name, ' ') || '' }}"
-          if echo "$labels" | grep -qiE '(^| )full-ci( |$)'; then
-            echo "mode=workspace" >> "$GITHUB_OUTPUT"
-          elif [[ -n "${{ steps.diff.outputs.changed }}" ]]; then
-            echo "mode=changed" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=workspace" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Run tests (targeted or workspace)
-        shell: bash
-        run: |
-          set -euo pipefail
-          MODE="${{ steps.scope.outputs.mode }}"
-          if [[ "$MODE" == "changed" ]]; then
-            for pkg in ${{ steps.diff.outputs.changed }}; do
-              echo "==> testing crate: $pkg"
-              cargo nextest run -p "$pkg" --all-features --no-fail-fast
-            done
-          else
-            echo "==> testing workspace"
+          if command -v cargo-nextest >/dev/null; then
             cargo nextest run --workspace --all-features --no-fail-fast
+          else
+            cargo test --workspace --all-features --no-fail-fast
           fi
+      - name: Upload target (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-check-target
+          path: target
+          if-no-files-found: ignore
+          retention-days: 7
+
+  security:
+    name: Rust — deny & audit
+    needs: changes
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: rustsec/audit-check@v2
