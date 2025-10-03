@@ -13,9 +13,9 @@ import difflib
 import json
 import os
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
 
 DEFAULT_NAMESPACE = "default"
 MARKER_START = "<!-- related:auto:start -->"
@@ -41,8 +41,8 @@ class Node:
 
 @dataclass
 class RelatedBlock:
-    auto: List[Tuple[str, float]]
-    review: List[Tuple[str, float]]
+    auto: list[tuple[str, float]]
+    review: list[tuple[str, float]]
 
 
 def parse_args() -> argparse.Namespace:
@@ -75,8 +75,8 @@ def gewebe_dir(index_path: Path, namespace: str) -> Path:
     return index_path.expanduser() / namespace / ".gewebe"
 
 
-def load_nodes(path: Path) -> Dict[str, Node]:
-    mapping: Dict[str, Node] = {}
+def load_nodes(path: Path) -> dict[str, Node]:
+    mapping: dict[str, Node] = {}
     nodes_file = path / "nodes.jsonl"
     if not nodes_file.exists():
         return mapping
@@ -93,9 +93,9 @@ def load_nodes(path: Path) -> Dict[str, Node]:
     return mapping
 
 
-def load_edges(path: Path) -> List[Edge]:
+def load_edges(path: Path) -> list[Edge]:
     edges_path = path / "edges.jsonl"
-    edges: List[Edge] = []
+    edges: list[Edge] = []
     if not edges_path.exists():
         return edges
 
@@ -113,9 +113,9 @@ def load_edges(path: Path) -> List[Edge]:
 
 
 def build_related_map(
-    nodes: Dict[str, Node], edges: Iterable[Edge]
-) -> Dict[str, RelatedBlock]:
-    related: Dict[str, RelatedBlock] = {}
+    nodes: dict[str, Node], edges: Iterable[Edge]
+) -> dict[str, RelatedBlock]:
+    related: dict[str, RelatedBlock] = {}
 
     for edge in edges:
         source_node = nodes.get(edge.source)
@@ -156,7 +156,7 @@ def render_block(block: RelatedBlock) -> str:
     return "\n".join(lines) + "\n"
 
 
-def upsert_block(content: str, rendered: str) -> Tuple[str, bool]:
+def upsert_block(content: str, rendered: str) -> tuple[str, bool]:
     if BLOCK_PATTERN.search(content):
         new_content = BLOCK_PATTERN.sub(rendered.strip("\n"), content)
         # Stelle sicher, dass der Block auf einer eigenen Zeile endet
@@ -172,7 +172,7 @@ def upsert_block(content: str, rendered: str) -> Tuple[str, bool]:
 
 def update_notes(
     vault: Path,
-    related_map: Dict[str, RelatedBlock],
+    related_map: dict[str, RelatedBlock],
     check_only: bool,
     single_note: str | None,
 ) -> None:
@@ -213,7 +213,7 @@ def main() -> None:
         if args.note:
             related_map[args.note] = RelatedBlock(auto=[], review=[])
         else:
-            print("[semantah] keine Kanten gefunden – keine Notizen aktualisiert")
+            print("[semantah] keine Kanten gefunden - keine Notizen aktualisiert")
             return
 
     update_notes(vault, related_map, args.check, args.note)

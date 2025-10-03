@@ -6,8 +6,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any
 
 DEFAULT_NAMESPACE = "default"
 
@@ -32,7 +33,7 @@ def ensure_dirs(base: Path) -> Path:
     return gewebe
 
 
-def build_stub_nodes(namespace: str) -> Iterable[Dict[str, Any]]:
+def build_stub_nodes(namespace: str) -> Iterable[dict[str, Any]]:
     vault_rel = "notes"
     return [
         {
@@ -48,7 +49,7 @@ def build_stub_nodes(namespace: str) -> Iterable[Dict[str, Any]]:
     ]
 
 
-def build_stub_edges(nodes: List[Dict[str, Any]]) -> Iterable[Dict[str, Any]]:
+def build_stub_edges(nodes: list[dict[str, Any]]) -> Iterable[dict[str, Any]]:
     if len(nodes) < 2:
         return []
     source, target = nodes[0], nodes[1]
@@ -66,7 +67,7 @@ def build_stub_edges(nodes: List[Dict[str, Any]]) -> Iterable[Dict[str, Any]]:
     ]
 
 
-def write_jsonl(path: Path, items: Iterable[Dict[str, Any]]) -> None:
+def write_jsonl(path: Path, items: Iterable[dict[str, Any]]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for item in items:
             handle.write(json.dumps(item, ensure_ascii=False) + "\n")
