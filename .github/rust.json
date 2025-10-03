@@ -1,0 +1,44 @@
+{
+  "problemMatcher": [
+    {
+      "owner": "rustc-error",
+      "pattern": [
+        {
+          "regexp": "^(error)(\\[[^\\]]+\\])?:\\s+(.*)$",
+          "message": 3,
+          "severity": "error"
+        },
+        {
+          "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3
+        },
+        {
+          "regexp": "^\\s*\|.*$",
+          "loop": true
+        }
+      ]
+    },
+    {
+      "owner": "rustc-warning",
+      "pattern": [
+        {
+          "regexp": "^(warning)(\\[[^\\]]+\\])?:\\s+(.*)$",
+          "message": 3,
+          "severity": "warning"
+        },
+        {
+          "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3
+        },
+        {
+          "regexp": "^\\s*\|.*$",
+          "loop": true
+        }
+      ]
+    }
+  ]
+}
