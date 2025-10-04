@@ -6,7 +6,7 @@
         {
           "regexp": "^(error)(\\[[^\\]]+\\])?:\\s+(.*)$",
           "message": 3,
-          "severity": "error"
+          "severity": 1
         },
         {
           "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
@@ -26,7 +26,7 @@
         {
           "regexp": "^(warning)(\\[[^\\]]+\\])?:\\s+(.*)$",
           "message": 3,
-          "severity": "warning"
+          "severity": 2
         },
         {
           "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
