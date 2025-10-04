@@ -27,7 +27,7 @@ jobs:
         run: cargo install cargo-llvm-cov --locked --version 0.6.9
       - name: Run coverage (focused)
         env:
-          # genügt für llvm-cov, ist etwas schneller als debuginfo=2
+          # sufficient for llvm-cov; slightly faster than debuginfo=2
           RUSTFLAGS: "-C debuginfo=1"
         run: |
           # nur die runtime-relevanten Crates messen
