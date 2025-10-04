@@ -4,6 +4,6 @@
 
 ```bash
 cd tools/py
-uv sync        # erstellt venv, installiert deps (aktuell leer)
+uv sync --frozen        # erstellt venv, installiert deps (aktuell leer)
 uv run python -V
 ```

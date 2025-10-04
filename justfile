@@ -27,7 +27,7 @@ run-cli ARGS='':
 # Python tooling via uv
 
 py-init:
-	uv sync --group dev
+        uv sync --group dev --frozen
 
 py-lint:
 	uv run ruff check .

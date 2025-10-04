@@ -129,7 +129,7 @@ Beispielabfragen für Dashboards oder die Prometheus-Konsole:
 - **Python-Tooling (optional):**
   - Setup:
     ```bash
-    uv sync --group dev
+    uv sync --group dev --frozen
     uv run pre-commit install
     ```
   - Init: `just py-init`
