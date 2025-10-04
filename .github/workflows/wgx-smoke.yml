@@ -1,7 +1,7 @@
 name: wgx-smoke (disabled)
 on:
-  # Nur noch manuell startbar, damit die Datei gültig bleibt,
-  # aber im normalen CI nicht mehr „rot“ erscheint.
+  # Only manually startable to keep the file valid,
+  # but no longer appears "red" in normal CI.
   workflow_dispatch: {}
 
 jobs:
