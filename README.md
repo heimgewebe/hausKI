@@ -1,4 +1,6 @@
 ![WGX](https://img.shields.io/badge/wgx-enabled-blue)
+![security](https://github.com/hauski/hauski/actions/workflows/security.yml/badge.svg)
+![coverage](https://github.com/hauski/hauski/actions/workflows/coverage.yml/badge.svg)
 
 # HausKI — Rust-first, Offline-Default, GPU-aware
 
