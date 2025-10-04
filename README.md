@@ -28,6 +28,19 @@ HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-
 
 ---
 
+## Server-Tunables (per Umgebungsvariable)
+
+| Variable                    | Typ | Default | Wirkung |
+|----------------------------|-----|---------|--------|
+| `HAUSKI_HTTP_TIMEOUT_MS`   | u64 | `1500`  | Request-Timeout in Millisekunden (bei `0` deaktiviert) |
+| `HAUSKI_HTTP_CONCURRENCY`  | u64 | `512`   | Limit gleichzeitiger Requests (bei `0` deaktiviert) |
+
+Beispiel:
+
+```bash
+HAUSKI_HTTP_TIMEOUT_MS=2500 HAUSKI_HTTP_CONCURRENCY=256 ./target/release/hauski-cli serve
+```
+
 ## Schnellstart
 
 **Voraussetzungen lokal (Pop!_OS, Rust stable):**
