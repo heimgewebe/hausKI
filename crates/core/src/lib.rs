@@ -422,7 +422,7 @@ fn core_routes() -> Router<AppState> {
         .route(
             "/docs/openapi.json",
             get(|| async {
-                // robuste Ausgabe als JSON-String
+                // robust output as JSON string
                 let json = ApiDoc::openapi().to_json().expect("openapi json");
                 (
                     StatusCode::OK,
