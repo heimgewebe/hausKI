@@ -73,7 +73,7 @@ tasks:
       - |
         echo "[wgx.smoke] repo=$(basename "$(git rev-parse --show-toplevel)")"
         [ -f Cargo.toml ] && cargo metadata --no-deps > /dev/null || true
-        [ -f pyproject.toml ] && grep -q '^\[project\]' pyproject.toml || true
+        [ -f pyproject.toml ] && grep -q '^\[project\]\s*$' pyproject.toml || true
 
 meta:
   owner: "alexdermohr"
