@@ -1,3 +1,4 @@
+use axum::extract::FromRef;
 use axum::{
     body::Body,
     extract::State,
@@ -7,7 +8,6 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use axum::extract::FromRef;
 use hauski_indexd::{router as index_router, IndexState};
 use prometheus_client::{
     encoding::{text::encode, EncodeLabel, EncodeLabelSet},
@@ -20,8 +20,11 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
+use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 mod config;
 mod egress;
@@ -35,8 +38,16 @@ pub use egress::{
 
 const LATENCY_BUCKETS: [f64; 8] = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0];
 const CORE_SERVICE_NAME: &str = "core";
+const INDEXD_SERVICE_NAME: &str = "indexd";
 
 type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(health, ready),
+    tags((name = "core", description = "Core health & readiness"))
+)]
+struct ApiDoc;
 
 /// Creates a latency histogram with predefined buckets.
 ///
@@ -97,10 +108,14 @@ impl AppState {
 
         let build_info = Family::<BuildInfoLabels, Gauge>::default();
         build_info
-            .get_or_create(&BuildInfoLabels { service: CORE_SERVICE_NAME })
+            .get_or_create(&BuildInfoLabels {
+                service: CORE_SERVICE_NAME,
+            })
             .set(1);
         build_info
-            .get_or_create(&BuildInfoLabels { service: INDEXD_SERVICE_NAME })
+            .get_or_create(&BuildInfoLabels {
+                service: INDEXD_SERVICE_NAME,
+            })
             .set(1);
         registry.register("build_info", "Build info per service", build_info.clone());
 
@@ -286,6 +301,12 @@ async fn get_routing(State(state): State<AppState>) -> Json<RoutingPolicy> {
     response
 }
 
+#[utoipa::path(
+    get,
+    path = "/health",
+    responses((status = 200, description = "Service healthy")),
+    tag = "core"
+)]
 async fn health(State(state): State<AppState>) -> &'static str {
     let started = Instant::now();
     let status = StatusCode::OK;
@@ -293,6 +314,15 @@ async fn health(State(state): State<AppState>) -> &'static str {
     "ok"
 }
 
+#[utoipa::path(
+    get,
+    path = "/ready",
+    responses(
+        (status = 200, description = "Service ready"),
+        (status = 503, description = "Service starting")
+    ),
+    tag = "core"
+)]
 async fn ready(State(state): State<AppState>) -> (StatusCode, &'static str) {
     let started = Instant::now();
     let (status, body) = if state.is_ready() {
@@ -378,7 +408,9 @@ pub fn build_app_with_state(
     // The readiness flag is set by the caller once the listener is bound.
     let app = app
         .with_state(state.clone())
-        .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware));
+        .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware))
+        .layer(TimeoutLayer::new(Duration::from_millis(1500)))
+        .layer(ConcurrencyLimitLayer::new(512));
     (app, state)
 }
 
@@ -387,6 +419,19 @@ fn core_routes() -> Router<AppState> {
         .route("/health", get(health))
         .route("/ready", get(ready))
         .route("/metrics", get(metrics))
+        .route(
+            "/docs/openapi.json",
+            get(|| async {
+                // robust output as JSON string
+                let json = ApiDoc::openapi().to_json().expect("openapi json");
+                (
+                    StatusCode::OK,
+                    [(header::CONTENT_TYPE, "application/json")],
+                    json,
+                )
+            }),
+        )
+        .merge(SwaggerUi::new("/docs").url("/docs/openapi.json", "openapi.json"))
 }
 
 fn config_routes() -> Router<AppState> {

@@ -1,0 +1,20 @@
+name: security
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  pull_request:
+  workflow_dispatch:
+jobs:
+  audit-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install tools
+        run: |
+          cargo install cargo-audit --locked
+          cargo install cargo-deny --locked
+      - name: cargo audit
+        run: cargo audit
+      - name: cargo deny
+        run: cargo deny check
