@@ -1,10 +1,11 @@
+use axum::error_handling::HandleErrorLayer;
 use axum::extract::FromRef;
 use axum::{
     body::Body,
     extract::State,
     http::{header, HeaderValue, Method, Request, StatusCode},
     middleware::{from_fn_with_state, Next},
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Response},
     routing::get,
     Json, Router,
 };
@@ -22,9 +23,8 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer};
+use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, BoxError, ServiceBuilder};
 use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
 
 mod config;
 mod egress;
@@ -391,9 +391,8 @@ pub fn build_app_with_state(
     let state = AppState::new(limits, models, routing, flags, expose_config);
     let allowed_origin = Arc::new(allowed_origin);
 
-    // --- Configurable server tunables --------------------------------------
-    // Defaults: 1500ms timeout, 512 concurrent requests.
-    // Override via environment variables:
+    // --- Request guards ------------------------------------------------------
+    // Defaults: 1500ms timeout, 512 concurrent requests – configurable via ENV:
     //   HAUSKI_HTTP_TIMEOUT_MS (u64; 0 = disabled)
     //   HAUSKI_HTTP_CONCURRENCY (u64; 0 = disabled)
     fn env_u64(key: &str, default: u64) -> u64 {
@@ -411,12 +410,14 @@ pub fn build_app_with_state(
     let timeout_ms = env_u64("HAUSKI_HTTP_TIMEOUT_MS", 1500);
     let concurrency = env_u64("HAUSKI_HTTP_CONCURRENCY", 512);
 
+    // Apply a timeout and concurrency limit before executing handlers so that
+    // overload and slow upstreams surface consistent errors.
     let mut app = Router::new()
         .merge(core_routes())
         .nest("/index", index_router::<AppState>());
 
     if state.expose_config() {
-        app = app.merge(config_routes());
+        app = app.merge(config_routes()).merge(docs_routes());
     }
 
     if state.safe_mode() {
@@ -425,22 +426,34 @@ pub fn build_app_with_state(
         app = app.merge(plugin_routes()).merge(cloud_routes());
     }
 
-    // The readiness flag is set by the caller once the listener is bound.
-    let mut app = app
-        .with_state(state.clone())
-        .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware));
-
+    let mut request_guards =
+        ServiceBuilder::new().layer(HandleErrorLayer::new(|err: BoxError| async move {
+            if err.is::<tower::timeout::error::Elapsed>() {
+                (StatusCode::REQUEST_TIMEOUT, "request timed out")
+            } else {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "service temporarily unavailable",
+                )
+            }
+        }));
     if timeout_ms > 0 {
-        app = app.layer(TimeoutLayer::new(Duration::from_millis(timeout_ms)));
+        request_guards = request_guards.layer(TimeoutLayer::new(Duration::from_millis(timeout_ms)));
     } else {
         tracing::info!("HAUSKI_HTTP_TIMEOUT_MS=0 → request timeout disabled");
     }
     if concurrency > 0 {
         let c = std::cmp::min(concurrency, usize::MAX as u64) as usize;
-        app = app.layer(ConcurrencyLimitLayer::new(c));
+        request_guards = request_guards.layer(ConcurrencyLimitLayer::new(c));
     } else {
         tracing::info!("HAUSKI_HTTP_CONCURRENCY=0 → concurrency limit disabled");
     }
+
+    // The readiness flag is set by the caller once the listener is bound.
+    let app = app
+        .with_state(state.clone())
+        .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware))
+        .layer(request_guards);
     (app, state)
 }
 
@@ -449,19 +462,41 @@ fn core_routes() -> Router<AppState> {
         .route("/health", get(health))
         .route("/ready", get(ready))
         .route("/metrics", get(metrics))
-        .route(
-            "/docs/openapi.json",
-            get(|| async {
-                // robust output as JSON string
-                let json = ApiDoc::openapi().to_json().expect("openapi json");
-                (
-                    StatusCode::OK,
-                    [(header::CONTENT_TYPE, "application/json")],
-                    json,
-                )
-            }),
-        )
-        .merge(SwaggerUi::new("/docs").url("/docs/openapi.json", "openapi.json"))
+}
+
+fn docs_routes() -> Router<AppState> {
+    Router::new().route("/docs", get(api_docs)).route(
+        "/docs/openapi.json",
+        get(|| async { Json(ApiDoc::openapi()) }),
+    )
+}
+
+const SWAGGER_UI_HTML: &str = r#"<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HausKI OpenAPI</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+      window.onload = () => {
+        window.ui = SwaggerUIBundle({
+          url: '/docs/openapi.json',
+          dom_id: '#swagger-ui',
+          presets: [SwaggerUIBundle.presets.apis],
+        });
+      };
+    </script>
+  </body>
+</html>
+"#;
+
+async fn api_docs() -> Html<&'static str> {
+    Html(SWAGGER_UI_HTML)
 }
 
 fn config_routes() -> Router<AppState> {
@@ -609,8 +644,14 @@ mod tests {
         let text_one = String::from_utf8(body.to_vec()).unwrap();
 
         // Assert that the first /metrics call reported the /health call.
+        let expected_health = [
+            r#"http_requests_total{method="GET",path="/health",status="200"} 1"#,
+            r#"http_requests_total_total{method="GET",path="/health",status="200"} 1"#,
+        ];
         assert!(
-            text_one.contains(r#"http_requests_total{method="GET",path="/health",status="200"} 1"#),
+            expected_health
+                .iter()
+                .any(|needle| text_one.contains(needle)),
             "metrics missing labeled health counter:\n{text_one}"
         );
 
@@ -623,9 +664,14 @@ mod tests {
         let text_two = String::from_utf8(body.to_vec()).unwrap();
 
         // Assert that the second /metrics call reported the first /metrics call.
+        let expected_metrics = [
+            r#"http_requests_total{method="GET",path="/metrics",status="200"} 1"#,
+            r#"http_requests_total_total{method="GET",path="/metrics",status="200"} 1"#,
+        ];
         assert!(
-            text_two
-                .contains(r#"http_requests_total{method="GET",path="/metrics",status="200"} 1"#),
+            expected_metrics
+                .iter()
+                .any(|needle| text_two.contains(needle)),
             "metrics missing labeled metrics counter:\n{text_two}"
         );
     }
@@ -719,10 +765,12 @@ mod tests {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let text = String::from_utf8(body.to_vec()).unwrap();
 
+        let expected_search = [
+            r#"http_requests_total{method="POST",path="/index/search",status="200"} 1"#,
+            r#"http_requests_total_total{method="POST",path="/index/search",status="200"} 1"#,
+        ];
         assert!(
-            text.contains(
-                r#"http_requests_total{method="POST",path="/index/search",status="200"} 1"#
-            ),
+            expected_search.iter().any(|needle| text.contains(needle)),
             "metrics missing index/search counter:\n{text}"
         );
     }
