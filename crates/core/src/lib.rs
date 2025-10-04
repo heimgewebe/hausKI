@@ -15,7 +15,7 @@ use prometheus_client::{
     registry::Registry,
 };
 use std::{
-    fmt,
+    env, fmt,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -391,6 +391,26 @@ pub fn build_app_with_state(
     let state = AppState::new(limits, models, routing, flags, expose_config);
     let allowed_origin = Arc::new(allowed_origin);
 
+    // --- Configurable server tunables --------------------------------------
+    // Defaults: 1500ms timeout, 512 concurrent requests.
+    // Override via environment variables:
+    //   HAUSKI_HTTP_TIMEOUT_MS (u64; 0 = disabled)
+    //   HAUSKI_HTTP_CONCURRENCY (u64; 0 = disabled)
+    fn env_u64(key: &str, default: u64) -> u64 {
+        match env::var(key) {
+            Ok(v) => v.parse::<u64>().unwrap_or_else(|_| {
+                tracing::warn!(
+                    "Invalid value for {key}='{}' – falling back to {default}",
+                    v
+                );
+                default
+            }),
+            Err(_) => default,
+        }
+    }
+    let timeout_ms = env_u64("HAUSKI_HTTP_TIMEOUT_MS", 1500);
+    let concurrency = env_u64("HAUSKI_HTTP_CONCURRENCY", 512);
+
     let mut app = Router::new()
         .merge(core_routes())
         .nest("/index", index_router::<AppState>());
@@ -406,11 +426,21 @@ pub fn build_app_with_state(
     }
 
     // The readiness flag is set by the caller once the listener is bound.
-    let app = app
+    let mut app = app
         .with_state(state.clone())
-        .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware))
-        .layer(TimeoutLayer::new(Duration::from_millis(1500)))
-        .layer(ConcurrencyLimitLayer::new(512));
+        .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware));
+
+    if timeout_ms > 0 {
+        app = app.layer(TimeoutLayer::new(Duration::from_millis(timeout_ms)));
+    } else {
+        tracing::info!("HAUSKI_HTTP_TIMEOUT_MS=0 → request timeout disabled");
+    }
+    if concurrency > 0 {
+        let c = std::cmp::min(concurrency, usize::MAX as u64) as usize;
+        app = app.layer(ConcurrencyLimitLayer::new(c));
+    } else {
+        tracing::info!("HAUSKI_HTTP_CONCURRENCY=0 → concurrency limit disabled");
+    }
     (app, state)
 }
 
