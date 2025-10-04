@@ -24,7 +24,7 @@ jobs:
           cache-on-failure: true
           shared-key: ${{ runner.os }}-cov-${{ hashFiles('**/Cargo.lock') }}
       - name: Install cargo-llvm-cov
-        run: cargo install cargo-llvm-cov --locked
+        run: cargo install cargo-llvm-cov --locked --version 0.6.9
       - name: Run coverage (focused)
         env:
           # genügt für llvm-cov, ist etwas schneller als debuginfo=2
