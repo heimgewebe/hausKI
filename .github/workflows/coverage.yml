@@ -22,7 +22,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          key: ${{ runner.os }}-cov-${{ hashFiles('**/Cargo.lock') }}
+          shared-key: ${{ runner.os }}-cov-${{ hashFiles('**/Cargo.lock') }}
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked
       - name: Run coverage (focused)
