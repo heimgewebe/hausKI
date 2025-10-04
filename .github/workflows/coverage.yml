@@ -30,7 +30,7 @@ jobs:
           # sufficient for llvm-cov; slightly faster than debuginfo=2
           RUSTFLAGS: "-C debuginfo=1"
         run: |
-          # nur die runtime-relevanten Crates messen
+          # measure only the runtime-relevant crates
           PKGS="--package hauski-core --package hauski-indexd"
           cargo llvm-cov $PKGS --lcov --output-path lcov.info
       - name: Upload lcov
