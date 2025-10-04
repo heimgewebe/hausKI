@@ -8,7 +8,7 @@ readme = "README.md"
 [tool.uv]
 managed = true
 python-preference = "managed"
-python-version = "3.10"
+required-version = "3.10"
 
 [project.optional-dependencies]
 ## Note:
