@@ -19,7 +19,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/advisory-db
-          key: ${{ runner.os }}-advisory-db
+          # Stabiler Key mit Restore-Präfix; Frische wird durch 'cargo audit fetch' sichergestellt
+          key: ${{ runner.os }}-advisory-db-v1
+          restore-keys: |
+            ${{ runner.os }}-advisory-db-
+      - name: Update advisory DB
+        run: |
+          # Aktualisiert die RustSec-Datenbank nach Cache-Restore, um Staleness zu vermeiden
+          cargo audit fetch
       - name: cargo audit
         run: cargo audit --timeout 60
       - name: cargo deny
