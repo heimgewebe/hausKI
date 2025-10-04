@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - uses: dtolnay/rust-toolchain@stable
