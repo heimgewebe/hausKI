@@ -1,3 +1,5 @@
+![WGX](https://img.shields.io/badge/wgx-enabled-blue)
+
 # HausKI — Rust-first, Offline-Default, GPU-aware
 
 HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-GPU.
