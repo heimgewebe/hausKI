@@ -116,7 +116,7 @@ where
 async fn upsert_handler(
     State(state): State<IndexState>,
     Json(payload): Json<UpsertRequest>,
-) -> impl IntoResponse {
+) -> Result<(StatusCode, Json<UpsertResponse>), (StatusCode, Json<Value>)> {
     let started = Instant::now();
     if payload.namespace.trim().is_empty() {
         state.record(
@@ -125,26 +125,26 @@ async fn upsert_handler(
             StatusCode::BAD_REQUEST,
             started,
         );
-        return (
+        return Err((
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": "namespace must not be empty" })),
-        );
+        ));
     }
     let ingested = state.upsert(payload).await;
     state.record(Method::POST, "/index/upsert", StatusCode::OK, started);
-    (
+    Ok((
         StatusCode::OK,
         Json(UpsertResponse {
             status: "queued".into(),
             ingested,
         }),
-    )
+    ))
 }
 
 async fn search_handler(
     State(state): State<IndexState>,
     Json(payload): Json<SearchRequest>,
-) -> impl IntoResponse {
+) -> Result<(StatusCode, Json<SearchResponse>), (StatusCode, Json<Value>)> {
     let started = Instant::now();
     if payload
         .namespace
@@ -157,22 +157,22 @@ async fn search_handler(
             StatusCode::BAD_REQUEST,
             started,
         );
-        return (
+        return Err((
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": "namespace must not be empty" })),
-        );
+        ));
     }
     let matches = state.search(&payload).await;
     let latency_ms = started.elapsed().as_secs_f64() * 1000.0;
     state.record(Method::POST, "/index/search", StatusCode::OK, started);
-    (
+    Ok((
         StatusCode::OK,
         Json(SearchResponse {
             matches,
             latency_ms,
             budget_ms: state.budget_ms(),
         }),
-    )
+    ))
 }
 
 #[derive(Debug, Deserialize)]
