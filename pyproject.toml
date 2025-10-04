@@ -11,8 +11,8 @@ python-preference = "managed"
 python-version = "3.10"
 
 [project.optional-dependencies]
-## Hinweis:
-## Dev-Tools werden nur noch hier unter den PEP 621-konformen Extras gepflegt.
+## Note:
+## Dev tools are now only maintained here under the PEP 621-compliant extras.
 ## Installation:
 ##   - uv:  `uv sync --extra dev`
 ##   - pip: `pip install .[dev]`
