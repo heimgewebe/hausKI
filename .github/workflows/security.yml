@@ -19,7 +19,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/advisory-db
-          # Stabiler Key mit Restore-Präfix; Frische wird durch 'cargo audit fetch' sichergestellt
+          # Stable key with restore prefix; freshness is ensured by 'cargo audit fetch'
           key: ${{ runner.os }}-advisory-db-v1
           restore-keys: |
             ${{ runner.os }}-advisory-db-
