@@ -1,3 +1,12 @@
 name: wgx-smoke (disabled)
-on: {}
-jobs: {}
+on:
+  # Only manually startable to keep the file valid,
+  # but no longer appears "red" in normal CI.
+  workflow_dispatch: {}
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report disabled status
+        run: echo "wgx-smoke workflow is intentionally disabled (noop)."
