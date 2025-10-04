@@ -436,11 +436,7 @@ pub fn build_app_with_state(
         tracing::info!("HAUSKI_HTTP_TIMEOUT_MS=0 → request timeout disabled");
     }
     if concurrency > 0 {
-        let c = if concurrency > usize::MAX as u64 {
-            usize::MAX
-        } else {
-            concurrency as usize
-        };
+        let c = std::cmp::min(concurrency, usize::MAX as u64) as usize;
         app = app.layer(ConcurrencyLimitLayer::new(c));
     } else {
         tracing::info!("HAUSKI_HTTP_CONCURRENCY=0 → concurrency limit disabled");
