@@ -59,6 +59,19 @@ cargo test --workspace -- --nocapture
 > vorliegt. Dank `.cargo/config.toml` nutzt Cargo automatisch die lokal
 > eingecheckte Vendor-Struktur.
 
+```toml
+# .cargo/config.toml
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
+```
+
+> Falls du eine eigene Konfiguration in einem Fork verwendest, behalte die
+> `replace-with`-Direktive unbedingt bei, damit Builds auf air-gapped Hosts
+> zuverlässig funktionieren.
+
 **Vendor-Snapshot befüllen**
 
 Mit Internetzugang lässt sich der Snapshot direkt im Repository erzeugen:
