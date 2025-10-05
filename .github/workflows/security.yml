@@ -29,7 +29,7 @@ env:
 
 jobs:
   deny:
-    name: cargo-deny (Lizenzen/Bans/Advisories)
+    name: cargo-deny (Licenses/Bans/Advisories)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
