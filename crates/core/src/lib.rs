@@ -465,10 +465,9 @@ fn core_routes() -> Router<AppState> {
 }
 
 fn docs_routes() -> Router<AppState> {
-    Router::new().route("/docs", get(api_docs)).route(
-        "/docs/openapi.json",
-        get(|| async { Json(ApiDoc::openapi()) }),
-    )
+    Router::new()
+        .route("/docs", get(api_docs))
+        .route("/docs/openapi.json", get(openapi_json))
 }
 
 const SWAGGER_UI_HTML: &str = r#"<!DOCTYPE html>
@@ -497,6 +496,43 @@ const SWAGGER_UI_HTML: &str = r#"<!DOCTYPE html>
 
 async fn api_docs() -> Html<&'static str> {
     Html(SWAGGER_UI_HTML)
+}
+
+/// Serve OpenAPI as JSON with robust error handling.
+async fn openapi_json() -> Response {
+    // 1) Build the OpenAPI struct (infallible in `utoipa`).
+    let spec = ApiDoc::openapi();
+
+    // 2) Serialize explicitly so we can handle failures gracefully.
+    match serde_json::to_vec(&spec) {
+        Ok(bytes) => (
+            StatusCode::OK,
+            [(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            )],
+            bytes,
+        )
+            .into_response(),
+        Err(err) => {
+            // Log for operators.
+            tracing::error!("failed to serialize OpenAPI JSON: {err}");
+            // Compact JSON error payload for clients.
+            let body = format!(
+                "{{\"error\":\"failed to serialize openapi\",\"details\":\"{}\"}}",
+                err
+            );
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [(
+                    header::CONTENT_TYPE,
+                    HeaderValue::from_static("application/json"),
+                )],
+                body,
+            )
+                .into_response()
+        }
+    }
 }
 
 fn config_routes() -> Router<AppState> {
