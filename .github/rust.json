@@ -17,7 +17,27 @@
         },
         { "regexp": "^\\s*\\|$" },
         {
-          "regexp": "^\\s*\\|\\s*(.*)$",
+          "regexp": "^\\s*[|].*$",
+          "loop": true
+        }
+      ]
+    },
+    {
+      "owner": "rustc-warning",
+      "pattern": [
+        {
+          "regexp": "^(warning)(\\[[^\\]]+\\])?:\\s+(.*)$",
+          "message": 3,
+          "severity": 2
+        },
+        {
+          "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3
+        },
+        {
+          "regexp": "^\\s*[|].*$",
           "loop": true
         }
       ]
