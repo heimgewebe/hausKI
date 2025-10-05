@@ -35,15 +35,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: cargo-deny
-        uses: EmbarkStudios/cargo-deny-action@v2
+      - name: Cache cargo-deny binary
+        id: cache-cargo-deny
+        uses: actions/cache@v4
         with:
-          command: check
-          # No --disable-fetch -> keeps advisory/index data fresh
-          arguments: >
-            advisories
-            bans
-            licenses
+          path: ~/.cargo-deny-bin
+          key: cargo-deny-bin-v0.14.20 # Update version as needed
+      - name: Download cargo-deny binary if not cached
+        if: steps.cache-cargo-deny.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.cargo-deny-bin
+          cd ~/.cargo-deny-bin
+          curl -sSL -o cargo-deny.tar.gz https://github.com/EmbarkStudios/cargo-deny/releases/download/0.14.20/cargo-deny-x86_64-unknown-linux-musl.tar.gz
+          tar xzf cargo-deny.tar.gz
+          mv cargo-deny*/* .
+          rm -rf cargo-deny*
+          rm cargo-deny.tar.gz
+      - name: Add cargo-deny to PATH
+        run: echo "$HOME/.cargo-deny-bin" >> $GITHUB_PATH
+      - name: Run cargo-deny checks
+        run: |
+          cargo-deny check advisories
+          cargo-deny check bans
+          cargo-deny check licenses
   audit:
     name: cargo-audit (CVE Check)
     runs-on: ubuntu-latest
