@@ -179,5 +179,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - name: cargo deny (advisories/bans/licenses)
+        run: |
+          cargo deny check advisories
+          cargo deny check bans
+          cargo deny check licenses
       - uses: rustsec/audit-check@v2

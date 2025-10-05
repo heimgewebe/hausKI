@@ -35,15 +35,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: cargo-deny
-        uses: EmbarkStudios/cargo-deny-action@v2
-        with:
-          command: check
-          # No --disable-fetch -> keeps advisory/index data fresh
-          arguments: >
-            advisories
-            bans
-            licenses
+      - name: cargo deny (advisories/bans/licenses)
+        run: |
+          cargo deny check advisories
+          cargo deny check bans
+          cargo deny check licenses
   audit:
     name: cargo-audit (CVE Check)
     runs-on: ubuntu-latest
