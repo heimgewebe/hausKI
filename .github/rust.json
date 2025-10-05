@@ -16,8 +16,7 @@
         },
         {
           "regexp": "^\\s*[|].*$",
-          "loop": true,
-          "message": 3
+          "loop": true
         }
       ]
     },
@@ -35,10 +34,9 @@
           "line": 2,
           "column": 3
         },
+        {
           "regexp": "^\\s*[|].*$",
-          "loop": true,
-          "message": 3
-  
+          "loop": true
         }
       ]
     }
