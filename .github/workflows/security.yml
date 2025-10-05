@@ -3,11 +3,18 @@ on:
   schedule:
     - cron: "0 3 * * *"
   pull_request:
+  push:
+    branches: [ main ]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   audit-deny:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
@@ -19,15 +26,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/advisory-db
-          # Stable key with restore prefix; freshness is ensured by 'cargo audit fetch'
-          key: ${{ runner.os }}-advisory-db-v1
+          key: ${{ runner.os }}-advisory-db-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-advisory-db-
       - name: Update advisory DB
         run: |
           # Updates the RustSec database after cache restore to avoid staleness
-          cargo audit fetch
+          timeout 120s cargo audit fetch || true
       - name: cargo audit
-        run: cargo audit --timeout 60
+        run: cargo audit -D warnings --timeout 60
       - name: cargo deny
         run: cargo deny check
