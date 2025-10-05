@@ -2394,6 +2394,7 @@ dependencies = [
  "indexmap",
  "serde",
  "serde_json",
+ "utoipa-axum",
  "utoipa-gen",
 ]
 
@@ -2408,6 +2409,19 @@ dependencies = [
  "quote",
  "regex",
  "syn 2.0.106",
+]
+
+[[package]]
+name = "utoipa-axum"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f92a3fbc3056a8322d8ef6e7c1282c58e4458b4a5bc9aef12640add3521dc1a2"
+dependencies = [
+ "axum",
+ "http",
+ "serde",
+ "serde_json",
+ "utoipa",
 ]
 
 [[package]]
