@@ -44,13 +44,33 @@ jobs:
       - name: Download cargo-deny binary if not cached
         if: steps.cache-cargo-deny.outputs.cache-hit != 'true'
         run: |
+          set -euo pipefail
           mkdir -p ~/.cargo-deny-bin
           cd ~/.cargo-deny-bin
-          curl -sSL -o cargo-deny.tar.gz https://github.com/EmbarkStudios/cargo-deny/releases/download/0.14.20/cargo-deny-x86_64-unknown-linux-musl.tar.gz
-          tar xzf cargo-deny.tar.gz
-          mv cargo-deny*/* .
-          rm -rf cargo-deny*
-          rm cargo-deny.tar.gz
+          archive_url=https://github.com/EmbarkStudios/cargo-deny/releases/download/0.14.20/cargo-deny-x86_64-unknown-linux-musl.tar.gz
+          if curl -sSfL -o cargo-deny.tar.gz "${archive_url}"; then
+            if tar tzf cargo-deny.tar.gz > /dev/null; then
+              extracted_dir=$(tar tzf cargo-deny.tar.gz | head -1 | cut -d/ -f1)
+              if tar xzf cargo-deny.tar.gz; then
+                install -m 755 "${extracted_dir}/cargo-deny" ./cargo-deny
+                rm -rf "${extracted_dir}" cargo-deny.tar.gz
+              else
+                echo "Failed to extract prebuilt cargo-deny archive; falling back to cargo install" >&2
+                rm -rf "${extracted_dir}" cargo-deny.tar.gz
+                cargo install cargo-deny --locked --force
+                install -m 755 "$HOME/.cargo/bin/cargo-deny" ./cargo-deny
+              fi
+            else
+              echo "Downloaded cargo-deny archive is invalid; falling back to cargo install" >&2
+              rm -f cargo-deny.tar.gz
+              cargo install cargo-deny --locked --force
+              install -m 755 "$HOME/.cargo/bin/cargo-deny" ./cargo-deny
+            fi
+          else
+            echo "Failed to download prebuilt cargo-deny archive; falling back to cargo install" >&2
+            cargo install cargo-deny --locked --force
+            install -m 755 "$HOME/.cargo/bin/cargo-deny" ./cargo-deny
+          fi
       - name: Add cargo-deny to PATH
         run: echo "$HOME/.cargo-deny-bin" >> $GITHUB_PATH
       - name: Run cargo-deny checks
