@@ -1,46 +1,58 @@
 name: security
+
 on:
-  schedule:
-    - cron: "0 3 * * *"
-  pull_request:
   push:
-    branches: [ main ]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "deny.toml"
+      - ".github/workflows/security.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "deny.toml"
+      - ".github/workflows/security.yml"
+  schedule:
+    - cron: "17 5 * * 1"   # montags 05:17 UTC (wöchentlicher Grundschutz)
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  audit-deny:
+  deny:
+    name: cargo-deny (Lizenzen/Bans/Advisories)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install tools
-        run: |
-          cargo install cargo-audit --locked
-          cargo install cargo-deny --locked
-      - name: Cache cargo-audit DB
-        uses: actions/cache@v4
+      - name: cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
         with:
-          path: ~/.cargo/advisory-db
-          key: ${{ runner.os }}-advisory-db-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-advisory-db-
-      - name: Update advisory DB
-        run: |
-          # Updates the RustSec database after cache restore to avoid staleness
-          timeout 120s cargo audit fetch
-          status=$?
-          if [ $status -eq 124 ]; then
-            echo "cargo audit fetch timed out (exit code 124), continuing with possibly stale advisory DB."
-          elif [ $status -ne 0 ]; then
-            echo "cargo audit fetch failed with exit code $status"
-            exit $status
-          fi
-      - name: cargo audit
-        run: cargo audit -D warnings --timeout 60
-      - name: cargo deny
-        run: cargo deny check
+          command: check
+          # Kein --disable-fetch -> hält Advisory-/Indexdaten frisch
+          arguments: >
+            advisories
+            bans
+            licenses
+  audit:
+    name: cargo-audit (CVE-Check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [deny]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit (fresh)
+        run: cargo install cargo-audit --locked --force
+      - name: Run cargo audit
+        run: cargo audit --timeout 90
