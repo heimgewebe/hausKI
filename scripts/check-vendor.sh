@@ -29,22 +29,16 @@ missing_display=${missing_display% }
 cat <<MSG
 error: vendored crates missing: ${missing_display}
 
-The workspace is configured to run fully offline via .cargo/config.toml.
-Cargo will therefore look for every dependency inside the local vendor/
-directory. When key crates are absent (e.g. axum, tokio, serde) the default
-Cargo error message is misleading and does not explain how to fix the setup.
+Der Workspace erzwingt Offline-Builds über '.cargo/config.toml'. Wenn Cargo
+mit '--locked' läuft (z. B. in CI) und 'Cargo.lock' nicht aktuell ist, schlägt
+'cargo vendor' mit der Meldung "the lock file … needs to be updated but --locked
+was passed" fehl. Erneuere deshalb zuerst die Lock-Datei ('cargo generate-lockfile'
+oder 'cargo update') und führe anschließend 'cargo vendor' aus.
 
-To populate vendor/ you can either:
-  * run 'just vendor' (requires network access) and optionally 'just vendor-archive'
-    to create a distributable tarball, or
-  * download the prebuilt vendor snapshot from CI artifacts and extract it
-    into vendor/.
-
-If network access is unavailable in your environment, copy the archived
-vendor tarball produced by a trusted build machine into this repository and
-extract it manually, for example with:
+Ohne Netzwerkzugang kannst du den vorbereiteten Tarball entpacken, beispielsweise
+mit:
   tar --zstd -xvf /path/to/hauski-vendor-snapshot.tar.zst -C vendor --strip-components=1
 
-Once vendor/ contains the required crates, rerun this command.
+Sobald 'vendor/' vollständig ist, erneut ausführen.
 MSG
 exit 1

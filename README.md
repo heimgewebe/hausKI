@@ -59,6 +59,14 @@ cargo test --workspace -- --nocapture
 > vorliegt. Dank `.cargo/config.toml` nutzt Cargo automatisch die lokal
 > eingecheckte Vendor-Struktur.
 
+> Falls CI mit der Meldung `the lock file … needs to be updated but --locked was
+> passed` oder `no matching package named 'axum' found` stoppt, führe die
+> Aktualisierung lokal durch und committe die Ergebnisse:
+> 1. `cargo generate-lockfile` (bzw. `cargo update`), um die `Cargo.lock` zu
+>    erneuern.
+> 2. `cargo vendor` (oder `just vendor`), damit `vendor/` alle Crates enthält.
+> 3. `git add Cargo.lock vendor/` und anschließend committen.
+
 ```toml
 # .cargo/config.toml
 [source.crates-io]
