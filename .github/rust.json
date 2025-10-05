@@ -15,16 +15,11 @@
           "line": 2,
           "column": 3
         },
-        { "regexp": "^\\s*\\|$", "comment": "Matches and ignores empty context lines in Rust error output." },
-        {
-          // This pattern matches and skips empty pipe lines in Rust error output.
-          "regexp": "^\\s*\\|$"
-        },
+        { "regexp": "^\\s*\\|$" },
         {
 
           "regexp": "^\\s*[|].*$",
-          "loop": true,
-          "message": 3
+          "loop": true
         }
       ]
     }
