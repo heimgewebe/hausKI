@@ -39,7 +39,7 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
-          # Kein --disable-fetch -> hält Advisory-/Indexdaten frisch
+          # No --disable-fetch -> keeps advisory/index data fresh
           arguments: >
             advisories
             bans
