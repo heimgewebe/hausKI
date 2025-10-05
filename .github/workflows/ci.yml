@@ -68,6 +68,8 @@ jobs:
           toolchain: ${{ env.toolchain }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Check vendor snapshot
+        run: bash scripts/check-vendor.sh
       - name: rustfmt (check)
         run: cargo fmt --all --check
       - name: clippy (deny warnings)
@@ -147,6 +149,8 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Check vendor snapshot
+        run: bash scripts/check-vendor.sh
       - name: Cargo fmt
         run: cargo fmt --all -- --check
       - name: Cargo clippy
@@ -179,6 +183,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      - name: Check vendor snapshot
+        run: bash scripts/check-vendor.sh
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny
