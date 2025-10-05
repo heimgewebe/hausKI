@@ -41,7 +41,7 @@ jobs:
           set -euo pipefail
           WANT_VER="${CARGO_DENY_VERSION:-latest}"
           have() { command -v "$1" >/dev/null 2>&1; }
-          version_of() { "$1" --version 2>/dev/null | awk '{print $3}'; }
+          version_of() { "$1" --version 2>/dev/null | awk '{print $2}'; }
 
           install_cargo_deny() {
             local want="$1"
