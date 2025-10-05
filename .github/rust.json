@@ -35,10 +35,10 @@
           "line": 2,
           "column": 3
         },
-        {
           "regexp": "^\\s*[|].*$",
           "loop": true,
           "message": 3
+  
         }
       ]
     }
