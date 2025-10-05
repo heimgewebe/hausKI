@@ -35,9 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Cache cargo-deny binary
-        id: cache-cargo-deny
-        uses: actions/cache@v4
+      - uses: taiki-e/install-action@v2
         with:
           path: ~/.cargo-deny-bin
           key: cargo-deny-bin-v0.14.20 # Update version as needed
@@ -88,9 +86,9 @@ jobs:
         run: echo "$HOME/.cargo-deny-bin" >> $GITHUB_PATH
       - name: Run cargo-deny checks
         run: |
-          cargo-deny check advisories
-          cargo-deny check bans
-          cargo-deny check licenses
+          cargo deny check advisories
+          cargo deny check bans
+          cargo deny check licenses
   audit:
     name: cargo-audit (CVE Check)
     runs-on: ubuntu-latest
