@@ -1,7 +1,7 @@
 use axum::{
     extract::{FromRef, State},
     http::{Method, StatusCode},
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::post,
     Json, Router,
 };
@@ -116,7 +116,7 @@ where
 async fn upsert_handler(
     State(state): State<IndexState>,
     Json(payload): Json<UpsertRequest>,
-) -> Result<(StatusCode, Json<UpsertResponse>), (StatusCode, Json<Value>)> {
+) -> Response {
     let started = Instant::now();
     if payload.namespace.trim().is_empty() {
         state.record(
@@ -125,26 +125,28 @@ async fn upsert_handler(
             StatusCode::BAD_REQUEST,
             started,
         );
-        return Err((
+        return (
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": "namespace must not be empty" })),
-        ));
+        )
+            .into_response();
     }
     let ingested = state.upsert(payload).await;
     state.record(Method::POST, "/index/upsert", StatusCode::OK, started);
-    Ok((
+    (
         StatusCode::OK,
         Json(UpsertResponse {
             status: "queued".into(),
             ingested,
         }),
-    ))
+    )
+        .into_response()
 }
 
 async fn search_handler(
     State(state): State<IndexState>,
     Json(payload): Json<SearchRequest>,
-) -> Result<(StatusCode, Json<SearchResponse>), (StatusCode, Json<Value>)> {
+) -> Response {
     let started = Instant::now();
     if payload
         .namespace
@@ -157,22 +159,24 @@ async fn search_handler(
             StatusCode::BAD_REQUEST,
             started,
         );
-        return Err((
+        return (
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": "namespace must not be empty" })),
-        ));
+        )
+            .into_response();
     }
     let matches = state.search(&payload).await;
     let latency_ms = started.elapsed().as_secs_f64() * 1000.0;
     state.record(Method::POST, "/index/search", StatusCode::OK, started);
-    Ok((
+    (
         StatusCode::OK,
         Json(SearchResponse {
             matches,
             latency_ms,
             budget_ms: state.budget_ms(),
         }),
-    ))
+    )
+        .into_response()
 }
 
 #[derive(Debug, Deserialize)]
