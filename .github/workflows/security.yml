@@ -60,7 +60,7 @@ jobs:
             if [[ "$want" == "latest" ]]; then
               url="https://github.com/EmbarkStudios/cargo-deny/releases/latest/download/cargo-deny-x86_64-unknown-linux-gnu.tar.gz"
             else
-              url="https://github.com/EmbarkStudios/cargo-deny/releases/download/v${want}/cargo-deny-x86_64-unknown-linux-gnu.tar.gz"
+              url="https://github.com/EmbarkStudios/cargo-deny/releases/download/${want}/cargo-deny-x86_64-unknown-linux-gnu.tar.gz"
             fi
 
             echo "Attempting prebuilt cargo-deny from: $url"
