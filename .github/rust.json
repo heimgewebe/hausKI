@@ -17,26 +17,11 @@
         },
         { "regexp": "^\\s*\\|$", "comment": "Matches and ignores empty context lines in Rust error output." },
         {
-          "regexp": "^\\s*[|].*$",
-          "loop": true
-        }
-      ]
-    },
-    {
-      "owner": "rustc-warning",
-      "pattern": [
-        {
-          "regexp": "^(warning)(\\[[^\\]]+\\])?:\\s+(.*)$",
-          "message": 3,
-          "severity": 2
+          // This pattern matches and skips empty pipe lines in Rust error output.
+          "regexp": "^\\s*\\|$"
         },
         {
-          "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
-          "file": 1,
-          "line": 2,
-          "column": 3
-        },
-        {
+
           "regexp": "^\\s*[|].*$",
           "loop": true,
           "message": 3
