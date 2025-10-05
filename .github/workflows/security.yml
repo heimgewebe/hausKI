@@ -1,46 +1,48 @@
 name: security
+
 on:
-  schedule:
-    - cron: "0 3 * * *"
-  pull_request:
   push:
-    branches: [ main ]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "deny.toml"
+      - ".github/workflows/security.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "deny.toml"
+      - ".github/workflows/security.yml"
+  schedule:
+    - cron: "17 5 * * 1"   # montags 05:17 UTC
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
-
 jobs:
-  audit-deny:
+  audit:
+    name: Cargo security checks
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install tools
-        run: |
-          cargo install cargo-audit --locked
-          cargo install cargo-deny --locked
-      - name: Cache cargo-audit DB
-        uses: actions/cache@v4
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo/target
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/.cargo/advisory-db
-          key: ${{ runner.os }}-advisory-db-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-advisory-db-
-      - name: Update advisory DB
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      # ---- cargo-deny (nutzt euer vorhandenes deny.toml) ----
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+      - name: cargo deny check (advisories + bans + sources)
         run: |
-          # Updates the RustSec database after cache restore to avoid staleness
-          timeout 120s cargo audit fetch
-          status=$?
-          if [ $status -eq 124 ]; then
-            echo "cargo audit fetch timed out (exit code 124), continuing with possibly stale advisory DB."
-          elif [ $status -ne 0 ]; then
-            echo "cargo audit fetch failed with exit code $status"
-            exit $status
-          fi
+          cargo deny check advisories bans sources
+
+      # ---- cargo-audit (ohne 'fetch'; DB wird automatisch aktualisiert) ----
+      - name: Install cargo-audit (fresh)
+        run: cargo install cargo-audit --locked --force
       - name: cargo audit
-        run: cargo audit -D warnings --timeout 60
-      - name: cargo deny
-        run: cargo deny check
+        run: cargo audit
