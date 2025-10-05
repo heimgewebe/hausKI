@@ -35,6 +35,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      - name: Ensure vendor snapshot
+        run: bash scripts/ensure-vendor.sh
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: Install cargo-deny (prebuilt with fallback; deduped)
@@ -103,6 +105,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      - name: Ensure vendor snapshot
+        run: bash scripts/ensure-vendor.sh
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: Install cargo-audit (fresh)
