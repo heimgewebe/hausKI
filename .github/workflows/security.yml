@@ -14,7 +14,7 @@ on:
       - "deny.toml"
       - ".github/workflows/security.yml"
   schedule:
-    - cron: "17 5 * * 1"   # montags 05:17 UTC (wöchentlicher Grundschutz)
+    - cron: "17 5 * * 1"   # Mondays 05:17 UTC (weekly baseline protection)
   workflow_dispatch:
 
 permissions:
