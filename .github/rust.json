@@ -38,7 +38,8 @@
         },
         {
           "regexp": "^\\s*[|].*$",
-          "loop": true
+          "loop": true,
+          "message": 3
         }
       ]
     }
