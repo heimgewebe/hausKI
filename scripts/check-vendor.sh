@@ -14,7 +14,7 @@ REQUIRED_CRATES=(
 
 missing=()
 for crate in "${REQUIRED_CRATES[@]}"; do
-  if [ ! -d "vendor/${crate}" ]; then
+  if ! compgen -G "vendor/${crate}-*" > /dev/null && [ ! -d "vendor/${crate}" ]; then
     missing+=("${crate}")
   fi
 done
