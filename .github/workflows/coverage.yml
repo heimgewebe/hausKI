@@ -25,13 +25,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
-      - name: Cache llvm tools
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/llvm
-          key: llvm-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            llvm-${{ runner.os }}-
       - name: Cache cargo + target
         uses: Swatinem/rust-cache@v2
         with:
