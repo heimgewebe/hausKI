@@ -16,6 +16,7 @@
           "column": 3
         },
         {
+          // This pattern matches and skips empty pipe lines in Rust error output.
           "regexp": "^\\s*\\|$"
         },
         {
