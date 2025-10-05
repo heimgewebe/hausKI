@@ -68,8 +68,10 @@ jobs:
               tar -xzf cargo-deny.tar.gz -C "$tmpdir"
               binpath="$(find "$tmpdir" -type f -name 'cargo-deny' -perm -111 | head -n1 || true)"
               if [[ -n "${binpath:-}" ]]; then
-                sudo install -m 0755 "$binpath" /usr/local/bin/cargo-deny
-                echo "Installed prebuilt cargo-deny to /usr/local/bin."
+                mkdir -p "$HOME/.cargo/bin"
+                install -m 0755 "$binpath" "$HOME/.cargo/bin/cargo-deny"
+                echo "Installed prebuilt cargo-deny to $HOME/.cargo/bin."
+                export PATH="$HOME/.cargo/bin:$PATH"
               else
                 echo "Prebuilt archive did not contain cargo-deny binary; falling back to cargo install."
                 cargo install cargo-deny --locked --force
