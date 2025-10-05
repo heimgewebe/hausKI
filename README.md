@@ -52,6 +52,46 @@ cargo build --workspace
 cargo test --workspace -- --nocapture
 ```
 
+> 💡 **Hinweis auf Offline-Builds:** Bevor du `cargo clippy`, `cargo build` oder
+> `cargo test` ausführst, stelle sicher, dass `vendor/` alle benötigten Crates
+> enthält. Der neue Helper `scripts/check-vendor.sh` bricht früh mit einer
+> verständlichen Meldung ab, falls beispielsweise `axum` noch nicht lokal
+> vorliegt. Dank `.cargo/config.toml` nutzt Cargo automatisch die lokal
+> eingecheckte Vendor-Struktur.
+
+```toml
+# .cargo/config.toml
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
+```
+
+> Falls du eine eigene Konfiguration in einem Fork verwendest, behalte die
+> `replace-with`-Direktive unbedingt bei, damit Builds auf air-gapped Hosts
+> zuverlässig funktionieren.
+
+**Vendor-Snapshot befüllen**
+
+Mit Internetzugang lässt sich der Snapshot direkt im Repository erzeugen:
+
+```bash
+just vendor
+just vendor-archive
+```
+
+Die erzeugte Datei `hauski-vendor-snapshot.tar.zst` kannst du anschließend auf
+eine Offline-Maschine kopieren und dort auspacken:
+
+```bash
+mkdir -p vendor
+tar --zstd -xvf hauski-vendor-snapshot.tar.zst -C vendor --strip-components=1
+```
+
+Alternativ steht der Snapshot auch als Artefakt des Workflows
+`vendor-snapshot` zur Verfügung.
+
 **VS Code Devcontainer:**
 1. Repository klonen und in VS Code öffnen.
 2. "Reopen in Container" ausführen; das Post-Create-Skript setzt `pre-commit` auf und prüft GPU-Verfügbarkeit.
