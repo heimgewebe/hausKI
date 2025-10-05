@@ -1,12 +1,13 @@
 {
   "problemMatcher": [
     {
-      "owner": "rustc-error",
+      "owner": "rustc",
       "pattern": [
         {
-          "regexp": "^(error)(\\[[^\\]]+\\])?:\\s+(.*)$",
-          "message": 3,
-          "severity": 1
+          "regexp": "^(error|warning|note|help)(\\[(E\\d{4}|[\\w\\-]+)\\])?:\\s+(.*)$",
+          "severity": "1",
+          "code": 3,
+          "message": 4
         },
         {
           "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
@@ -14,6 +15,7 @@
           "line": 2,
           "column": 3
         },
+        { "regexp": "^\\s*\\|$", "comment": "Matches and ignores empty context lines in Rust error output." },
         {
           "regexp": "^\\s*[|].*$",
           "loop": true
