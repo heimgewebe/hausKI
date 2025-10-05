@@ -519,7 +519,7 @@ async fn openapi_json() -> Response {
             tracing::error!("failed to serialize OpenAPI JSON: {err}");
             // Compact JSON error payload for clients.
             let body = format!(
-                "{{\"error\":\"failed to render openapi\",\"details\":\"{}\"}}",
+                "{{\"error\":\"failed to serialize openapi\",\"details\":\"{}\"}}",
                 err
             );
             (
