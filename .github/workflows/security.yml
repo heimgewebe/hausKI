@@ -32,7 +32,14 @@ jobs:
       - name: Update advisory DB
         run: |
           # Updates the RustSec database after cache restore to avoid staleness
-          timeout 120s cargo audit fetch || true
+          timeout 120s cargo audit fetch
+          status=$?
+          if [ $status -eq 124 ]; then
+            echo "cargo audit fetch timed out (exit code 124), continuing with possibly stale advisory DB."
+          elif [ $status -ne 0 ]; then
+            echo "cargo audit fetch failed with exit code $status"
+            exit $status
+          fi
       - name: cargo audit
         run: cargo audit -D warnings --timeout 60
       - name: cargo deny
