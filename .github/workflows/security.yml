@@ -35,60 +35,56 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/install-action@v2
-        with:
-          path: ~/.cargo-deny-bin
-          key: cargo-deny-bin-v0.14.20 # Update version as needed
-      - name: Download cargo-deny binary if not cached
-        if: steps.cache-cargo-deny.outputs.cache-hit != 'true'
+      - name: Install cargo-deny (prebuilt with fallback; deduped)
+        shell: bash
         run: |
           set -euo pipefail
-          mkdir -p ~/.cargo-deny-bin
-          cd ~/.cargo-deny-bin
-          archive_url=https://github.com/EmbarkStudios/cargo-deny/releases/download/0.14.20/cargo-deny-x86_64-unknown-linux-musl.tar.gz
-          if curl -sSfL -o cargo-deny.tar.gz "${archive_url}"; then
-            if tar tzf cargo-deny.tar.gz > /dev/null; then
-              extracted_dir=$(tar tzf cargo-deny.tar.gz | head -1 | cut -d/ -f1)
-              # Validate extracted_dir: non-empty, safe characters, and exists after extraction
-              if [ -z "$extracted_dir" ] || ! echo "$extracted_dir" | grep -Eq '^[a-zA-Z0-9._-]+$'; then
-                echo "Archive structure is invalid or unexpected (bad directory name: '$extracted_dir'); falling back to cargo install" >&2
-                rm -rf "$extracted_dir" cargo-deny.tar.gz 2>/dev/null || true
-                cargo install cargo-deny --locked --force
-                install -m 755 "$HOME/.cargo/bin/cargo-deny" ./cargo-deny
-              elif tar xzf cargo-deny.tar.gz; then
-                if [ ! -d "$extracted_dir" ]; then
-                  echo "Extracted directory '$extracted_dir' does not exist; falling back to cargo install" >&2
-                  rm -rf "$extracted_dir" cargo-deny.tar.gz 2>/dev/null || true
-                  cargo install cargo-deny --locked --force
-                  install -m 755 "$HOME/.cargo/bin/cargo-deny" ./cargo-deny
-                else
-                  install -m 755 "${extracted_dir}/cargo-deny" ./cargo-deny
-                  rm -rf "${extracted_dir}" cargo-deny.tar.gz
-                fi
+          WANT_VER="${CARGO_DENY_VERSION:-latest}"
+          have() { command -v "$1" >/dev/null 2>&1; }
+          version_of() { "$1" --version 2>/dev/null | awk '{print $3}'; }
+
+          install_cargo_deny() {
+            local want="$1"
+            if have cargo-deny; then
+              local have_ver
+              have_ver="$(version_of cargo-deny || true)"
+              if [[ "$want" == "latest" || "$have_ver" == "$want" ]]; then
+                echo "cargo-deny already installed ($have_ver), keeping it."
+                return 0
+              fi
+            fi
+
+            tmpdir="$(mktemp -d)"
+            trap 'rm -rf "$tmpdir" cargo-deny.tar.gz 2>/dev/null || true' EXIT
+
+            if [[ "$want" == "latest" ]]; then
+              url="https://github.com/EmbarkStudios/cargo-deny/releases/latest/download/cargo-deny-x86_64-unknown-linux-gnu.tar.gz"
+            else
+              url="https://github.com/EmbarkStudios/cargo-deny/releases/download/v${want}/cargo-deny-x86_64-unknown-linux-gnu.tar.gz"
+            fi
+
+            echo "Attempting prebuilt cargo-deny from: $url"
+            if curl -fsSL "$url" -o cargo-deny.tar.gz; then
+              tar -xzf cargo-deny.tar.gz -C "$tmpdir"
+              binpath="$(find "$tmpdir" -type f -name 'cargo-deny' -perm -111 | head -n1 || true)"
+              if [[ -n "${binpath:-}" ]]; then
+                sudo install -m 0755 "$binpath" /usr/local/bin/cargo-deny
+                echo "Installed prebuilt cargo-deny to /usr/local/bin."
               else
-                echo "Failed to extract prebuilt cargo-deny archive; falling back to cargo install" >&2
-                rm -rf "${extracted_dir}" cargo-deny.tar.gz
+                echo "Prebuilt archive did not contain cargo-deny binary; falling back to cargo install."
                 cargo install cargo-deny --locked --force
-                install -m 755 "$HOME/.cargo/bin/cargo-deny" ./cargo-deny
               fi
             else
-              echo "Downloaded cargo-deny archive is invalid; falling back to cargo install" >&2
-              rm -f cargo-deny.tar.gz
+              echo "Failed to download prebuilt cargo-deny archive; falling back to cargo install."
               cargo install cargo-deny --locked --force
-              install -m 755 "$HOME/.cargo/bin/cargo-deny" ./cargo-deny
             fi
-          else
-            echo "Failed to download prebuilt cargo-deny archive; falling back to cargo install" >&2
-            cargo install cargo-deny --locked --force
-            install -m 755 "$HOME/.cargo/bin/cargo-deny" ./cargo-deny
-          fi
-      - name: Add cargo-deny to PATH
-        run: echo "$HOME/.cargo-deny-bin" >> $GITHUB_PATH
-      - name: Run cargo-deny checks
+          }
+
+          install_cargo_deny "$WANT_VER"
+
+      - name: cargo-deny
         run: |
-          cargo deny check advisories
-          cargo deny check bans
-          cargo deny check licenses
+          cargo deny check advisories bans licenses
   audit:
     name: cargo-audit (CVE Check)
     runs-on: ubuntu-latest
