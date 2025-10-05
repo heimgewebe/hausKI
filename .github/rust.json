@@ -5,7 +5,7 @@
       "pattern": [
         {
           "regexp": "^(error|warning|note|help)(\\[(E\\d{4}|[\\w\\-]+)\\])?:\\s+(.*)$",
-          "severity": 1,
+          "severity": "1",
           "code": 3,
           "message": 4
         },
@@ -15,6 +15,7 @@
           "line": 2,
           "column": 3
         },
+        { "regexp": "^\\s*\\|$", "comment": "Matches and ignores empty context lines in Rust error output." },
         {
           // This pattern matches and skips empty pipe lines in Rust error output.
           "regexp": "^\\s*\\|$"
