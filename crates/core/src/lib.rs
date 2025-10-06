@@ -26,6 +26,7 @@ use std::{
 use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, BoxError, ServiceBuilder};
 use utoipa::OpenApi;
 
+mod ask;
 mod config;
 mod egress;
 pub use config::{
@@ -44,7 +45,8 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(health, ready),
+    paths(health, ready, ask::ask_handler),
+    components(schemas(ask::AskResponse, ask::AskHit)),
     tags((name = "core", description = "Core health & readiness"))
 )]
 struct ApiDoc;
@@ -462,6 +464,7 @@ fn core_routes() -> Router<AppState> {
         .route("/health", get(health))
         .route("/ready", get(ready))
         .route("/metrics", get(metrics))
+        .route("/ask", get(ask::ask_handler))
 }
 
 fn docs_routes() -> Router<AppState> {
@@ -607,12 +610,13 @@ async fn cors_middleware(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ask::AskResponse;
     use axum::{
         body::Body,
         http::{header, HeaderValue, Request, StatusCode},
     };
     use http_body_util::BodyExt;
-    use serde_json::json;
+    use serde_json::{from_slice, json};
     use tower::ServiceExt;
 
     fn demo_app(expose: bool) -> axum::Router {
@@ -752,6 +756,57 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(search_res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn ask_route_returns_hits() {
+        let app = demo_app(false);
+
+        let upsert_payload = json!({
+            "doc_id": "ask-doc",
+            "namespace": "default",
+            "chunks": [
+                {"chunk_id": "ask-doc#0", "text": "Hallo Hauski", "embedding": []}
+            ],
+            "meta": {"kind": "markdown"}
+        });
+
+        let upsert_res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/index/upsert")
+                    .method("POST")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(upsert_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(upsert_res.status(), StatusCode::OK);
+
+        let ask_res = app
+            .oneshot(
+                Request::builder()
+                    .uri("/ask?q=Hauski&k=3&ns=default")
+                    .method("GET")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ask_res.status(), StatusCode::OK);
+
+        let body = ask_res.into_body().collect().await.unwrap().to_bytes();
+        let response: AskResponse = from_slice(&body).unwrap();
+        assert_eq!(response.namespace, "default");
+        assert_eq!(response.k, 3);
+        assert_eq!(response.query, "Hauski");
+        assert!(!response.hits.is_empty(), "expected at least one hit");
+        assert!(
+            response.hits.iter().any(|hit| hit.doc_id == "ask-doc"),
+            "expected a hit with doc_id ask-doc"
+        );
     }
 
     #[tokio::test]

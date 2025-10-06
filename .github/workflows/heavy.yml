@@ -73,12 +73,21 @@ jobs:
             -H 'content-type: application/json' \
             -d '{"query":"hi","k":1,"namespace":"default"}' | tee search.txt
 
+          curl -sf "http://127.0.0.1:8080/ask?q=hi&k=3&ns=default" | tee ask.txt
+          jq -e '.hits | length >= 1' ask.txt
+
           curl -sf "http://127.0.0.1:8080/metrics" -o metrics.txt
           search_histogram_pattern='/http_request_duration_seconds_bucket/ && /path="\/index\/search"/ {print}'
           awk "$search_histogram_pattern" metrics.txt | head -n 5
           first_bucket=$(awk "$search_histogram_pattern {exit}" metrics.txt)
           if [ -n "$first_bucket" ]; then
             echo "::notice::index search histogram sample: $first_bucket"
+          fi
+          ask_histogram_pattern='/http_request_duration_seconds_bucket/ && /path="\/ask"/ {print}'
+          awk "$ask_histogram_pattern" metrics.txt | head -n 5 
+          ask_first_bucket=$(awk "$ask_histogram_pattern {exit}" metrics.txt)
+          if [ -n "$ask_first_bucket" ]; then
+            echo "::notice::ask histogram sample: $ask_first_bucket"
           fi
           echo "::notice::index search budget p95 target: 60ms (observability to be enforced later)"
       - name: Upload logs/artifacts
@@ -93,6 +102,7 @@ jobs:
             health.txt
             upsert.txt
             search.txt
+            ask.txt
             metrics.txt
           if-no-files-found: ignore
           retention-days: 7

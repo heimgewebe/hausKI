@@ -211,6 +211,14 @@ Beispielabfragen für Dashboards oder die Prometheus-Konsole:
 
 HausKI bringt mit [semantAH](docs/semantah.md) eine semantische Gedächtnisschicht mit. Der Bootstrap enthält Dokumentation, Konfiguration, Skripte und Rust-Scaffolds für Index, Graph und Related-Blöcke. Starte mit dem Quickstart in `docs/semantah.md`, um Ollama einzubinden, Seeds zu laden und die `/index`-Endpunkte zu testen.
 
+### Fragen stellen (Semantik-Suche)
+
+```bash
+curl -s "http://localhost:8080/ask?q=dein+text&k=5&ns=default" | jq
+```
+
+Der Endpoint liefert die Top-k-Treffer mit Score, Snippet und Metadaten aus dem lokalen Index. Der Server begrenzt `k` serverseitig auf maximal 100 Treffer.
+
 ---
 
 ## Policies & Budgets

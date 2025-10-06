@@ -72,7 +72,7 @@ impl IndexState {
         ingested
     }
 
-    async fn search(&self, request: &SearchRequest) -> Vec<SearchMatch> {
+    pub async fn search(&self, request: &SearchRequest) -> Vec<SearchMatch> {
         let store = self.inner.store.read().await;
         let namespace = request.namespace.as_deref().unwrap_or(DEFAULT_NAMESPACE);
         let Some(namespace_store) = store.get(namespace) else {
@@ -85,20 +85,21 @@ impl IndexState {
                 doc.chunks
                     .iter()
                     .enumerate()
-                    .map(move |(idx, chunk)| (doc, idx, chunk))
+                    .filter_map(move |(idx, chunk)| {
+                        chunk.text.as_ref().map(|text| SearchMatch {
+                            doc_id: doc.doc_id.clone(),
+                            namespace: doc.namespace.clone(),
+                            chunk_id: chunk
+                                .chunk_id
+                                .clone()
+                                .unwrap_or_else(|| format!("{}#{idx}", doc.doc_id)),
+                            score: 0.0,
+                            text: text.clone(),
+                            meta: doc.meta.clone(),
+                        })
+                    })
             })
             .take(limit)
-            .filter_map(|(doc, idx, chunk)| {
-                chunk.text.as_ref().map(|text| SearchMatch {
-                    doc_id: doc.doc_id.clone(),
-                    chunk_id: chunk
-                        .chunk_id
-                        .clone()
-                        .unwrap_or_else(|| format!("{}#{idx}", doc.doc_id)),
-                    score: 0.0,
-                    text: text.clone(),
-                })
-            })
             .collect()
     }
 }
@@ -224,12 +225,14 @@ pub struct SearchResponse {
     pub budget_ms: u64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct SearchMatch {
     pub doc_id: String,
+    pub namespace: String,
     pub chunk_id: String,
     pub score: f32,
     pub text: String,
+    pub meta: Value,
 }
 
 fn default_namespace() -> String {
