@@ -104,6 +104,12 @@ Alternativ steht der Snapshot auch als Artefakt des Workflows
 2. "Reopen in Container" ausführen; das Post-Create-Skript setzt `pre-commit` auf und prüft GPU-Verfügbarkeit.
 3. Danach genügen die Shortcuts aus der `justfile` (`just build`, `just test`, `just run-core`).
 
+### Codex-Review-Ablage
+
+Codex-Läufe schreiben ihre Rohdaten nach `~/.hauski/review/hauski/`. Lege dir im Repo optional einen Symlink `ln -s ~/.hauski/review/hauski .hauski-reports` an; dadurch bleiben Logs, Pläne und Canvas-Dateien persistent, ohne ins Repo zu geraten.
+
+Nutze `just codex:doctor`, um vor einem Run schnell zu prüfen, ob eine lokale `codex`-Installation gefunden wird oder automatisch auf `npx @openai/codex@1.0.0` zurückgefallen wird.
+
 ---
 
 ## wgx-Manifest & Aufgaben
