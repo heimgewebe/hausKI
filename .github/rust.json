@@ -19,7 +19,7 @@
         {
           "regexp": "^\\s*[|]\\s*(.*)$",
           "loop": true,
-          "message": 1
+          "message": "$1"
         }
       ]
     }
