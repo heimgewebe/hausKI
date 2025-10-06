@@ -67,3 +67,31 @@ py-docs-build:
 
 py-pre-commit:
     uv run pre-commit run --all-files
+
+# Quick vs. Full
+test-quick:
+    @echo "running quick tests…"
+    @if command -v cargo >/dev/null; then cargo test -q; fi
+    @if command -v uv >/dev/null; then uv run pytest -q || true; fi
+    @if command -v npm >/dev/null; then npm test -s || true; fi
+
+test-full:
+    @echo "running full test suite…"
+    @if command -v cargo >/dev/null; then cargo test -q; fi
+    @if command -v uv >/dev/null; then uv run pytest -q || true; fi
+    @if command -v npm >/dev/null; then npm test -s || true; fi
+
+# Codex Runs
+codex:doctor:
+    @echo "🔎 Checking codex availability…"
+    @if command -v codex >/dev/null; then echo "✅ codex in PATH"; \
+    else echo "ℹ️  using npx @openai/codex@1.0.0"; fi
+
+codex bugfix:
+    bash scripts/hauski-codex.sh . scripts/codex-prompts/bugfix.md scripts/policies/codex.policy.yml
+
+codex testgap:
+    bash scripts/hauski-codex.sh . scripts/codex-prompts/testgap.md scripts/policies/codex.policy.yml
+
+codex refactor:
+    bash scripts/hauski-codex.sh . scripts/codex-prompts/refactor.md scripts/policies/codex.policy.yml
