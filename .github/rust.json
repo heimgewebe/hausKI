@@ -13,14 +13,17 @@
           "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
           "file": 1,
           "line": 2,
-          "column": 3
+          "column": 3,
+          "message": 0
         },
         {
-          "regexp": "^\\s*\\|$"
+          "regexp": "^(\\s*\\|)$",
+          "message": 1
         },
         {
           "regexp": "^\\s*\\|\\s*(.*)$",
-          "loop": true
+          "loop": true,
+          "message": 1
         }
       ]
     }
