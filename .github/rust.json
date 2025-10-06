@@ -18,7 +18,8 @@
         { "regexp": "^\\s*\\|$" },
         {
           "regexp": "^\\s*[|]\\s*(.*)$",
-          "loop": true
+          "loop": true,
+          "message": 1
         }
       ]
     }
