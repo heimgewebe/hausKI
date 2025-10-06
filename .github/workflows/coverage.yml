@@ -25,6 +25,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
+      - name: Ensure vendor snapshot
+        run: bash scripts/ensure-vendor.sh
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: Cache cargo + target
