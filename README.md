@@ -1,6 +1,5 @@
 ![WGX](https://img.shields.io/badge/wgx-enabled-blue)
-[![Coverage](https://img.shields.io/github/actions/workflow/status/hauski/hauski/coverage.yml?branch=main&label=Coverage)](https://github.com/hauski/hauski/actions/workflows/coverage.yml?query=branch%3Amain)
-[![Security](https://img.shields.io/github/actions/workflow/status/hauski/hauski/security.yml?branch=main&label=Security)](https://github.com/hauski/hauski/actions/workflows/security.yml?query=branch%3Amain)
+<!-- Coverage and Security badges will be added once the corresponding workflows are available. -->
 
 # HausKI — Rust-first, Offline-Default, GPU-aware
 
