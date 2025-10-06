@@ -23,7 +23,7 @@ reqwest.workspace = true
 url.workspace = true
 hauski-indexd = { path = "../indexd", version = "0.1.0" }
 tower = { version = "0.5", features = ["limit", "timeout", "util"] }
-utoipa = { version = "4", features = ["axum_extras", "macros"] }
+utoipa = { version = "4", features = ["axum_extras"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
