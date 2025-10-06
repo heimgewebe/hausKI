@@ -1,0 +1,13 @@
+paths:
+  read: ['.']
+  write: ['src/','crates/','scripts/','.github/workflows/','docs/']
+commands:
+  allow: ['git status','git diff','git apply --3way *','cargo build --locked','cargo test -q','uv run pytest -q','npm test -s']
+  deny: ['curl *','wget *','sudo *','rm -rf /']
+git:
+  work_branch_prefix: 'codex/'
+  max_commit_lines: 800
+guardrails:
+  ask_before_apply: true
+  require_green_tests: true
+  require_git_clean: true
