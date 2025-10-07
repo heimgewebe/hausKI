@@ -39,7 +39,7 @@ fn parse_allow_entry(entry: &str) -> Result<AllowedTarget, AllowEntryError> {
 
     if let Ok(url) = Url::parse(trimmed) {
         if url.host_str().is_some() {
-            return allowed_target_from_url(&url);
+            return allowed_target_from_url(&url, true);
         }
 
         if trimmed.contains("://") {
@@ -49,12 +49,20 @@ fn parse_allow_entry(entry: &str) -> Result<AllowedTarget, AllowEntryError> {
 
     let fallback = format!("http://{trimmed}");
     let url = Url::parse(&fallback).map_err(AllowEntryError::Url)?;
-    allowed_target_from_url(&url)
+    allowed_target_from_url(&url, false)
 }
 
-fn allowed_target_from_url(url: &Url) -> Result<AllowedTarget, AllowEntryError> {
+fn allowed_target_from_url(url: &Url, had_scheme: bool) -> Result<AllowedTarget, AllowEntryError> {
     let host = url.host_str().ok_or(AllowEntryError::MissingHost)?;
-    Ok(AllowedTarget::new(host, url.port()))
+    let port = if let Some(port) = url.port() {
+        Some(port)
+    } else if had_scheme {
+        url.port_or_known_default()
+    } else {
+        None
+    };
+
+    Ok(AllowedTarget::new(host, port))
 }
 
 #[derive(Debug, Error)]
@@ -292,6 +300,27 @@ egress:
         assert!(guard
             .ensure_allowed(&Url::parse("https://evil.example").unwrap())
             .is_err());
+    }
+
+    #[test]
+    fn guard_rejects_mismatched_port_for_scheme_entries() {
+        let policy = policy_from_yaml(
+            r#"
+egress:
+  default: deny
+  allow:
+    - https://api.matrix.example
+"#,
+        );
+        let guard = EgressGuard::from_policy(&policy).unwrap();
+
+        guard
+            .ensure_allowed(&Url::parse("https://api.matrix.example/v1").unwrap())
+            .unwrap();
+        assert!(matches!(
+            guard.ensure_allowed(&Url::parse("https://api.matrix.example:8443/alt").unwrap()),
+            Err(GuardError::HostDenied { .. })
+        ));
     }
 
     #[test]
