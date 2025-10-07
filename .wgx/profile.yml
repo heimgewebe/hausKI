@@ -76,7 +76,7 @@ tasks:
         [ -f pyproject.toml ] && grep -q '^\[project\]\s*$' pyproject.toml || true
 
 meta:
-  owner: "alexdermohr"
+  owner: "heimgewebe"
   conventions:
     gewebedir: ".gewebe"
     version_endpoint: "/version"

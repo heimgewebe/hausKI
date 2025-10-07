@@ -6,7 +6,9 @@ on:
     types: [labeled, synchronize, reopened, ready_for_review]
     branches: [ main ]
 
-permissions: { contents: read }
+permissions:
+  id-token: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
