@@ -16,11 +16,13 @@
           "column": 3
         },
         {
-          "regexp": "^(\\s*\\|)$"
+          "regexp": "^(\\s*\\|)$",
+          "message": 1
         },
         {
           "regexp": "^\\s*\\|\\s*(.*)$",
-          "loop": true
+          "loop": true,
+          "message": 1
         }
       ]
     }
