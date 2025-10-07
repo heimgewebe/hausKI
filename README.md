@@ -53,10 +53,11 @@ cargo test --workspace -- --nocapture
 
 > 💡 **Hinweis auf Offline-Builds:** Bevor du `cargo clippy`, `cargo build` oder
 > `cargo test` ausführst, stelle sicher, dass `vendor/` alle benötigten Crates
-> enthält. Der neue Helper `scripts/check-vendor.sh` bricht früh mit einer
-> verständlichen Meldung ab, falls beispielsweise `axum` noch nicht lokal
-> vorliegt. Dank `.cargo/config.toml` nutzt Cargo automatisch die lokal
-> eingecheckte Vendor-Struktur.
+> enthält. Der Helper `scripts/check-vendor.sh` warnt früh mit einer
+> verständlichen Meldung, falls beispielsweise `axum` noch nicht lokal
+> vorliegt. Standardmäßig lädt Cargo fehlende Crates wieder aus `crates.io`;
+> setze `HAUSKI_ENFORCE_VENDOR=1`, wenn der Build zwingend offline erfolgen
+> soll.
 
 > Falls CI mit der Meldung `the lock file … needs to be updated but --locked was
 > passed` oder `no matching package named 'axum' found` stoppt, führe die
@@ -68,16 +69,16 @@ cargo test --workspace -- --nocapture
 
 ```toml
 # .cargo/config.toml
-[source.crates-io]
-replace-with = "vendored-sources"
+[registries.crates-io]
+protocol = "sparse"
 
 [source.vendored-sources]
 directory = "vendor"
 ```
 
-> Falls du eine eigene Konfiguration in einem Fork verwendest, behalte die
-> `replace-with`-Direktive unbedingt bei, damit Builds auf air-gapped Hosts
-> zuverlässig funktionieren.
+> Offline-Builds kannst du erzwingen, indem du Cargo mit `--config` oder einer
+> eigenen `config.toml` startest, die `source.crates-io.replace-with =
+> "vendored-sources"` setzt. So bleiben air-gapped Workflows weiterhin möglich.
 
 **Vendor-Snapshot befüllen**
 

@@ -4,26 +4,23 @@
       "owner": "rustc",
       "pattern": [
         {
-          "regexp": "^(error|warning|note|help)(\\[(E\\d{4}|[\\w\\-]+)\\])?:\\s+(.*)$",
+          "regexp": "^(error|warning|note|help)(?:\\[(E\\d{4}|[\\w\\-]+)\\])?:\\s+(.*)$",
           "severity": 1,
-          "code": 3,
-          "message": 4
+          "code": 2,
+          "message": 3
         },
         {
           "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
           "file": 1,
           "line": 2,
-          "column": 3,
-          "message": 0
+          "column": 3
         },
         {
-          "regexp": "^(\\s*\\|)$",
-          "message": 1
+          "regexp": "^(\\s*\\|)$"
         },
         {
           "regexp": "^\\s*\\|\\s*(.*)$",
-          "loop": true,
-          "message": 1
+          "loop": true
         }
       ]
     }

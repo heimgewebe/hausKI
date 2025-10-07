@@ -26,7 +26,8 @@ fi
 missing_display=$(printf '%s ' "${missing[@]}")
 missing_display=${missing_display% }
 
-cat <<MSG
+if [[ ${HAUSKI_ENFORCE_VENDOR:-0} != "0" ]]; then
+  cat <<MSG
 error: vendored crates missing: ${missing_display}
 
 Der Workspace erzwingt Offline-Builds über '.cargo/config.toml'. Wenn Cargo
@@ -41,4 +42,12 @@ mit:
 
 Sobald 'vendor/' vollständig ist, erneut ausführen.
 MSG
-exit 1
+  exit 1
+fi
+
+cat <<MSG
+warning: vendored crates missing: ${missing_display}
+
+Cargo fällt nun auf crates.io zurück. Setze HAUSKI_ENFORCE_VENDOR=1, wenn der
+Build zwingend offline erfolgen muss.
+MSG
