@@ -579,7 +579,10 @@ async fn cors_middleware(
                 header::ACCESS_CONTROL_ALLOW_ORIGIN,
                 allowed_origin.as_ref().clone(),
             )
-            .header(header::ACCESS_CONTROL_ALLOW_METHODS, "GET, HEAD, OPTIONS")
+            .header(
+                header::ACCESS_CONTROL_ALLOW_METHODS,
+                "GET, HEAD, POST, OPTIONS",
+            )
             .header(
                 header::ACCESS_CONTROL_ALLOW_HEADERS,
                 HeaderValue::from_static("Content-Type, Authorization"),
@@ -613,7 +616,7 @@ mod tests {
     use crate::ask::AskResponse;
     use axum::{
         body::Body,
-        http::{header, HeaderValue, Request, StatusCode},
+        http::{header, HeaderValue, Method, Request, StatusCode},
     };
     use http_body_util::BodyExt;
     use serde_json::{from_slice, json};
@@ -976,6 +979,43 @@ mod tests {
             .headers()
             .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn cors_preflight_allows_post_requests() {
+        let origin = HeaderValue::from_static("http://127.0.0.1:8080");
+        let app = demo_app_with_origin(false, origin.clone());
+
+        let res = app
+            .oneshot(
+                Request::builder()
+                    .uri("/index/upsert")
+                    .method(Method::OPTIONS)
+                    .header(header::ORIGIN, origin.clone())
+                    .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+        let allow_methods = res
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_METHODS)
+            .expect("missing Access-Control-Allow-Methods header");
+        let allow_methods = allow_methods
+            .to_str()
+            .expect("non-UTF8 allow methods header");
+        assert!(
+            allow_methods.contains("POST"),
+            "preflight response missing POST in allow methods: {allow_methods}"
+        );
+        assert_eq!(
+            res.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN),
+            Some(&origin)
+        );
     }
 
     #[tokio::test]
