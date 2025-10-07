@@ -109,7 +109,7 @@ where
     S: Clone + Send + Sync + 'static,
     IndexState: FromRef<S>,
 {
-    Router::new()
+    Router::<S>::new()
         .route("/upsert", post(upsert_handler))
         .route("/search", post(search_handler))
 }
