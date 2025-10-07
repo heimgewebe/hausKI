@@ -4,10 +4,10 @@
       "owner": "rustc",
       "pattern": [
         {
-          "regexp": "^(error|warning|note|help)(\\[(E\\d{4}|[\\w\\-]+)\\])?:\\s+(.*)$",
+          "regexp": "^(error|warning|note|help)(?:\\[(E\\d{4}|[\\w\\-]+)\\])?:\\s+(.*)$",
           "severity": 1,
-          "code": 3,
-          "message": 4
+          "code": 2,
+          "message": 3
         },
         {
           "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
