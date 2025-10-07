@@ -39,10 +39,24 @@ jobs:
       - uses: actions/checkout@v4
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Tools installieren
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Build (release)
-        run: cargo build --workspace --release
+      - name: Vendoring sicherstellen (Proxy neutralisieren, dann Snapshot, dann offline prüfen)
+        env:
+          http_proxy: ""
+          https_proxy: ""
+          HTTP_PROXY: ""
+          HTTPS_PROXY: ""
+        run: |
+          set -euo pipefail
+          chmod +x scripts/ensure-vendor.sh
+          NEUTRALIZE_PROXY=1 ./scripts/ensure-vendor.sh
+          NO_NETWORK=1 ./scripts/ensure-vendor.sh
+      - name: Cargo offline bauen
+        env:
+          CARGO_NET_OFFLINE: "true"
+        run: cargo build --workspace --release --locked
       - name: API smoke test
         env:
           RUST_LOG: info

@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{FromRef, State},
     http::{Method, StatusCode},
     response::IntoResponse,
     routing::post,
@@ -103,7 +103,11 @@ impl IndexState {
     }
 }
 
-pub fn router() -> Router<IndexState> {
+pub fn router<S>() -> Router<S>
+where
+    IndexState: FromRef<S> + Clone,
+    S: Clone + Send + Sync + 'static,
+{
     Router::new()
         .route("/upsert", post(upsert_handler))
         .route("/search", post(search_handler))

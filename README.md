@@ -213,3 +213,8 @@ hauski audio profile set <profile-name>
 - [`hauski-skizze.md`](hauski-skizze.md) – Vision, Funktionsumfang, Performance-Budgets, Security-Ansatz.
 - [`hauski-stack.md`](hauski-stack.md) – Technologiewahl, Tooling, CI-Strategie und Testpyramide.
 
+tick Mo 6. Okt 06:42:36 CEST 2025
+tick Mo 6. Okt 06:52:56 CEST 2025
+tick Mo 6. Okt 06:53:04 CEST 2025
+tick Mo 6. Okt 06:58:12 CEST 2025
+tick Mo 6. Okt 07:10:14 CEST 2025

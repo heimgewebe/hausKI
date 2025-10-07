@@ -1,2 +1,15 @@
+# Erzwingt, dass alle crates aus vendor/ kommen.
+# Verhindert "accidentally online"-Builds im CI.
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
+
+# Optional nützlich: klare Timeouts/Retry-Politik, falls "ensure-vendor" mal online muss
+[net]
+git-fetch-with-cli = true
+retry = 1
+
 [registries.crates-io]
 protocol = "sparse"

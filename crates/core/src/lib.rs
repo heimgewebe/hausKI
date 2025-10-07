@@ -32,6 +32,8 @@ pub use egress::{
     AllowlistedClient, EgressGuard, EgressGuardError, GuardError, GuardedRequestError,
 };
 
+const CORE_SERVICE_NAME: &str = "hauski-core";
+const INDEXD_SERVICE_NAME: &str = "hauski-indexd";
 const LATENCY_BUCKETS: [f64; 8] = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0];
 
 type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
@@ -95,10 +97,14 @@ impl AppState {
 
         let build_info = Family::<BuildInfoLabels, Gauge>::default();
         build_info
-            .get_or_create(&BuildInfoLabels { service: CORE_SERVICE_NAME })
+            .get_or_create(&BuildInfoLabels {
+                service: CORE_SERVICE_NAME,
+            })
             .set(1);
         build_info
-            .get_or_create(&BuildInfoLabels { service: INDEXD_SERVICE_NAME })
+            .get_or_create(&BuildInfoLabels {
+                service: INDEXD_SERVICE_NAME,
+            })
             .set(1);
         registry.register("build_info", "Build info per service", build_info.clone());
 
@@ -361,7 +367,7 @@ pub fn build_app_with_state(
 
     let mut app = Router::new()
         .merge(core_routes())
-        .nest("/index", index_router());
+        .nest("/index", index_router::<AppState>());
 
     if state.expose_config() {
         app = app.merge(config_routes());
