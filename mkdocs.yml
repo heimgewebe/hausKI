@@ -1,7 +1,7 @@
 site_name: HausKI
-site_url: https://hauski.github.io/hauski
-repo_url: https://github.com/hauski/hauski
-repo_name: hauski/hauski
+site_url: https://heimgewebe.github.io/hausKI
+repo_url: https://github.com/heimgewebe/hausKI
+repo_name: heimgewebe/hausKI
 edit_uri: edit/main/docs/
 theme:
   name: material
@@ -32,4 +32,4 @@ plugins:
 extra:
   social:
     - icon: material/github
-      link: https://github.com/hauski/hauski
+      link: https://github.com/heimgewebe/hausKI
