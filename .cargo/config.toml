@@ -1,8 +1,10 @@
 [registries.crates-io]
 protocol = "sparse"
 
-[source.crates-io]
-replace-with = "vendored-sources"
-
+# Offline builds can opt into the vendored snapshot by passing
+# `--config source.crates-io.replace-with=vendored-sources` or by setting
+# `CARGO_CONFIG` to include this file together with an override.  We keep the
+# directory definition here so `cargo vendor` continues to materialise crates
+# under `vendor/` without requiring additional configuration.
 [source.vendored-sources]
 directory = "vendor"
