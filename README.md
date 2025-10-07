@@ -72,6 +72,11 @@ cargo run -p hauski-cli -- serve
 just run-core
 ```
 
+Für reproduzierbare Builds sorgt `scripts/ensure-vendor.sh`. Der Helper regeneriert bei
+Bedarf `vendor/` (optional mit neutralisierten Proxy-Variablen) und kann mit
+`NO_NETWORK=1` sicherstellen, dass der erzeugte Snapshot vollständig ist – genau so baut
+auch die CI offline.
+
 > **Hinweis:** Setze `HAUSKI_EXPOSE_CONFIG=true`, um die geschützten Routen unter `/config/*` bewusst freizugeben (nur für lokale Tests empfohlen).
 
 ### CORS & Frontend-Integration
