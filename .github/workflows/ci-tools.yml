@@ -29,7 +29,7 @@ jobs:
 
       - name: Ensure uv version
         run: |
-          uv self update v0.1.18
+          uv self update v0.1.17
           uv --version
 
       - name: Cache uv
