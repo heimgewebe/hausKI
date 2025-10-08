@@ -8,5 +8,6 @@ license = "MIT"
 axum.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tower = { version = "0.5", features = ["util"] }
 tokio.workspace = true
 tracing.workspace = true

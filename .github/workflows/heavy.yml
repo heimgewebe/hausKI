@@ -40,6 +40,7 @@ jobs:
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - name: Tools installieren
+        # only keep a single toolchain setup step (duplicate removed)
         uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Vendoring sicherstellen (Proxy neutralisieren, dann Snapshot, dann offline prüfen)

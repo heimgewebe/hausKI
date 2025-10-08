@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc, time::Instant};
 use tokio::sync::RwLock;
+#[cfg(test)]
+use tower::util::ServiceExt; // provides Router::oneshot in tests
 
 const DEFAULT_NAMESPACE: &str = "default";
 
@@ -103,10 +105,12 @@ impl IndexState {
     }
 }
 
+// Generischer Router: outer State `S` muss thread-safe & clonable sein,
+// `IndexState` wird via `FromRef<S>` extrahiert.
 pub fn router<S>() -> Router<S>
 where
-    IndexState: FromRef<S> + Clone,
-    S: Clone + Send + Sync + 'static,
+    S: Send + Sync + Clone + 'static,
+    IndexState: FromRef<S>,
 {
     Router::new()
         .route("/upsert", post(upsert_handler))
@@ -208,7 +212,6 @@ fn default_namespace() -> String {
 mod tests {
     use super::*;
     use axum::http::Request;
-    use tower::ServiceExt;
 
     #[tokio::test]
     async fn upsert_and_search_return_ok() {
