@@ -5,9 +5,9 @@
       "pattern": [
         {
           "regexp": "^(error|warning|note|help)(?:\\[(E\\d{4}|[\\w\\-]+)\\])?:\\s+(.*)$",
-          "severity": 1,
+          "message": 3,
           "code": 2,
-          "message": 3
+          "severity": 1
         },
         {
           "regexp": "^\\s*-->\\s+([^:]+):(\\d+):(\\d+)$",
