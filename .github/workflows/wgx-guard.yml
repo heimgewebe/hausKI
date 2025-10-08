@@ -1,0 +1,71 @@
+name: wgx-guard
+
+on:
+  push:
+    paths:
+      - ".wgx/**"
+      - ".github/workflows/wgx-guard.yml"
+      - "pyproject.toml"
+      - "Cargo.toml"
+  pull_request:
+    paths:
+      - ".wgx/**"
+      - ".github/workflows/wgx-guard.yml"
+      - "pyproject.toml"
+      - "Cargo.toml"
+  workflow_dispatch:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check .wgx/profile.yml presence
+        run: |
+          test -f .wgx/profile.yml || { echo "::error::.wgx/profile.yml missing"; exit 1; }
+          echo "found .wgx/profile.yml"
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML
+        run: pip install --disable-pip-version-check --upgrade pip pyyaml
+
+      - name: Run schema-lite check
+        run: |
+          python - <<'PY'
+          import sys, yaml, pathlib
+          p = pathlib.Path(".wgx/profile.yml")
+          data = yaml.safe_load(p.read_text(encoding="utf-8"))
+          required_top = ["version","env_priority","tooling","tasks"]
+          missing = [k for k in required_top if k not in data]
+          if missing:
+              print(f"::error::missing keys: {missing}")
+              sys.exit(1)
+          envp = data["env_priority"]
+          if not isinstance(envp, list) or not envp:
+              print("::error::env_priority must be a non-empty list")
+              sys.exit(1)
+          for t in ["up","lint","test","build","smoke"]:
+              if t not in data["tasks"]:
+                  print(f"::error::task '{t}' missing")
+                  sys.exit(1)
+          print("schema-lite ok")
+          PY
+
+      - name: (Optional) UV bootstrap (pyproject present)
+        if: ${{ hashFiles('pyproject.toml') != '' }}
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          uv self update 3.10
+          uv --version
+          uv sync --frozen
+
+      - name: Done
+        run: echo "wgx-guard passed ✅"

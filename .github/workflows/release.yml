@@ -10,8 +10,10 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      - name: Check vendor snapshot
+        run: bash scripts/check-vendor.sh
       - name: Build (release, locked)
         run: cargo build --workspace --release --locked
       - name: Package binaries

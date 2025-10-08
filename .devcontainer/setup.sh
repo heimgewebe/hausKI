@@ -5,7 +5,10 @@ sudo apt-get update -y
 # Rust toolchain (if feature didn't handle fully)
 if ! command -v rustup >/dev/null 2>&1; then
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-  source "$HOME/.cargo/env"
+  if [ -f "$HOME/.cargo/env" ]; then
+    # shellcheck source=/dev/null
+    source "$HOME/.cargo/env"
+  fi
 fi
 rustup component add clippy rustfmt
 

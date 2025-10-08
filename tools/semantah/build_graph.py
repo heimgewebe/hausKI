@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Stub zum Erzeugen eines semantAH-Graphen."""
+
 from __future__ import annotations
 
 import argparse
 import json
 import os
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any
 
 DEFAULT_NAMESPACE = "default"
 
@@ -15,7 +17,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="semantAH Graph-Stub")
     parser.add_argument(
         "--index-path",
-        default=os.environ.get("HAUSKI_INDEX_PATH", os.path.expandvars("$HOME/.local/state/hauski/index")),
+        default=os.environ.get(
+            "HAUSKI_INDEX_PATH", os.path.expandvars("$HOME/.local/state/hauski/index")
+        ),
         help="Basisverzeichnis für den Index",
     )
     parser.add_argument("--namespace", default=DEFAULT_NAMESPACE, help="Namespace")
@@ -29,7 +33,7 @@ def ensure_dirs(base: Path) -> Path:
     return gewebe
 
 
-def build_stub_nodes(namespace: str) -> Iterable[Dict[str, Any]]:
+def build_stub_nodes(namespace: str) -> Iterable[dict[str, Any]]:
     vault_rel = "notes"
     return [
         {
@@ -45,7 +49,7 @@ def build_stub_nodes(namespace: str) -> Iterable[Dict[str, Any]]:
     ]
 
 
-def build_stub_edges(nodes: List[Dict[str, Any]]) -> Iterable[Dict[str, Any]]:
+def build_stub_edges(nodes: list[dict[str, Any]]) -> Iterable[dict[str, Any]]:
     if len(nodes) < 2:
         return []
     source, target = nodes[0], nodes[1]
@@ -63,7 +67,7 @@ def build_stub_edges(nodes: List[Dict[str, Any]]) -> Iterable[Dict[str, Any]]:
     ]
 
 
-def write_jsonl(path: Path, items: Iterable[Dict[str, Any]]) -> None:
+def write_jsonl(path: Path, items: Iterable[dict[str, Any]]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for item in items:
             handle.write(json.dumps(item, ensure_ascii=False) + "\n")
@@ -78,7 +82,9 @@ def write_graph(gewebe: Path, namespace: str) -> None:
 
     report = gewebe / "reports"
     report.mkdir(exist_ok=True)
-    (report / "graph_report.md").write_text("# semantAH Graph Report (Stub)\n", encoding="utf-8")
+    (report / "graph_report.md").write_text(
+        "# semantAH Graph Report (Stub)\n", encoding="utf-8"
+    )
 
 
 def main() -> None:

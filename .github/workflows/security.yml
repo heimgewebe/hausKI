@@ -1,0 +1,116 @@
+name: security
+
+on:
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "deny.toml"
+      - ".github/workflows/security.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "deny.toml"
+      - ".github/workflows/security.yml"
+  schedule:
+    - cron: "17 5 * * 1"   # Mondays 05:17 UTC (weekly baseline protection)
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deny:
+    name: cargo-deny (Licenses/Bans/Advisories)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Ensure vendor snapshot
+        run: bash scripts/ensure-vendor.sh
+      - name: Check vendor snapshot
+        run: bash scripts/check-vendor.sh
+      - name: Install cargo-deny (prebuilt with fallback; deduped)
+        shell: bash
+        run: |
+          set -euo pipefail
+          WANT_VER="${CARGO_DENY_VERSION:-latest}"
+          have() { command -v "$1" >/dev/null 2>&1; }
+          version_of() { "$1" --version 2>/dev/null | awk '{print $2}'; }
+
+          install_cargo_deny() {
+            local want="$1"
+            if have cargo-deny; then
+              local have_ver
+              have_ver="$(version_of cargo-deny || true)"
+              if [[ "$want" == "latest" || "$have_ver" == "$want" ]]; then
+                echo "cargo-deny already installed ($have_ver), keeping it."
+                return 0
+              fi
+            fi
+
+            tmpdir="$(mktemp -d)"
+            trap 'rm -rf "$tmpdir" cargo-deny.tar.gz 2>/dev/null || true' EXIT
+
+            if [[ "$want" == "latest" ]]; then
+              url="https://github.com/EmbarkStudios/cargo-deny/releases/latest/download/cargo-deny-x86_64-unknown-linux-gnu.tar.gz"
+            else
+              url="https://github.com/EmbarkStudios/cargo-deny/releases/download/${want}/cargo-deny-x86_64-unknown-linux-gnu.tar.gz"
+            fi
+
+            echo "Attempting prebuilt cargo-deny from: $url"
+            if curl -fsSL "$url" -o cargo-deny.tar.gz; then
+              tar -xzf cargo-deny.tar.gz -C "$tmpdir"
+              binpath="$(find "$tmpdir" -type f -name 'cargo-deny' -perm -111 | head -n1 || true)"
+              if [[ -n "${binpath:-}" ]]; then
+                mkdir -p "$HOME/.cargo/bin"
+                install -m 0755 "$binpath" "$HOME/.cargo/bin/cargo-deny"
+                echo "Installed prebuilt cargo-deny to $HOME/.cargo/bin."
+                export PATH="$HOME/.cargo/bin:$PATH"
+              else
+                echo "Prebuilt archive did not contain cargo-deny binary; falling back to cargo install."
+                cargo install cargo-deny --locked --force
+              fi
+            else
+              echo "Failed to download prebuilt cargo-deny archive; falling back to cargo install."
+              cargo install cargo-deny --locked --force
+            fi
+          }
+
+          install_cargo_deny "$WANT_VER"
+
+      - name: cargo-deny (conditional)
+        run: |
+          if [ -f deny.toml ]; then
+            cargo deny check advisories
+            cargo deny check bans
+            cargo deny check licenses
+          else
+            echo "skip cargo-deny (deny.toml not found)"
+          fi
+  audit:
+    name: cargo-audit (CVE Check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [deny]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Ensure vendor snapshot
+        run: bash scripts/ensure-vendor.sh
+      - name: Check vendor snapshot
+        run: bash scripts/check-vendor.sh
+      - name: Install cargo-audit (fresh)
+        run: cargo install cargo-audit --locked --force
+      - name: Run cargo audit
+        run: cargo audit --timeout 90

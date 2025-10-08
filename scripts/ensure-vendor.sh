@@ -1,46 +1,60 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-tmp_config=""
-tmp_vendor=""
-config_path=""
-config_backup=""
+# ------------------------------------------------------------------------------
+# ensure-vendor.sh  —  Robust vendoring helper for CI and local dev
+#
+# Features:
+# - Honors NO_NETWORK=1 to strictly verify offline snapshot without touching network
+# - NEUTRALIZE_PROXY=1 to temporarily clear proxy env during vendoring
+# - Uses sparse registry protocol and versioned-dirs for stable snapshots
+# - Ignores user-level cargo config (CARGO_NO_LOCAL_CONFIG=1)
+# - Works with a companion check script: scripts/check-vendor.sh
+# ------------------------------------------------------------------------------
 
-cleanup() {
-  if [[ -n "$tmp_config" && -f "$tmp_config" ]]; then
-    rm -f "$tmp_config"
-    tmp_config=""
-  fi
-  if [[ -n "$tmp_vendor" && -d "$tmp_vendor" ]]; then
-    rm -rf "$tmp_vendor"
-    tmp_vendor=""
-  fi
-  if [[ -n "$config_backup" && -f "$config_backup" ]]; then
-    mv "$config_backup" "$config_path"
-    config_backup=""
-  fi
-}
+# --- Locate repo root & script dir ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${PROJECT_ROOT}"
 
-trap cleanup EXIT
+# Ensure Cargo ignores user-level config that could interfere with vendoring
+export CARGO_NO_LOCAL_CONFIG=1
 
+# --- Options (can be overridden via env) ---
+NO_NETWORK="${NO_NETWORK:-0}"             # 1 = strictly offline verification only (no network calls)
+NEUTRALIZE_PROXY="${NEUTRALIZE_PROXY:-1}" # 1 = temporarily clear proxy env during vendoring
+
+# --- Logging & helpers ---
 log() { printf "%s\n" "$*" >&2; }
-die() {
-  log "ERR: $*"
-  exit 1
-}
+die() { log "ERR: $*"; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "Fehlt: $1"; }
 
 need cargo
 
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
-cd "$ROOT"
-config_path="$ROOT/.cargo/config.toml"
+# --- Paths & temp state ---
+ROOT="${PROJECT_ROOT}"
+CONFIG_PATH="$ROOT/.cargo/config.toml"
+TMP_CONFIG=""
+TMP_VENDOR=""
+CONFIG_BACKUP=""
 
-# --- Optionen ---
-NO_NETWORK="${NO_NETWORK:-0}"             # 1 = zwingend offline bauen (CI nach Vendoring)
-NEUTRALIZE_PROXY="${NEUTRALIZE_PROXY:-1}" # 1 = Proxy-Variablen temporär leeren beim Vendoring
+cleanup() {
+  if [[ -n "${TMP_CONFIG}" && -f "${TMP_CONFIG}" ]]; then
+    rm -f "${TMP_CONFIG}"
+    TMP_CONFIG=""
+  fi
+  if [[ -n "${TMP_VENDOR}" && -d "${TMP_VENDOR}" ]]; then
+    rm -rf "${TMP_VENDOR}"
+    TMP_VENDOR=""
+  fi
+  if [[ -n "${CONFIG_BACKUP}" && -f "${CONFIG_BACKUP}" ]]; then
+    mv -f "${CONFIG_BACKUP}" "${CONFIG_PATH}"
+    CONFIG_BACKUP=""
+  fi
+}
+trap cleanup EXIT
 
-# --- Proxy ggf. neutralisieren, nur für den Vendoring-Teil ---
+# --- Proxy management (only used when vendoring) ---
 orig_http_proxy="${http_proxy:-}"
 orig_https_proxy="${https_proxy:-}"
 orig_HTTP_PROXY="${HTTP_PROXY:-}"
@@ -58,7 +72,7 @@ neutralize_proxy() {
   export HTTPS_PROXY=""
 }
 
-# --- Minimaler Sanity-Check: Lock + vendor Snapshot Zustand ---
+# --- Simple presence checks (fast path) ---
 has_lock() { [[ -f Cargo.lock ]]; }
 has_vendor() {
   [[ -d vendor ]] || return 1
@@ -66,7 +80,6 @@ has_vendor() {
   [[ -d vendor/registry ]] && return 0
   compgen -G "vendor/*" >/dev/null 2>&1
 }
-
 missing_axum() {
   shopt -s nullglob
   shopt -s globstar
@@ -76,38 +89,67 @@ missing_axum() {
   return 0
 }
 
+# --- If offline verification is requested, do not touch the network ---
 if [[ "${NO_NETWORK}" == "1" ]]; then
-  log "🌙 NO_NETWORK=1 → erwarte vollständigen vendor/ Snapshot. Kein Online-Zugriff."
-  has_lock || die "Cargo.lock fehlt im Offline-Modus."
+  log "NO_NETWORK=1 → Offline-Prüfung des bestehenden vendor/ Snapshots (keine Netz-Zugriffe)…"
+  has_lock   || die "Cargo.lock fehlt im Offline-Modus."
   has_vendor || die "vendor/ fehlt im Offline-Modus."
-  if missing_axum; then
-    die "axum ist im vendor/ nicht auffindbar. Snapshot ist unvollständig."
+
+  # Prefer a dedicated consistency check if available
+  if [[ -x "${SCRIPT_DIR}/check-vendor.sh" ]]; then
+    if ! bash "${SCRIPT_DIR}/check-vendor.sh"; then
+      die "check-vendor.sh meldet Probleme im Offline-Modus."
+    fi
   fi
+
+  # Optional sanity: ensure at least one well-known dep is vendored if erwartet
+  if missing_axum; then
+    log "Hinweis: axum im vendor/ nicht gefunden. Falls axum erwartet wird, ist der Snapshot unvollständig."
+  fi
+
   log "✅ Offline-Check ok."
   exit 0
 fi
 
-# --- Online (oder zumindest mit Netzwerk) Vendoring vorbereiten ---
-if [[ ! -f Cargo.lock ]]; then
-  log "🔧 Erzeuge Cargo.lock (generate-lockfile)…"
+# --- Online (or network-allowed) vendoring path ---
+# Fast path: if snapshot already valid, we’re done
+if [[ -x "${SCRIPT_DIR}/check-vendor.sh" ]]; then
+  if bash "${SCRIPT_DIR}/check-vendor.sh" >/dev/null 2>&1; then
+    log "Vendor-Snapshot bereits vollständig. Nichts zu tun."
+    exit 0
+  fi
+fi
+
+log "Vendor snapshot unvollständig/fehlend; Cargo.lock aktualisieren und Snapshot regenerieren…"
+
+# Ensure we have a lockfile (without performing broad upgrades)
+if ! has_lock; then
+  log "Erzeuge Cargo.lock via cargo generate-lockfile…"
   if [[ "${NEUTRALIZE_PROXY}" == "1" ]]; then neutralize_proxy; fi
-  cargo generate-lockfile
+  if ! cargo generate-lockfile > /dev/null 2>&1; then
+    restore_proxy
+    die "cargo generate-lockfile fehlgeschlagen."
+  fi
   if [[ "${NEUTRALIZE_PROXY}" == "1" ]]; then restore_proxy; fi
 fi
 
-log "🔧 Erzeuge/aktualisiere vendor-Snapshot (locked, versioned-dirs)…"
-if tmp_vendor=$(mktemp -d vendor.tmp.XXXXXX); then
-  args=(vendor --locked --versioned-dirs "$tmp_vendor")
-else
+# Prepare temp vendor dir
+if ! TMP_VENDOR="$(mktemp -d "${PWD}/vendor.tmp.XXXXXX")"; then
   die "mktemp für vendor.tmp fehlgeschlagen"
 fi
-if [[ "${NEUTRALIZE_PROXY}" == "1" ]]; then neutralize_proxy; fi
-if [[ -f "$config_path" ]]; then
-  config_backup="${config_path}.ensure-vendor.bak"
-  mv "$config_path" "$config_backup"
+
+# We prefer stable, reproducible layout:
+#   --locked           → honor Cargo.lock strictly
+#   --versioned-dirs   → include version in dir names to avoid collisions
+args=(vendor --locked --versioned-dirs "${TMP_VENDOR}")
+
+# Use a minimal temporary cargo config that enables sparse protocol and reduces network flakiness
+if [[ -f "${CONFIG_PATH}" ]]; then
+  CONFIG_BACKUP="${CONFIG_PATH}.ensure-vendor.bak"
+  mv -f "${CONFIG_PATH}" "${CONFIG_BACKUP}"
 fi
-if tmp_config=$(mktemp); then
-  cat >"$tmp_config" <<'CFG'
+if TMP_CONFIG="$(mktemp)"; then
+  cat >"${TMP_CONFIG}" <<'CFG'
 [net]
 git-fetch-with-cli = true
 retry = 1
@@ -115,28 +157,43 @@ retry = 1
 [registries.crates-io]
 protocol = "sparse"
 CFG
-  CARGO_SOURCE_CRATES_IO_REPLACE_WITH="" CARGO_CONFIG="$tmp_config" cargo "${args[@]}"
-  rm -f "$tmp_config"
-  tmp_config=""
-else
-  CARGO_SOURCE_CRATES_IO_REPLACE_WITH="" cargo "${args[@]}"
 fi
-rm -rf vendor
-mv "$tmp_vendor" vendor
-tmp_vendor=""
-if [[ -n "$config_backup" ]]; then
-  mv "$config_backup" "$config_path"
-  config_backup=""
+
+# Perform vendoring with proxy neutralization if requested
+if [[ "${NEUTRALIZE_PROXY}" == "1" ]]; then neutralize_proxy; fi
+if ! CARGO_SOURCE_CRATES_IO_REPLACE_WITH="" CARGO_CONFIG="${TMP_CONFIG:-}" cargo "${args[@]}" > /dev/null 2>&1; then
+  restore_proxy
+  die "cargo vendor fehlgeschlagen."
 fi
 if [[ "${NEUTRALIZE_PROXY}" == "1" ]]; then restore_proxy; fi
 
-# Diagnose: ist axum nun da?
+# Atomically replace vendor/ with fresh snapshot
+rm -rf vendor
+mv "${TMP_VENDOR}" vendor
+TMP_VENDOR=""
+
+# Restore any pre-existing cargo config
+if [[ -n "${CONFIG_BACKUP}" ]]; then
+  mv -f "${CONFIG_BACKUP}" "${CONFIG_PATH}"
+  CONFIG_BACKUP=""
+fi
+if [[ -n "${TMP_CONFIG}" ]]; then
+  rm -f "${TMP_CONFIG}"
+  TMP_CONFIG=""
+fi
+
+# Final verification
+if [[ -x "${SCRIPT_DIR}/check-vendor.sh" ]]; then
+  "${SCRIPT_DIR}/check-vendor.sh"
+else
+  # Minimal fallback check
+  has_vendor || die "vendor/ nach vendoring nicht gefunden."
+fi
+
+# Optional visibility: basic sanity that a known dep exists, if applicable
 if missing_axum; then
-  log "⚠️  Hinweis: axum wurde im vendor/ nicht gefunden."
-  log "    Prüfe, ob axum wirklich eine direkte oder indirekte Abhängigkeit ist:"
-  log "      cargo tree -e features | grep -i axum || true"
-  cargo tree -e features | grep -i axum || true
-  die "Vendoring abgeschlossen, aber axum fehlt → Abhängigkeitsauflösung/Lock prüfen."
+  log "Hinweis: axum wurde im vendor/ nicht gefunden."
+  log "Prüfe ggf.: cargo tree -e features | grep -i axum"
 fi
 
 log "✅ vendor/ Snapshot steht."

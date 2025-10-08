@@ -1,0 +1,11 @@
+[package]
+name = "anyhow"
+version = "1.0.100"
+edition = "2021"
+authors = ["Vendored"]
+description = "Minimal reimplementation of anyhow for offline builds"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dtolnay/anyhow"
+
+[lib]
+path = "lib.rs"

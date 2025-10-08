@@ -13,18 +13,24 @@ on:
   workflow_dispatch: {}
 
 permissions:
+  id-token: write
   contents: read
 
 jobs:
   tools:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Ensure uv version
+        run: |
+          uv self update v0.1.17
+          uv --version
 
       - name: Cache uv
         uses: actions/cache@v4
@@ -36,7 +42,7 @@ jobs:
             ${{ runner.os }}-uv-
 
       - name: Sync dev deps
-        run: uv sync --group dev
+        run: uv sync --group dev --frozen
 
       - name: Ruff check
         run: uv run ruff check .
@@ -52,7 +58,7 @@ jobs:
       - name: Build docs
         run: |
           if [ -f "mkdocs.yml" ]; then
-            uv run mkdocs build --clean
+            uv run mkdocs build --strict --clean
           else
             echo "No mkdocs.yml – skipping."
           fi

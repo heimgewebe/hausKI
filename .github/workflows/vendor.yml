@@ -1,0 +1,31 @@
+name: vendor-snapshot
+
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - Cargo.lock
+      - .github/workflows/vendor.yml
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-vendor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Create vendor tree
+        run: cargo vendor --locked --respect-source-config > /dev/null
+      - name: Verify vendor snapshot
+        run: bash scripts/check-vendor.sh
+      - name: Pack vendor snapshot
+        run: tar --zstd -cvf hauski-vendor-snapshot.tar.zst vendor
+      - name: Upload vendor artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hauski-vendor-snapshot
+          path: hauski-vendor-snapshot.tar.zst

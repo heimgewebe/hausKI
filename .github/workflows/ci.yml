@@ -8,7 +8,9 @@ on:
   workflow_dispatch: {}
 
 permissions:
+  id-token: write
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -23,7 +25,7 @@ jobs:
       docs:  ${{ steps.filter.outputs.docs }}
       sh:    ${{ steps.filter.outputs.sh }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: dorny/paths-filter@v3
@@ -48,14 +50,18 @@ jobs:
       (github.event_name == 'merge_group') ||
       (github.event_name != 'merge_group' &&
        github.event.pull_request.draft == false &&
-       (needs.changes.outputs.rust == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
+       (
+         needs.changes.outputs.docs == 'true' ||
+         needs.changes.outputs.sh == 'true' ||
+         contains(join(github.event.pull_request.labels.*.name), 'full-ci')
+       ))
     runs-on: ubuntu-latest
     env:
       toolchain: stable
       RUSTFLAGS: -Dwarnings
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - uses: dtolnay/rust-toolchain@stable
@@ -63,6 +69,8 @@ jobs:
           toolchain: ${{ env.toolchain }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Check vendor snapshot
+        run: bash scripts/check-vendor.sh
       - name: rustfmt (check)
         run: cargo fmt --all --check
       - name: clippy (deny warnings)
@@ -79,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: lycheeverse/lychee-action@v2
         with:
           args: >-
@@ -88,7 +96,6 @@ jobs:
             --retry-wait-time 2
             --max-redirects 5
             --max-retries 2
-            --exclude-mail
             --accept 200,204,206,301,302,307,308
             --user-agent "lychee-ci"
             --
@@ -108,9 +115,13 @@ jobs:
       (github.event_name == 'merge_group') ||
       (github.event_name != 'merge_group' &&
        github.event.pull_request.draft == false &&
-       (needs.changes.outputs.rust == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
+       (
+         needs.changes.outputs.sh == 'true' ||
+         contains(join(github.event.pull_request.labels.*.name), 'full-ci')
+       ))
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
       - name: Emit TODO notice
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
@@ -119,7 +130,7 @@ jobs:
         if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --no-progress --verbose --retry-wait-time 2 --max-redirects 5 --exclude-mail "**/*.md"
+          args: --no-progress --verbose --retry-wait-time 2 --max-redirects 5 -- "**/*.md"
 
   rust-check:
     name: Rust — fmt & clippy & test
@@ -130,7 +141,7 @@ jobs:
     env:
       RUSTFLAGS: -Dwarnings
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Enable Rust problem matchers
@@ -139,6 +150,8 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Check vendor snapshot
+        run: bash scripts/check-vendor.sh
       - name: Cargo fmt
         run: cargo fmt --all -- --check
       - name: Cargo clippy
@@ -169,7 +182,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - name: Check vendor snapshot
+        run: bash scripts/check-vendor.sh
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - name: cargo deny (advisories/bans/licenses)
+        run: |
+          cargo deny check advisories
+          cargo deny check bans
+          cargo deny check licenses
       - uses: rustsec/audit-check@v2

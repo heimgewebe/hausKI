@@ -1,0 +1,35 @@
+site_name: HausKI
+site_url: https://heimgewebe.github.io/hausKI
+repo_url: https://github.com/heimgewebe/hausKI
+repo_name: heimgewebe/hausKI
+edit_uri: edit/main/docs/
+theme:
+  name: material
+  language: de
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - content.code.annotate
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+nav:
+  - Start: index.md
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.emoji
+plugins:
+  - search
+  - minify:
+      minify_html: true
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+extra:
+  social:
+    - icon: material/github
+      link: https://github.com/heimgewebe/hausKI

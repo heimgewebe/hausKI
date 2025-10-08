@@ -1,3 +1,6 @@
+![WGX](https://img.shields.io/badge/wgx-enabled-blue)
+<!-- Coverage and Security badges will be added once the corresponding workflows are available. -->
+
 # HausKI — Rust-first, Offline-Default, GPU-aware
 
 HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-GPU.
@@ -24,6 +27,19 @@ HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-
 
 ---
 
+## Server-Tunables (per Umgebungsvariable)
+
+| Variable                    | Typ | Default | Wirkung |
+|----------------------------|-----|---------|--------|
+| `HAUSKI_HTTP_TIMEOUT_MS`   | u64 | `1500`  | Request-Timeout in Millisekunden (bei `0` deaktiviert) |
+| `HAUSKI_HTTP_CONCURRENCY`  | u64 | `512`   | Limit gleichzeitiger Requests (bei `0` deaktiviert) |
+
+Beispiel:
+
+```bash
+HAUSKI_HTTP_TIMEOUT_MS=2500 HAUSKI_HTTP_CONCURRENCY=256 ./target/release/hauski-cli serve
+```
+
 ## Schnellstart
 
 **Voraussetzungen lokal (Pop!_OS, Rust stable):**
@@ -35,10 +51,65 @@ cargo build --workspace
 cargo test --workspace -- --nocapture
 ```
 
+> 💡 **Hinweis auf Offline-Builds:** Bevor du `cargo clippy`, `cargo build` oder
+> `cargo test` ausführst, stelle sicher, dass `vendor/` alle benötigten Crates
+> enthält. Der Helper `scripts/check-vendor.sh` warnt früh mit einer
+> verständlichen Meldung, falls beispielsweise `axum` noch nicht lokal
+> vorliegt. Standardmäßig lädt Cargo fehlende Crates wieder aus `crates.io`;
+> setze `HAUSKI_ENFORCE_VENDOR=1`, wenn der Build zwingend offline erfolgen
+> soll.
+
+> Falls CI mit der Meldung `the lock file … needs to be updated but --locked was
+> passed` oder `no matching package named 'axum' found` stoppt, führe die
+> Aktualisierung lokal durch und committe die Ergebnisse:
+> 1. `cargo generate-lockfile` (bzw. `cargo update`), um die `Cargo.lock` zu
+>    erneuern.
+> 2. `cargo vendor` (oder `just vendor`), damit `vendor/` alle Crates enthält.
+> 3. `git add Cargo.lock vendor/` und anschließend committen.
+
+```toml
+# .cargo/config.toml
+[registries.crates-io]
+protocol = "sparse"
+
+[source.vendored-sources]
+directory = "vendor"
+```
+
+> Offline-Builds kannst du erzwingen, indem du Cargo mit `--config` oder einer
+> eigenen `config.toml` startest, die `source.crates-io.replace-with =
+> "vendored-sources"` setzt. So bleiben air-gapped Workflows weiterhin möglich.
+
+**Vendor-Snapshot befüllen**
+
+Mit Internetzugang lässt sich der Snapshot direkt im Repository erzeugen:
+
+```bash
+just vendor
+just vendor-archive
+```
+
+Die erzeugte Datei `hauski-vendor-snapshot.tar.zst` kannst du anschließend auf
+eine Offline-Maschine kopieren und dort auspacken:
+
+```bash
+mkdir -p vendor
+tar --zstd -xvf hauski-vendor-snapshot.tar.zst -C vendor --strip-components=1
+```
+
+Alternativ steht der Snapshot auch als Artefakt des Workflows
+`vendor-snapshot` zur Verfügung.
+
 **VS Code Devcontainer:**
 1. Repository klonen und in VS Code öffnen.
 2. "Reopen in Container" ausführen; das Post-Create-Skript setzt `pre-commit` auf und prüft GPU-Verfügbarkeit.
 3. Danach genügen die Shortcuts aus der `justfile` (`just build`, `just test`, `just run-core`).
+
+### Codex-Review-Ablage
+
+Codex-Läufe schreiben ihre Rohdaten nach `~/.hauski/review/hauski/`. Lege dir im Repo optional einen Symlink `ln -s ~/.hauski/review/hauski .hauski-reports` an; dadurch bleiben Logs, Pläne und Canvas-Dateien persistent, ohne ins Repo zu geraten.
+
+Nutze `just codex:doctor`, um vor einem Run schnell zu prüfen, ob eine lokale `codex`-Installation gefunden wird oder automatisch auf `npx @openai/codex@1.0.0` zurückgefallen wird.
 
 ---
 
@@ -132,17 +203,32 @@ Beispielabfragen für Dashboards oder die Prometheus-Konsole:
 - Lints: `cargo clippy --all-targets --all-features -- -D warnings` und `cargo deny check`.
 - Tests: `cargo test --workspace -- --nocapture`.
 - **Python-Tooling (optional):**
-  - Setup: `just py-init`
+  - Setup:
+    ```bash
+    uv sync --group dev --frozen
+    uv run pre-commit install
+    ```
+  - Init: `just py-init`
   - Lint: `just py-lint`
   - Format: `just py-fmt`
   - Tests: `just py-test`
   - Docs lokal: `just py-docs-serve`
+  - Docs strikt: `just py-docs-build`
+  - Hooks lokal prüfen: `just py-pre-commit`
 
 ---
 
 ## Memory & semantische Suche
 
 HausKI bringt mit [semantAH](docs/semantah.md) eine semantische Gedächtnisschicht mit. Der Bootstrap enthält Dokumentation, Konfiguration, Skripte und Rust-Scaffolds für Index, Graph und Related-Blöcke. Starte mit dem Quickstart in `docs/semantah.md`, um Ollama einzubinden, Seeds zu laden und die `/index`-Endpunkte zu testen.
+
+### Fragen stellen (Semantik-Suche)
+
+```bash
+curl -s "http://localhost:8080/ask?q=dein+text&k=5&ns=default" | jq
+```
+
+Der Endpoint liefert die Top-k-Treffer mit Score, Snippet und Metadaten aus dem lokalen Index. Der Server begrenzt `k` serverseitig auf maximal 100 Treffer.
 
 ---
 

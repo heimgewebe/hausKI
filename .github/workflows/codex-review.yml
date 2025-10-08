@@ -1,0 +1,69 @@
+name: codex-review
+on:
+  pull_request:
+    branches: [ "main" ]
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+concurrency:
+  group: codex-review-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.draft == false }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Quick checks
+        run: |
+          set -e
+          command -v cargo >/dev/null 2>&1 && cargo test -q || true
+          if [ -f package.json ]; then
+            npm ci
+            npm test -s || true
+          fi
+          if [ -f pyproject.toml ]; then
+            uv run pytest -q || true
+          fi
+      - name: Collect PR diff
+        id: diff
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          git diff --unified=0 --minimal --no-color origin/${{ github.base_ref }}...HEAD > pr.diff
+          wc -l pr.diff | awk '{print "lines="$1}' >> $GITHUB_OUTPUT
+      - name: Run codex (review)
+        id: codex
+        env:
+          DIFF_LINES: ${{ steps.diff.outputs.lines }}
+        run: |
+          echo "### REVIEW PROMPT" > prompt.md
+          cat <<'EOP' >> prompt.md
+Bewerte diesen PR:
+- Risiken, API-Brüche, fehlende Tests
+- Mache maximal 3 konkrete Patch-Vorschläge (ohne Reformat)
+- Nenne in 3 Sätzen die Begründung und 1–2 Risiken pro Vorschlag
+EOP
+          echo >> prompt.md
+          echo "### DIFF (gekürzt)" >> prompt.md
+          head -n 1000 pr.diff >> prompt.md
+          npx -y @openai/codex@1.0.0 < prompt.md > review.txt
+      - name: Upload review as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-review-${{ github.run_id }}
+          path: review.txt
+          retention-days: 7
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('review.txt', 'utf8').slice(0, 60000);
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            })

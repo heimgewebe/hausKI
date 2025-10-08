@@ -1,7 +1,37 @@
+# Build artefacts
 target/
+.venv/
+.uv/
+
+# Python caches
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.python-version
+
+# Logs and misc
 .env
 .direnv/
 **/*.log
+*.log
+.DS_Store
+.coverage
+coverage.xml
+
+# Project specific
 .wgx/profile.local.yml
+# Vendored crates are intentionally tracked to guarantee offline builds.
+# Do not ignore vendor/.
 # NICHT .vscode/settings.json ignorieren – projektweite Settings sind beabsichtigt
+
+# MkDocs build output
+site/
+
+# Node (falls vorhanden)
+node_modules/
+
+# Tooling
 observability/k6/summary.json
+.lycheecache
+.hauski-reports
