@@ -1,23 +1,14 @@
+[graph]
 targets = [{ triple = "x86_64-unknown-linux-gnu" }]
 
 [advisories]
-vulnerability = "deny"
-unmaintained = "deny"
+version = 2
 yanked = "warn"
-notice = "warn"
-ignore = []
+ignore = ["RUSTSEC-2024-0370"]
 
 [licenses]
-unlicensed = "deny"
-allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib", "Unicode-DFS-2016"]
-deny = [
-    "AGPL-3.0-only",
-    "AGPL-3.0-or-later",
-    "GPL-3.0-only",
-    "GPL-3.0-or-later",
-    "GPL-2.0-only",
-    "GPL-2.0-or-later",
-]
+version = 2
+allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "MPL-2.0", "Unicode-3.0"]
 confidence-threshold = 0.9
 
 [bans]
