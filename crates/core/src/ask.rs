@@ -28,21 +28,20 @@ pub struct AskResponse {
     pub hits: Vec<AskHit>,
 }
 
-#[derive(Deserialize, IntoParams)]
+#[derive(Deserialize, IntoParams, ToSchema)]
 #[into_params(parameter_in = Query)]
 pub struct AskParams {
+    /// The query string for semantic search.
     pub q: String,
+    /// Number of matches to return (server caps the value at 100).
     #[serde(default = "default_k")]
-    #[param(
-        default = 5,
-        description = "Number of matches to return (server caps the value at 100)"
-    )]
+    #[param(default = 5)]
+    #[schema(default = 5)]
     pub k: usize,
+    /// Namespace to query within the index.
     #[serde(default = "default_ns")]
-    #[param(
-        default = "default",
-        description = "Namespace to query within the index"
-    )]
+    #[param(default = "default")]
+    #[schema(default = "default")]
     pub ns: String,
 }
 

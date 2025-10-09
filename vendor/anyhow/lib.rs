@@ -50,11 +50,17 @@ impl fmt::Display for Error {
     }
 }
 
+// NOTE: This implementation is commented out to resolve a conflict with the
+// generic `impl<E: StdError> From<E> for Error`. The conflict arises because
+// this impl makes `Error` itself a `StdError`, which causes the generic `From`
+// to conflict with the standard library's `impl<T> From<T> for T`.
+/*
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         self.inner.source()
     }
 }
+*/
 
 impl<E> From<E> for Error
 where
@@ -62,18 +68,6 @@ where
 {
     fn from(error: E) -> Self {
         Self::new(Box::new(error))
-    }
-}
-
-impl From<String> for Error {
-    fn from(message: String) -> Self {
-        Self::msg(message)
-    }
-}
-
-impl From<&str> for Error {
-    fn from(message: &str) -> Self {
-        Self::msg(message)
     }
 }
 
@@ -161,11 +155,8 @@ impl<T> Context<T> for Option<T> {
 /// Creates an [`Error`] from the supplied message or error value.
 #[macro_export]
 macro_rules! anyhow {
-    ($fmt:expr, $($arg:tt)*) => {
-        $crate::Error::msg(format!($fmt, $($arg)*))
-    };
-    ($value:expr $(,)?) => {
-        $crate::Error::from($value)
+    ($($arg:tt)+) => {
+        $crate::Error::msg(format!($($arg)+))
     };
 }
 
@@ -193,4 +184,4 @@ macro_rules! ensure {
 }
 
 // Public re-exports to match anyhow's surface a bit closer.
-pub use crate::{anyhow, bail, ensure, Context as _};
+pub use crate::{Context as _};

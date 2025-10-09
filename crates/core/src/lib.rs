@@ -64,6 +64,7 @@ fn create_latency_histogram() -> Histogram {
 #[derive(Clone)]
 pub struct AppState(Arc<AppStateInner>);
 
+#[allow(dead_code)]
 struct AppStateInner {
     limits: Limits,
     models: ModelsFile,
@@ -428,8 +429,22 @@ pub fn build_app_with_state(
         app = app.merge(plugin_routes()).merge(cloud_routes());
     }
 
-    let mut request_guards =
-        ServiceBuilder::new().layer(HandleErrorLayer::new(|err: BoxError| async move {
+    let timeout_layer = if timeout_ms > 0 {
+        Some(TimeoutLayer::new(Duration::from_millis(timeout_ms)))
+    } else {
+        tracing::info!("HAUSKI_HTTP_TIMEOUT_MS=0 → request timeout disabled");
+        None
+    };
+    let concurrency_layer = if concurrency > 0 {
+        let c = std::cmp::min(concurrency, usize::MAX as u64) as usize;
+        Some(ConcurrencyLimitLayer::new(c))
+    } else {
+        tracing::info!("HAUSKI_HTTP_CONCURRENCY=0 → concurrency limit disabled");
+        None
+    };
+
+    let request_guards = ServiceBuilder::new()
+        .layer(HandleErrorLayer::new(|err: BoxError| async move {
             if err.is::<tower::timeout::error::Elapsed>() {
                 (StatusCode::REQUEST_TIMEOUT, "request timed out")
             } else {
@@ -438,18 +453,16 @@ pub fn build_app_with_state(
                     "service temporarily unavailable",
                 )
             }
-        }));
-    if timeout_ms > 0 {
-        request_guards = request_guards.layer(TimeoutLayer::new(Duration::from_millis(timeout_ms)));
-    } else {
-        tracing::info!("HAUSKI_HTTP_TIMEOUT_MS=0 → request timeout disabled");
-    }
-    if concurrency > 0 {
-        let c = std::cmp::min(concurrency, usize::MAX as u64) as usize;
-        request_guards = request_guards.layer(ConcurrencyLimitLayer::new(c));
-    } else {
-        tracing::info!("HAUSKI_HTTP_CONCURRENCY=0 → concurrency limit disabled");
-    }
+        }))
+        .option_layer(timeout_layer)
+        .option_layer(concurrency_layer)
+        // Map the router's infallible error type to a BoxError before it
+        // hits the optional layers. This is required for `option_layer`'s
+        // `Either` service to work, as it requires both branches to have the
+        // same error type.
+        .layer(tower::util::MapErrLayer::new(
+            |e: std::convert::Infallible| -> BoxError { match e {} },
+        ));
 
     // The readiness flag is set by the caller once the listener is bound.
     let app = app
@@ -521,10 +534,7 @@ async fn openapi_json() -> Response {
             // Log for operators.
             tracing::error!("failed to serialize OpenAPI JSON: {err}");
             // Compact JSON error payload for clients.
-            let body = format!(
-                "{{\"error\":\"failed to serialize openapi\",\"details\":\"{}\"}}",
-                err
-            );
+            let body = format!("{{\"error\":\"failed to serialize openapi\",\"details\":\"{err}\"}}");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 [(
