@@ -7,7 +7,12 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{collections::HashMap, sync::Arc, time::Instant};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    sync::Arc,
+    time::Instant,
+};
 use tokio::sync::RwLock;
 
 const DEFAULT_NAMESPACE: &str = "default";
@@ -73,35 +78,95 @@ impl IndexState {
     }
 
     pub async fn search(&self, request: &SearchRequest) -> Vec<SearchMatch> {
+        let query = request.query.trim();
+        if query.is_empty() {
+            return Vec::new();
+        }
+
         let store = self.inner.store.read().await;
         let namespace = request.namespace.as_deref().unwrap_or(DEFAULT_NAMESPACE);
         let Some(namespace_store) = store.get(namespace) else {
             return Vec::new();
         };
         let limit = request.k.unwrap_or(20).min(100);
-        namespace_store
-            .values()
-            .flat_map(|doc| {
-                doc.chunks
-                    .iter()
-                    .enumerate()
-                    .filter_map(move |(idx, chunk)| {
-                        chunk.text.as_ref().map(|text| SearchMatch {
-                            doc_id: doc.doc_id.clone(),
-                            namespace: doc.namespace.clone(),
-                            chunk_id: chunk
-                                .chunk_id
-                                .clone()
-                                .unwrap_or_else(|| format!("{}#{idx}", doc.doc_id)),
-                            score: 0.0,
-                            text: text.clone(),
-                            meta: doc.meta.clone(),
-                        })
-                    })
-            })
-            .take(limit)
-            .collect()
+        let query_lower = query.to_lowercase();
+        let query_char_len = query_lower.chars().count();
+        let query_byte_len = query_lower.len();
+
+        let mut matches: Vec<SearchMatch> = Vec::new();
+        for doc in namespace_store.values() {
+            for (idx, chunk) in doc.chunks.iter().enumerate() {
+                let Some(text) = chunk.text.as_ref() else {
+                    continue;
+                };
+
+                let Some(score) =
+                    substring_match_score(text, &query_lower, query_byte_len, query_char_len)
+                else {
+                    continue;
+                };
+
+                matches.push(SearchMatch {
+                    doc_id: doc.doc_id.clone(),
+                    namespace: doc.namespace.clone(),
+                    chunk_id: chunk
+                        .chunk_id
+                        .clone()
+                        .unwrap_or_else(|| format!("{}#{idx}", doc.doc_id)),
+                    score,
+                    text: text.clone(),
+                    meta: if !chunk.meta.is_null() {
+                        chunk.meta.clone()
+                    } else {
+                        doc.meta.clone()
+                    },
+                });
+            }
+        }
+
+        matches.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(Ordering::Equal)
+        });
+        if matches.len() > limit {
+            matches.truncate(limit);
+        }
+        matches
     }
+}
+
+fn substring_match_score(
+    text: &str,
+    query_lower: &str,
+    query_byte_len: usize,
+    query_char_len: usize,
+) -> Option<f32> {
+    if query_byte_len == 0 || query_char_len == 0 {
+        return None;
+    }
+
+    let text_lower = text.to_lowercase();
+    let mut count = 0;
+    let mut remaining = text_lower.as_str();
+
+    while let Some(pos) = remaining.find(query_lower) {
+        count += 1;
+        let advance = pos + query_byte_len;
+        if advance >= remaining.len() {
+            remaining = "";
+        } else {
+            remaining = &remaining[advance..];
+        }
+    }
+
+    if count == 0 {
+        return None;
+    }
+
+    let text_char_len = text_lower.chars().count().max(1);
+    let matched_chars = count * query_char_len;
+    Some((matched_chars as f32 / text_char_len as f32).min(1.0))
 }
 
 pub fn router<S>() -> Router<S>
@@ -243,6 +308,7 @@ fn default_namespace() -> String {
 mod tests {
     use super::*;
     use axum::http::Request;
+    use serde_json::json;
     use tower::ServiceExt;
 
     #[tokio::test]
@@ -287,5 +353,50 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn search_filters_results_by_query() {
+        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+
+        state
+            .upsert(UpsertRequest {
+                doc_id: "doc-rust".into(),
+                namespace: "default".into(),
+                chunks: vec![ChunkPayload {
+                    chunk_id: Some("doc-rust#0".into()),
+                    text: Some("Rust programming language".into()),
+                    embedding: Vec::new(),
+                    meta: json!({"chunk": 0}),
+                }],
+                meta: json!({"doc": "rust"}),
+            })
+            .await;
+
+        state
+            .upsert(UpsertRequest {
+                doc_id: "doc-cooking".into(),
+                namespace: "default".into(),
+                chunks: vec![ChunkPayload {
+                    chunk_id: Some("doc-cooking#0".into()),
+                    text: Some("A collection of delicious recipes".into()),
+                    embedding: Vec::new(),
+                    meta: json!({"chunk": 0}),
+                }],
+                meta: json!({"doc": "cooking"}),
+            })
+            .await;
+
+        let results = state
+            .search(&SearchRequest {
+                query: "rust".into(),
+                k: Some(5),
+                namespace: Some("default".into()),
+            })
+            .await;
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].doc_id, "doc-rust");
+        assert!(results[0].text.to_lowercase().contains("rust"));
     }
 }
