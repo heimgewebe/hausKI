@@ -20,8 +20,7 @@
         },
         {
           "regexp": "^\\s*\\|\\s*(.*)$",
-          "loop": true,
-          "message": 1
+          "loop": true
         }
       ]
     }
