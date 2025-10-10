@@ -16,6 +16,8 @@ jobs:
     if: ${{ github.event.pull_request.draft == false }}
     steps:
       - uses: actions/checkout@v4
+      - name: Enable Rust problem matchers
+        run: echo "::add-matcher::.github/rust.json"
       - name: Quick checks
         run: |
           set -e
