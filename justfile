@@ -95,3 +95,8 @@ codex testgap:
 
 codex refactor:
     bash scripts/hauski-codex.sh . scripts/codex-prompts/refactor.md scripts/policies/codex.policy.yml
+
+emit-event id='auto' kind='debug.test' payload='{"ok":true}':
+    @echo "Emitting event: {{kind}}"
+    if [ "{{id}}" = "auto" ]; then id_arg=""; else id_arg="{{id}}"; fi
+    NODE_ID="$(hostname)" KIND="{{kind}}" PAYLOAD='{{payload}}' ./scripts/emit_event_line.sh ${id_arg}
