@@ -1,7 +1,16 @@
-name: contracts-validate
+name: contracts
+
 on: [push, pull_request]
+
+#
+# Explizite, minimale Rechte für GITHUB_TOKEN.
+# Verhindert die CodeQL-Warnung und begrenzt das Risiko.
+#
 permissions:
   contents: read
+
 jobs:
   validate:
+    # Reusable Workflow aus dem metarepo
     uses: heimgewebe/metarepo/.github/workflows/contracts-validate.yml@contracts-v1
+    permissions: inherit
