@@ -1,4 +1,4 @@
-version: "1"
+version: 1
 repo:
   # Kurzname des Repos (wird automatisch aus git ableitbar sein – hier nur Doku)
   name: auto
