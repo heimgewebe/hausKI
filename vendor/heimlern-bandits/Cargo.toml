@@ -1,0 +1,7 @@
+[package]
+name = "heimlern-bandits"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+heimlern-core = { path = "../heimlern-core" }
