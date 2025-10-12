@@ -1,0 +1,45 @@
+name: policy-ci
+permissions:
+  contents: read
+  actions: read
+on:
+  push:
+    paths:
+      - "crates/policy_api/**"
+      - "vendor/heimlern-core/**"
+      - "vendor/heimlern-bandits/**"
+      - ".github/workflows/policy-ci.yml"
+  pull_request:
+    paths:
+      - "crates/policy_api/**"
+      - "vendor/heimlern-core/**"
+      - "vendor/heimlern-bandits/**"
+      - ".github/workflows/policy-ci.yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+      - name: Prepare lockfile (CI-only)
+        run: |
+          set -euo pipefail
+          cargo update -w
+      - name: Build (ignore vendor override in CI)
+        run: |
+          set -euo pipefail
+          cargo \
+            --config 'source.crates-io.replace-with = "crates-io"' \
+            --config 'net.git-fetch-with-cli = true' \
+            build -p hauski-policy-api --no-default-features --verbose
+      - name: Smoke test binary starts
+        run: |
+          set -euo pipefail
+          target/debug/policy_api >/dev/null 2>&1 & pid=$!
+          sleep 1
+          kill $pid || true
