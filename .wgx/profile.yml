@@ -12,7 +12,8 @@ env_priority:
   - termux
 
 tooling:
-  uv: "latest"        # nutze eine verfügbare UV-Version
+  uv:
+    version: "0.4.18"  # nutze eine verfügbare UV-Version
   python:
     version: "3.12"   # bevorzugte Python-Version für lokale Tasks
     uv: true           # uv ist Standard-Layer für Python-Tools
