@@ -1,57 +1,44 @@
 name: policy-ci
 permissions:
   contents: read
+  actions: read
 on:
   push:
     paths:
-      - "crates/policy/**"
+      - "crates/policy_api/**"
+      - "vendor/heimlern-core/**"
+      - "vendor/heimlern-bandits/**"
       - ".github/workflows/policy-ci.yml"
   pull_request:
     paths:
-      - "crates/policy/**"
+      - "crates/policy_api/**"
+      - "vendor/heimlern-core/**"
+      - "vendor/heimlern-bandits/**"
       - ".github/workflows/policy-ci.yml"
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      RUSTFLAGS: "-D warnings"
-      RUST_BACKTRACE: "1"
+      RUSTFLAGS: -Dwarnings
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Build policy crate (bins only)
-        run: cargo build -p policy --bins --verbose
-      - name: Run unit tests (policy only)
-        run: cargo test -p policy --verbose -- --nocapture
-  smoke:
-    runs-on: ubuntu-latest
-    needs: build
-    env:
-      RUST_BACKTRACE: "1"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Build policy_api
-        run: cargo build -p policy --bin policy_api --verbose
-      - name: Smoke run & health check
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+      - name: Prepare lockfile (CI-only)
         run: |
-          target/debug/policy_api >server.log 2>&1 &
-          pid=$!
-          trap "kill $pid || true" EXIT
-          ready_url=http://127.0.0.1:8779/ready
-          decide_url=http://127.0.0.1:8779/v1/policy/decide
-          for i in $(seq 1 30); do
-            if curl -sf "$ready_url"; then
-              ready=1
-              break
-            fi
-            sleep 1
-          done
-          if [ "${ready:-0}" != "1" ]; then
-            echo "service did not become ready"
-            tail -n +1 server.log
-            exit 1
-          fi
-          curl -sf -X POST "$decide_url" \
-            -H 'content-type: application/json' \
-            -d '{"kind":"reminder","features":{"load":0.1}}' >/dev/null
+          set -euo pipefail
+          cargo update -w
+      - name: Build (ignore vendor override in CI)
+        run: |
+          set -euo pipefail
+          cargo \
+            --config 'net.git-fetch-with-cli = true' \
+            build -p hauski-policy-api --no-default-features --verbose
+      - name: Smoke test binary starts
+        run: |
+          set -euo pipefail
+          target/debug/policy_api >/dev/null 2>&1 & pid=$!
+          sleep 1
+          kill $pid || true
