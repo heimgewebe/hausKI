@@ -1,4 +1,4 @@
-version: 1
+version: "1"
 repo:
   # Kurzname des Repos (wird automatisch aus git ableitbar sein – hier nur Doku)
   name: auto
@@ -12,6 +12,7 @@ env_priority:
   - termux
 
 tooling:
+  uv: "latest"        # nutze eine verfügbare UV-Version
   python:
     uv: true           # uv ist Standard-Layer für Python-Tools
     precommit: true    # falls .pre-commit-config.yaml vorhanden
