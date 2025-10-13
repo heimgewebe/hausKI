@@ -15,5 +15,7 @@ confidence-threshold = 0.9
 multiple-versions = "warn"
 wildcards = "deny"
 deny = []
-skip = []
+skip = [
+    { name = "syn", version = "1.0.109", reason = "Required by proc-macro-error in utoipa-gen until upstream removes the legacy dependency." },
+]
 skip-tree = []

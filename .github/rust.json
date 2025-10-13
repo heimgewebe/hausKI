@@ -16,9 +16,6 @@
           "column": 3
         },
         {
-          "regexp": "^(\\s*\\|)$"
-        },
-        {
           "regexp": "^\\s*\\|\\s*(.*)$",
           "loop": true,
           "message": 1
