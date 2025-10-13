@@ -51,13 +51,7 @@ py-fmt:
     uv run ruff format .
 
 py-test:
-    if [ -d "tests" ]; then
-        uv run pytest -q
-    elif ls tests_*.py >/dev/null 2>&1; then
-        uv run pytest -q
-    else
-        echo "No Python tests found – skipping."
-    fi
+    if [ -d "tests" ]; then uv run pytest -q; elif ls tests_*.py >/dev/null 2>&1; then uv run pytest -q; else echo "No Python tests found – skipping."; fi
 
 py-docs-serve:
     uv run mkdocs serve -a 0.0.0.0:8000
@@ -82,18 +76,18 @@ test-full:
     @if command -v npm >/dev/null; then npm test -s || true; fi
 
 # Codex Runs
-codex:doctor:
+codex-doctor:
     @echo "🔎 Checking codex availability…"
     @if command -v codex >/dev/null; then echo "✅ codex in PATH"; \
     else echo "ℹ️  using npx @openai/codex@1.0.0"; fi
 
-codex bugfix:
+codex-bugfix:
     bash scripts/hauski-codex.sh . scripts/codex-prompts/bugfix.md scripts/policies/codex.policy.yml
 
-codex testgap:
+codex-testgap:
     bash scripts/hauski-codex.sh . scripts/codex-prompts/testgap.md scripts/policies/codex.policy.yml
 
-codex refactor:
+codex-refactor:
     bash scripts/hauski-codex.sh . scripts/codex-prompts/refactor.md scripts/policies/codex.policy.yml
 
 emit-event id='auto' kind='debug.test' payload='{"ok":true}':

@@ -45,7 +45,7 @@ fn default_features() -> Value {
 #[tokio::main]
 async fn main() {
     let state = AppState {
-        policy: Arc::new(RwLock::new(RemindBandit::default())),
+        policy: Arc::new(RwLock::new(RemindBandit)),
     };
 
     let app = Router::new()

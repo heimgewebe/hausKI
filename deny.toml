@@ -4,7 +4,6 @@ targets = [{ triple = "x86_64-unknown-linux-gnu" }]
 [advisories]
 version = 2
 yanked = "warn"
-ignore = ["RUSTSEC-2024-0370"]
 
 [licenses]
 version = 2

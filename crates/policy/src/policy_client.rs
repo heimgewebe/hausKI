@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 pub async fn decide(kind: &str, features: Value) -> anyhow::Result<Value> {
     let url = std::env::var("POLICY_URL").unwrap_or_else(|_| "http://127.0.0.1:8779".into());
     let resp = reqwest::Client::new()
-        .post(format!("{}/v1/policy/decide", url))
+        .post(format!("{url}/v1/policy/decide"))
         .json(&json!({"kind": kind, "features": features}))
         .send()
         .await?
@@ -22,7 +22,7 @@ pub async fn feedback(
     let url = std::env::var("POLICY_URL").unwrap_or_else(|_| "http://127.0.0.1:8779".into());
     let body = json!({"kind": kind, "action": action, "reward": reward, "features": features.unwrap_or(json!({}))});
     reqwest::Client::new()
-        .post(format!("{}/v1/policy/feedback", url))
+        .post(format!("{url}/v1/policy/feedback"))
         .json(&body)
         .send()
         .await?
