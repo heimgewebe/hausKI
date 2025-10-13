@@ -33,6 +33,6 @@ pub fn write_event_line(kind: &str, payload: &Value) {
     });
 
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(file) {
-        let _ = writeln!(file, "{}", line);
+        let _ = writeln!(file, "{line}");
     }
 }

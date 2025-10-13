@@ -42,6 +42,6 @@ pub fn write_event_line(event_type: &str, payload: &Value) {
 
 fn append_line(path: &std::path::Path, line: &str) -> std::io::Result<()> {
     let mut file = OpenOptions::new().create(true).append(true).open(path)?;
-    writeln!(file, "{}", line)?;
+    writeln!(file, "{line}")?;
     Ok(())
 }
