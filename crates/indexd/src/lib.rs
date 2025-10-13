@@ -7,12 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{
-    cmp::Ordering,
-    collections::HashMap,
-    sync::Arc,
-    time::Instant,
-};
+use std::{cmp::Ordering, collections::HashMap, sync::Arc, time::Instant};
 use tokio::sync::RwLock;
 
 const DEFAULT_NAMESPACE: &str = "default";
@@ -124,11 +119,7 @@ impl IndexState {
             }
         }
 
-        matches.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(Ordering::Equal)
-        });
+        matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
         if matches.len() > limit {
             matches.truncate(limit);
         }
