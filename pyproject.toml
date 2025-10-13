@@ -8,7 +8,9 @@ readme = "README.md"
 [tool.uv]
 managed = true
 python-preference = "managed"
-required-version = "3.10"
+# Require a recent uv CLI release; Python compatibility lives above in
+# `requires-python`.
+required-version = ">=0.7.0"
 
 [project.optional-dependencies]
 ## Note:

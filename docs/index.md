@@ -1,22 +1,42 @@
-# HausKI
+# HausKI-Dokumentation
 
-> Lokale KI + Orchestrator auf Pop!_OS – mit schnellem Python-Tooling via `uv`.
+Willkommen bei **HausKI**, der lokalen KI-Orchestrierungsplattform für Pop!_OS. Dieses Portal bündelt Architekturüberblick, Betriebsleitfäden und modulare Referenzen, damit du schnell von der Installation zur täglichen Nutzung kommst.
 
-## Entwicklung
+## Schnellstart
 
 ```bash
-just py-init       # dev-Dependencies installieren
-just py-lint       # ruff lint
-just py-fmt        # ruff format
-just py-docs-serve # Dokumentation lokal
-just py-docs-build # statisches Build (./site)
+just py-init       # Python-Abhängigkeiten für Tools & Docs installieren
+just py-docs-serve # MkDocs-Server lokal starten
+just py-lint       # Ruff-Linting (Python-Hilfswerkzeuge)
+just py-fmt        # Ruff-Formatter ausführen
 ```
 
-## Ziele
-- Lokale KI (OSS-Modelle) + Cloud-Tools orchestrieren
-- Integration: Obsidian (Canvas), VS Code/GitHub, Qobuz
-- Reproduzierbare Toolchain (uv, just, CI)
+Weitere Einstiegspunkte:
 
----
+- [README](https://github.com/heimgewebe/hausKI/blob/main/README.md) – Gesamtüberblick, Setup und Devcontainer-Workflows
+- [hauski-stack.md](https://github.com/heimgewebe/hausKI/blob/main/hauski-stack.md) – Tech-Stack, Architekturrollen und Roadmap
+- [hauski-skizze.md](https://github.com/heimgewebe/hausKI/blob/main/hauski-skizze.md) – visuelle Skizze der Systemkomponenten
 
-_Diese Seite ist ein Platzhalter. Ergänze Inhalte nach Bedarf._
+## Inhaltsverzeichnis
+
+| Bereich | Beschreibung |
+| --- | --- |
+| [Architektur](https://github.com/heimgewebe/hausKI/blob/main/hauski-stack.md) | Stack-Entscheidungen, Modulzuschnitt und Budgets |
+| [Module](modules/index.md) | Fokusseiten zu Kern-Crates wie `core`, `memory` und `audio` |
+| [Runbooks](runbooks/index.md) | Schritt-für-Schritt-Anleitungen für Setup und Betrieb |
+| [semantAH](semantah.md) | Deep Dive in Embeddings, KPIs und Deploy |
+| [Prozesse](process/) | Sprachleitfaden, Tests, Release-Checks |
+
+## Aktuelle Schwerpunkte
+
+1. **Hot-Path in Rust:** Latenzkritische Pfade laufen konsequent in Rust, mit klaren FFI-Grenzen zu KI-Modellen.
+2. **Budget-Governance:** Observability und harte p95-Limits sichern Performance, Strombudget und Thermik.
+3. **Lokaler Vorrang:** Offline-Modelle sind Default; Cloud-Zugriffe benötigen Policies und Audit.
+
+## Nächste Schritte
+
+- Lokale Modelle vorbereiten? → siehe [`runbooks/semantah_local.md`](runbooks/semantah_local.md).
+- API testen? → starte `just core-dev` und greife auf `/v1/chat/completions` zu.
+- Audio-Setup anpassen? → folge den Profilen und CLI-Workflows in [Audio](modules/audio.md).
+
+Viel Erfolg beim Bauen, Betreiben und Erweitern von HausKI!
