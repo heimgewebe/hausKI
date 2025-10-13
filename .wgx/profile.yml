@@ -11,7 +11,7 @@ env_priority:
 # Toolchain expectations for this repository.
 tooling:
   uv:
-    version: "3.10"
+    version: "0.1.44"
   python:
     version: "3.12"
     uv: true
