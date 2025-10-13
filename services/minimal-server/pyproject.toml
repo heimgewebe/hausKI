@@ -1,0 +1,28 @@
+[project]
+name = "hauski-minimal-server"
+version = "0.1.0"
+description = "Minimaler FastAPI-Dienst für Policy, Ingest und Event-Log Schnittstellen von hausKI"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.111,<0.112",
+  "uvicorn[standard]>=0.30,<0.31",
+  "pydantic>=2.7,<3",
+  "httpx>=0.27,<0.28",
+  "python-json-logger>=2.0,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.6",
+  "pytest>=8.3",
+  "pytest-asyncio>=0.23",
+]
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+managed = true
+python-preference = "managed"
