@@ -1,7 +1,7 @@
 name: CI (smart PR)
 
 on:
-  pull_request_target:
+  pull_request:
     branches: [ main ]
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group: {}
@@ -13,7 +13,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.event.pull_request.number) || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -48,7 +48,8 @@ jobs:
     needs: changes
     if: >
       (github.event_name == 'merge_group') ||
-      (github.event_name != 'merge_group' &&
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'pull_request' &&
        github.event.pull_request.draft == false &&
        (
          needs.changes.outputs.docs == 'true' ||
@@ -62,6 +63,8 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - uses: dtolnay/rust-toolchain@stable
@@ -81,13 +84,16 @@ jobs:
     needs: changes
     if: >
       (github.event_name == 'merge_group') ||
-      (github.event_name != 'merge_group' &&
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'pull_request' &&
        github.event.pull_request.draft == false &&
        (needs.changes.outputs.docs == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - uses: lycheeverse/lychee-action@v2
         with:
           args: >-
@@ -113,7 +119,8 @@ jobs:
     needs: [changes]
     if: >
       (github.event_name == 'merge_group') ||
-      (github.event_name != 'merge_group' &&
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'pull_request' &&
        github.event.pull_request.draft == false &&
        (
          needs.changes.outputs.sh == 'true' ||
@@ -122,12 +129,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Emit TODO notice
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
           git ls-files '*.sh' | xargs -r shellcheck -x
       - name: Lychee (links)
-        if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
+        if: >-
+          github.event_name == 'merge_group' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
         uses: lycheeverse/lychee-action@v2
         with:
           args: --no-progress --verbose --retry-wait-time 2 --max-redirects 5 -- "**/*.md"
@@ -135,7 +147,7 @@ jobs:
   rust-check:
     name: Rust — fmt & clippy & test
     needs: changes
-    if: needs.changes.outputs.rust == 'true' || github.event_name == 'merge_group'
+    if: needs.changes.outputs.rust == 'true' || github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -143,7 +155,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - uses: dtolnay/rust-toolchain@stable
@@ -178,11 +190,16 @@ jobs:
   security:
     name: Rust — deny & audit
     needs: changes
-    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
+    if: >-
+      github.event_name == 'merge_group' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - uses: dtolnay/rust-toolchain@stable
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
