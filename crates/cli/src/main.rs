@@ -182,9 +182,7 @@ fn print_models_table(file: &ModelsFile) {
         );
     }
 
-    if !rows.is_empty() {
-        println!("{separator}");
-    }
+    println!("{separator}");
 }
 
 // ---- Konfiguration (YAML) ----
