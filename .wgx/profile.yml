@@ -1,32 +1,31 @@
 version: "1.0"
-repo:
-  # Kurzname des Repos (wird automatisch aus git ableitbar sein – hier nur Doku)
-  name: auto
-  description: "WGX profile for unified tasks and env priorities"
 
+# Ordered list of preferred execution environments for WGX tasks.
 env_priority:
-  # Ordnungsprinzip laut Vorgabe
+  - default
   - devcontainer
   - devbox
   - mise_direnv
   - termux
 
+# Toolchain expectations for this repository.
 tooling:
   uv:
-    version: "0.4.18"  # nutze eine verfügbare UV-Version
+    version: "3.10"
   python:
-    version: "3.12"   # bevorzugte Python-Version für lokale Tasks
-    uv: true           # uv ist Standard-Layer für Python-Tools
-    precommit: true    # falls .pre-commit-config.yaml vorhanden
+    version: "3.12"
+    uv: true
+    precommit: true
   rust:
-    cargo: auto        # wenn Cargo.toml vorhanden → Rust-Checks aktivieren
+    cargo: auto
     clippy_strict: true
     fmt_check: true
-    deny: optional     # cargo-deny, falls vorhanden
+    deny: optional
 
+# Standardized task definitions that WGX orchestrates.
 tasks:
   up:
-    desc: "Dev-Umgebung hochfahren (Container/venv/tooling bootstrap)"
+    desc: "Bootstrap the developer environment"
     sh:
       - |
         if command -v devcontainer >/dev/null 2>&1 || [ -f .devcontainer/devcontainer.json ]; then
@@ -36,26 +35,25 @@ tasks:
           uv --version || true
           [ -f pyproject.toml ] && uv sync --frozen || true
         fi
-        [ -f .pre-commit-config.yaml ] && command -v pre-commit >/dev/null 2>&1 && pre-commit install || true
+        if [ -f .pre-commit-config.yaml ] && command -v pre-commit >/dev/null 2>&1; then
+          pre-commit install
+        fi
   lint:
-    desc: "Schnelle statische Checks (Rust/Python/Markdown/YAML)"
+    desc: "Run fast static checks (Rust/Python/Docs)"
     sh:
       - |
-        # Rust
         if [ -f Cargo.toml ]; then
           cargo fmt --all -- --check
           cargo clippy --all-targets --all-features -- -D warnings
         fi
-        # Python
-        if [ -f pyproject.toml ]; then
-          if command -v uv >/dev/null 2>&1; then uv run ruff check . || true; fi
-          if command -v uv >/dev/null 2>&1; then uv run ruff format --check . || true; fi
+        if [ -f pyproject.toml ] && command -v uv >/dev/null 2>&1; then
+          uv run ruff check . || true
+          uv run ruff format --check . || true
         fi
-        # Docs
         command -v markdownlint >/dev/null 2>&1 && markdownlint "**/*.md" || true
         command -v yamllint    >/dev/null 2>&1 && yamllint . || true
   test:
-    desc: "Testsuite"
+    desc: "Execute the full testsuite"
     sh:
       - |
         [ -f Cargo.toml ] && cargo test --all --all-features || true
@@ -63,7 +61,7 @@ tasks:
           uv run pytest -q || true
         fi
   build:
-    desc: "Build-Artefakte erstellen"
+    desc: "Build release artefacts"
     sh:
       - |
         [ -f Cargo.toml ] && cargo build --release || true
@@ -71,7 +69,7 @@ tasks:
           uv build || true
         fi
   smoke:
-    desc: "Schnelle Smoke-Checks (läuft <60s)"
+    desc: "Run quick smoke checks (<60s)"
     sh:
       - |
         echo "[wgx.smoke] repo=$(basename "$(git rev-parse --show-toplevel)")"
