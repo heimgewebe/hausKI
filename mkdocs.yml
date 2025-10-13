@@ -15,6 +15,22 @@ theme:
     - search.highlight
 nav:
   - Start: index.md
+  - Module:
+      - Übersicht: modules/index.md
+      - Core: modules/core.md
+      - Memory: modules/memory.md
+      - Audio: modules/audio.md
+  - Prozesse:
+      - Übersicht: process/README.md
+      - Sprache: process/sprache.md
+      - Tests & Qualität: process/testing.md
+      - Release: process/release.md
+  - Runbooks:
+      - Übersicht: runbooks/index.md
+      - Lokale Entwicklung: runbooks/local-dev.md
+      - semantAH Bootstrap: runbooks/semantah_local.md
+      - Troubleshooting: runbooks/troubleshooting.md
+  - semantAH: semantah.md
 markdown_extensions:
   - admonition
   - toc:
