@@ -51,6 +51,47 @@ cargo build --workspace
 cargo test --workspace -- --nocapture
 ```
 
+### Python Shadow Policy API
+
+1. Optional die Python-Extras synchronisieren (uv verwaltet automatisch eine lokale Umgebung):
+
+   ```bash
+   uv sync --extra dev
+   ```
+
+2. Den FastAPI-Dienst lokal starten:
+
+   ```bash
+   uv run uvicorn services.policy_shadow.app:app --reload --port 8085
+   ```
+
+   Alternativ kannst du `just shadow` verwenden. Setze bei Bedarf `HAUSKI_TOKEN=supersecret` und rufe den Dienst anschließend mit dem Header `x-auth: <token>` auf.
+
+3. Beispielaufrufe mit `curl`:
+
+   ```bash
+   curl -X POST http://127.0.0.1:8085/v1/ingest/metrics \
+     -H 'Content-Type: application/json' \
+     -d '{
+       "ts": 1700000000000,
+       "host": "pop-os",
+       "updates": {"packages": 3},
+       "backup": {"last_run": "2024-01-01"},
+       "drift": {"config": []}
+     }'
+
+   curl -X POST http://127.0.0.1:8085/v1/policy/decide \
+     -H 'Content-Type: application/json' \
+     -d '{"context": {"routine": "coffee"}}'
+
+   curl -X POST http://127.0.0.1:8085/v1/policy/feedback \
+     -H 'Content-Type: application/json' \
+     -d '{"decision_id": "abc", "rating": 1.0, "notes": "works"}'
+
+   curl http://127.0.0.1:8085/v1/health/latest
+   curl http://127.0.0.1:8085/version
+   ```
+
 > 💡 **Hinweis auf Offline-Builds:** Bevor du `cargo clippy`, `cargo build` oder
 > `cargo test` ausführst, stelle sicher, dass `vendor/` alle benötigten Crates
 > enthält. Der Helper `scripts/check-vendor.sh` warnt früh mit einer
