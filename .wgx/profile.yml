@@ -1,4 +1,4 @@
-version: "1.0"
+version: 1
 
 # Ordered list of preferred execution environments for WGX tasks.
 env_priority:
@@ -10,8 +10,7 @@ env_priority:
 
 # Toolchain expectations for this repository.
 tooling:
-  uv:
-    version: "0.1.44"
+  uv: "0.1.44"
   python:
     version: "3.12"
     uv: true
