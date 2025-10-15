@@ -62,6 +62,9 @@ py-docs-build:
 py-pre-commit:
     uv run pre-commit run --all-files
 
+shadow:
+    uv run uvicorn services.policy_shadow.app:app --reload --port 8085
+
 # Quick vs. Full
 test-quick:
     @echo "running quick tests…"
