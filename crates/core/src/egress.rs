@@ -4,20 +4,24 @@ use std::collections::HashSet;
 use thiserror::Error;
 use url::ParseError;
 
+const FORBIDDEN_HOST_CHARS: &[char] = &['\u{ff0e}', '\u{3002}', '\u{ff61}', '\u{fe52}'];
+
 const KEY_EGRESS: &str = "egress";
 const KEY_DEFAULT: &str = "default";
 const KEY_ALLOW: &str = "allow";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct AllowedTarget {
+    scheme: Option<String>,
     host: String,
     port: Option<u16>,
 }
 
 impl AllowedTarget {
-    fn new(host: &str, port: Option<u16>) -> Self {
+    fn new(scheme: Option<&str>, host: &str, port: Option<u16>) -> Self {
         Self {
-            host: host.to_ascii_lowercase(),
+            scheme: scheme.map(|value| value.to_ascii_lowercase()),
+            host: normalize_host(host),
             port,
         }
     }
@@ -29,6 +33,8 @@ pub enum AllowEntryError {
     Url(#[from] ParseError),
     #[error("missing host component")]
     MissingHost,
+    #[error("host contains forbidden characters")]
+    InvalidHost,
 }
 
 fn parse_allow_entry(entry: &str) -> Result<AllowedTarget, AllowEntryError> {
@@ -39,7 +45,7 @@ fn parse_allow_entry(entry: &str) -> Result<AllowedTarget, AllowEntryError> {
 
     if let Ok(url) = Url::parse(trimmed) {
         if url.host_str().is_some() {
-            return allowed_target_from_url(&url, true);
+            return allowed_target_from_url(&url, true, Some(url.scheme()));
         }
 
         if trimmed.contains("://") {
@@ -49,11 +55,22 @@ fn parse_allow_entry(entry: &str) -> Result<AllowedTarget, AllowEntryError> {
 
     let fallback = format!("http://{trimmed}");
     let url = Url::parse(&fallback).map_err(AllowEntryError::Url)?;
-    allowed_target_from_url(&url, false)
+    allowed_target_from_url(&url, false, None)
 }
 
-fn allowed_target_from_url(url: &Url, had_scheme: bool) -> Result<AllowedTarget, AllowEntryError> {
+fn normalize_host(host: &str) -> String {
+    host.trim_end_matches('.').to_ascii_lowercase()
+}
+
+fn allowed_target_from_url(
+    url: &Url,
+    had_scheme: bool,
+    explicit_scheme: Option<&str>,
+) -> Result<AllowedTarget, AllowEntryError> {
     let host = url.host_str().ok_or(AllowEntryError::MissingHost)?;
+    if host_contains_forbidden_chars(host) {
+        return Err(AllowEntryError::InvalidHost);
+    }
     let port = if let Some(port) = url.port() {
         Some(port)
     } else if had_scheme {
@@ -62,7 +79,56 @@ fn allowed_target_from_url(url: &Url, had_scheme: bool) -> Result<AllowedTarget,
         None
     };
 
-    Ok(AllowedTarget::new(host, port))
+    Ok(AllowedTarget::new(explicit_scheme, host, port))
+}
+
+fn raw_host_segment(url: &str) -> Option<&str> {
+    let (_, remainder) = url.split_once("://")?;
+    let end = remainder
+        .char_indices()
+        .find(|(_, ch)| matches!(ch, '/' | '?' | '#'))
+        .map(|(idx, _)| idx)
+        .unwrap_or_else(|| remainder.len());
+    let authority = &remainder[..end];
+    if authority.is_empty() {
+        return None;
+    }
+
+    let host_port = authority
+        .rsplit_once('@')
+        .map(|(_, host)| host)
+        .unwrap_or(authority);
+    if host_port.is_empty() {
+        return None;
+    }
+
+    if let Some(stripped) = strip_port(host_port) {
+        Some(stripped)
+    } else {
+        Some(host_port)
+    }
+}
+
+fn strip_port(host_port: &str) -> Option<&str> {
+    if host_port.starts_with('[') {
+        host_port.find(']').map(|idx| &host_port[..=idx])
+    } else {
+        host_port.rsplit_once(':').map(|(host, candidate_port)| {
+            if candidate_port.chars().all(|c| c.is_ascii_digit()) {
+                host
+            } else {
+                host_port
+            }
+        })
+    }
+}
+
+fn host_contains_forbidden_chars(host: &str) -> bool {
+    host.chars()
+        .any(|c| c.is_ascii_control() || c.is_ascii_whitespace())
+        || host.contains('%')
+        || host.chars().any(|c| FORBIDDEN_HOST_CHARS.contains(&c))
+        || host.ends_with('.')
 }
 
 #[derive(Debug, Error)]
@@ -122,6 +188,20 @@ impl EgressGuard {
         self.enforce
     }
 
+    pub fn ensure_allowed(&self, url: &str) -> Result<Url, GuardError> {
+        if let Some(host) = raw_host_segment(url) {
+            if host_contains_forbidden_chars(host) {
+                return Err(GuardError::HostDenied {
+                    host: host.to_string(),
+                });
+            }
+        }
+
+        let parsed = Url::parse(url)?;
+        self.ensure_url_is_allowed(&parsed)?;
+        Ok(parsed)
+    }
+
     pub fn from_policy(policy: &RoutingPolicy) -> Result<Self, EgressGuardError> {
         let mapping = match policy.0.as_mapping() {
             Some(mapping) => mapping,
@@ -158,12 +238,26 @@ impl EgressGuard {
                     .as_str()
                     .ok_or(EgressGuardError::InvalidAllowList)?
                     .trim();
-                let target = parse_allow_entry(entry).map_err(|source| {
-                    EgressGuardError::InvalidAllowHost {
-                        entry: entry.to_string(),
-                        source,
-                    }
-                })?;
+                let target = if entry.contains("://") {
+                    let url =
+                        Url::parse(entry).map_err(|e| EgressGuardError::InvalidAllowHost {
+                            entry: entry.to_string(),
+                            source: AllowEntryError::Url(e),
+                        })?;
+                    allowed_target_from_url(&url, true, Some(url.scheme())).map_err(|source| {
+                        EgressGuardError::InvalidAllowHost {
+                            entry: entry.to_string(),
+                            source,
+                        }
+                    })?
+                } else {
+                    parse_allow_entry(entry).map_err(|source| {
+                        EgressGuardError::InvalidAllowHost {
+                            entry: entry.to_string(),
+                            source,
+                        }
+                    })?
+                };
                 allowed.insert(target);
             }
         }
@@ -171,28 +265,50 @@ impl EgressGuard {
         Ok(Self { enforce, allowed })
     }
 
-    fn ensure_allowed(&self, url: &Url) -> Result<(), GuardError> {
+    fn ensure_url_is_allowed(&self, url: &Url) -> Result<(), GuardError> {
         if !self.enforce {
             return Ok(());
         }
 
         let host = url.host_str().ok_or(GuardError::MissingHost)?;
-        let host_lower = host.to_ascii_lowercase();
-        let host_any_port = AllowedTarget::new(&host_lower, None);
+        if host_contains_forbidden_chars(host) {
+            return Err(GuardError::HostDenied {
+                host: host.to_string(),
+            });
+        }
+        let normalized_host = normalize_host(host);
+
+        if !url.username().is_empty() || url.password().is_some() {
+            return Err(GuardError::HostDenied {
+                host: normalized_host.clone(),
+            });
+        }
+
+        let host_any_port = AllowedTarget::new(Some(url.scheme()), host, None);
         if self.allowed.contains(&host_any_port) {
             return Ok(());
         }
 
+        let host_any_port_neutral = AllowedTarget::new(None, host, None);
+        if self.allowed.contains(&host_any_port_neutral) {
+            return Ok(());
+        }
+
         if let Some(port) = url.port_or_known_default() {
-            let host_with_port = AllowedTarget::new(&host_lower, Some(port));
+            let host_with_port = AllowedTarget::new(Some(url.scheme()), host, Some(port));
             if self.allowed.contains(&host_with_port) {
+                return Ok(());
+            }
+
+            let host_with_port_neutral = AllowedTarget::new(None, host, Some(port));
+            if self.allowed.contains(&host_with_port_neutral) {
                 return Ok(());
             }
         }
 
         let display = match url.port_or_known_default() {
-            Some(port) => format!("{host}:{port}"),
-            None => host.to_string(),
+            Some(port) => format!("{normalized_host}:{port}"),
+            None => normalized_host.clone(),
         };
         Err(GuardError::HostDenied { host: display })
     }
@@ -226,12 +342,12 @@ impl AllowlistedClient {
     }
 
     pub fn request(&self, method: Method, url: &str) -> Result<RequestBuilder, GuardError> {
-        let url = Url::parse(url)?;
+        let url = self.guard.ensure_allowed(url)?;
         self.request_url(method, url)
     }
 
     pub fn request_url(&self, method: Method, url: Url) -> Result<RequestBuilder, GuardError> {
-        self.guard.ensure_allowed(&url)?;
+        self.guard.ensure_url_is_allowed(&url)?;
         Ok(self.inner.request(method, url))
     }
 
@@ -252,7 +368,7 @@ impl AllowlistedClient {
     }
 
     pub async fn execute(&self, request: Request) -> Result<Response, GuardedRequestError> {
-        self.guard.ensure_allowed(request.url())?;
+        self.guard.ensure_url_is_allowed(request.url())?;
         Ok(self.inner.execute(request).await?)
     }
 }
@@ -292,13 +408,13 @@ egress:
         assert!(guard.is_enforced());
 
         guard
-            .ensure_allowed(&Url::parse("https://api.matrix.example/v1").unwrap())
+            .ensure_url_is_allowed(&Url::parse("https://api.matrix.example/v1").unwrap())
             .unwrap();
         guard
-            .ensure_allowed(&Url::parse("https://internal.service:8443/health").unwrap())
+            .ensure_url_is_allowed(&Url::parse("https://internal.service:8443/health").unwrap())
             .unwrap();
         assert!(guard
-            .ensure_allowed(&Url::parse("https://evil.example").unwrap())
+            .ensure_url_is_allowed(&Url::parse("https://evil.example").unwrap())
             .is_err());
     }
 
@@ -315,10 +431,11 @@ egress:
         let guard = EgressGuard::from_policy(&policy).unwrap();
 
         guard
-            .ensure_allowed(&Url::parse("https://api.matrix.example/v1").unwrap())
+            .ensure_url_is_allowed(&Url::parse("https://api.matrix.example/v1").unwrap())
             .unwrap();
         assert!(matches!(
-            guard.ensure_allowed(&Url::parse("https://api.matrix.example:8443/alt").unwrap()),
+            guard
+                .ensure_url_is_allowed(&Url::parse("https://api.matrix.example:8443/alt").unwrap()),
             Err(GuardError::HostDenied { .. })
         ));
     }
@@ -335,7 +452,7 @@ egress:
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
         guard
-            .ensure_allowed(&Url::parse("http://metrics.internal/data").unwrap())
+            .ensure_url_is_allowed(&Url::parse("http://metrics.internal/data").unwrap())
             .unwrap();
     }
 
@@ -352,6 +469,80 @@ egress:
             EgressGuardError::UnknownDefault(value) => assert_eq!(value, "maybe"),
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn guard_rejects_common_evasion_patterns() {
+        let policy = policy_from_yaml(
+            r#"
+egress:
+  default: deny
+  allow:
+    - https://api.matrix.example
+"#,
+        );
+        let guard = EgressGuard::from_policy(&policy).unwrap();
+
+        for candidate in [
+            "https://evil.api.matrix.example",
+            "https://api.matrix.example@evil.com",
+            "https://user:pass@api.matrix.example",
+            "https://арi.matrix.example",
+            "https://api.matrix.example:4443",
+            "https://api.matrix.example.evil.com",
+            "https://API.Matrix.Example./",
+            "https://api\u{ff0e}matrix\u{ff0e}example",
+            "https://api.matrix.example%20",
+            "https://api.matrix.example\n.evil",
+        ] {
+            assert!(
+                guard.ensure_allowed(candidate).is_err(),
+                "candidate {candidate} should be denied"
+            );
+        }
+
+        guard.ensure_allowed("https://api.matrix.example").unwrap();
+        guard
+            .ensure_allowed("https://api.matrix.example:443")
+            .unwrap();
+    }
+
+    #[test]
+    fn guard_allows_ipv6_targets_with_explicit_port() {
+        let policy = policy_from_yaml(
+            r#"
+egress:
+  default: deny
+  allow:
+    - https://[2001:db8::1]:8443
+"#,
+        );
+        let guard = EgressGuard::from_policy(&policy).unwrap();
+        guard
+            .ensure_allowed("https://[2001:db8::1]:8443/status")
+            .unwrap();
+        assert!(matches!(
+            guard.ensure_allowed("https://[2001:db8::1]:443/status"),
+            Err(GuardError::HostDenied { .. })
+        ));
+    }
+
+    #[test]
+    fn guard_rejects_http_when_only_https_allowed() {
+        let policy = policy_from_yaml(
+            r#"
+egress:
+  default: deny
+  allow:
+    - https://api.matrix.example
+"#,
+        );
+        let guard = EgressGuard::from_policy(&policy).unwrap();
+        guard.ensure_allowed("https://api.matrix.example").unwrap();
+        assert!(matches!(
+            guard.ensure_allowed("http://api.matrix.example"),
+            Err(GuardError::HostDenied { .. })
+        ));
     }
 
     #[test]
