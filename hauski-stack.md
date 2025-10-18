@@ -63,7 +63,7 @@ hauski/
 
 ## 3) APIs, Policies, Modelle
 
-* **OpenAI-kompatibel:** `POST /v1/chat/completions`, `POST /v1/embeddings`
+* **Chat (MVP):** `POST /v1/chat` (stub → `501 Not Implemented`, OpenAI-kompatible Routen folgen)
 * **Spezial:** `POST /asr/transcribe`, `/obsidian/canvas/suggest`, `/code/pr/draft`, `/audio/profile`
 * **Policies:**
 

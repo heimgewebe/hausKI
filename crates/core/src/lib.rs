@@ -6,7 +6,7 @@ use axum::{
     http::{header, HeaderValue, Method, Request, StatusCode},
     middleware::{from_fn_with_state, Next},
     response::{Html, IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use hauski_indexd::{router as index_router, IndexState};
@@ -27,6 +27,7 @@ use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, BoxError, Servi
 use utoipa::OpenApi;
 
 mod ask;
+mod chat;
 mod config;
 mod egress;
 pub use config::{
@@ -45,8 +46,16 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(health, ready, ask::ask_handler),
-    components(schemas(ask::AskResponse, ask::AskHit)),
+    paths(health, healthz, ready, ask::ask_handler, chat::chat_handler),
+    components(
+        schemas(
+            ask::AskResponse,
+            ask::AskHit,
+            chat::ChatRequest,
+            chat::ChatMessage,
+            chat::ChatStubResponse
+        )
+    ),
     tags((name = "core", description = "Core health & readiness"))
 )]
 struct ApiDoc;
@@ -319,6 +328,19 @@ async fn health(State(state): State<AppState>) -> &'static str {
 
 #[utoipa::path(
     get,
+    path = "/healthz",
+    responses((status = 200, description = "Service healthy")),
+    tag = "core"
+)]
+async fn healthz(State(state): State<AppState>) -> &'static str {
+    let started = Instant::now();
+    let status = StatusCode::OK;
+    state.record_http_observation(Method::GET, "/healthz", status, started);
+    "ok"
+}
+
+#[utoipa::path(
+    get,
     path = "/ready",
     responses(
         (status = 200, description = "Service ready"),
@@ -475,9 +497,11 @@ pub fn build_app_with_state(
 fn core_routes() -> Router<AppState> {
     Router::new()
         .route("/health", get(health))
+        .route("/healthz", get(healthz))
         .route("/ready", get(ready))
         .route("/metrics", get(metrics))
         .route("/ask", get(ask::ask_handler))
+        .route("/v1/chat", post(chat::chat_handler))
 }
 
 fn docs_routes() -> Router<AppState> {
@@ -624,7 +648,7 @@ async fn cors_middleware(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ask::AskResponse;
+    use crate::{ask::AskResponse, chat::ChatStubResponse};
     use axum::{
         body::Body,
         http::{header, HeaderValue, Method, Request, StatusCode},
@@ -1037,6 +1061,41 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn healthz_ok() {
+        let app = demo_app(false);
+        let res = app
+            .oneshot(Request::get("/healthz").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn chat_stub_returns_not_implemented() {
+        let app = demo_app(false);
+        let payload = json!({
+            "messages": [
+                {"role": "user", "content": "Hallo HausKI?"}
+            ]
+        });
+
+        let res = app
+            .oneshot(
+                Request::post("/v1/chat")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let stub: ChatStubResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(stub.status, "not_implemented");
     }
 
     #[tokio::test]

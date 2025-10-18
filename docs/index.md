@@ -36,7 +36,7 @@ Weitere Einstiegspunkte:
 ## Nächste Schritte
 
 - Lokale Modelle vorbereiten? → siehe [`runbooks/semantah_local.md`](runbooks/semantah_local.md).
-- API testen? → starte `just core-dev` und greife auf `/v1/chat/completions` zu.
+- API testen? → starte `just run-core` und rufe den Stub `/v1/chat` auf (`501 Not Implemented` bis zur LLM-Anbindung).
 - Audio-Setup anpassen? → folge den Profilen und CLI-Workflows in [Audio](modules/audio.md).
 
 Viel Erfolg beim Bauen, Betreiben und Erweitern von HausKI!

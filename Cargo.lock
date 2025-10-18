@@ -604,11 +604,15 @@ name = "hauski-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
  "clap",
  "hauski-core",
  "serde",
  "serde_yaml",
  "shellexpand",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
  "url",
 ]
 
