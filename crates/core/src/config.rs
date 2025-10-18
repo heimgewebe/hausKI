@@ -125,6 +125,7 @@ pub type RoutingDecision = serde_yaml::Value;
 #[serde(deny_unknown_fields, default)]
 pub struct FeatureFlags {
     pub safe_mode: bool,
+    pub chat_upstream_url: Option<String>,
 }
 
 fn parse_env_bool(value: &str) -> Option<bool> {
