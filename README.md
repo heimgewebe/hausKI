@@ -177,14 +177,70 @@ Nutze `just codex:doctor`, um vor einem Run schnell zu prüfen, ob eine lokale `
 
 ## Build, Test & Ausführung
 
-Den Core-Service lokal starten:
+Den Core-Service lokal starten (CLI-Kommando `hauski serve`):
 ```bash
 cargo run -p hauski-cli -- serve
-# Alternative über das Justfile (ruft intern `cargo run -p hauski-core` auf)
+# Alternative über das Justfile (ruft intern `cargo run -p hauski-cli -- serve` auf)
 just run-core
 ```
 
+Nach dem Start stehen folgende Kern-Endpunkte zur Verfügung:
+
+| Route | Methode | Zweck |
+| --- | --- | --- |
+| `/health` | GET | Lebenszeichen, antwortet mit `ok`. |
+| `/healthz` | GET | Lightweight-Check für Load-Balancer/Probes. |
+| `/ready` | GET | Signalisiert, dass Limits, Modelle & Routing geladen wurden. |
+| `/metrics` | GET | Prometheus-kompatible Metriken (HTTP, Budgets). |
+| `/v1/chat` | POST | Erster Chat-Stub. Gibt aktuell `501 Not Implemented` zurück und demonstriert den JSON-Schema-Fluss. |
+| `/docs`, `/docs/openapi.json` | GET | Menschliche bzw. maschinenlesbare API-Dokumentation. |
+
+Beispiel-Aufrufe:
+
+```bash
+curl -i http://127.0.0.1:8080/health
+curl -i http://127.0.0.1:8080/healthz
+curl -s http://127.0.0.1:8080/metrics | head -n 20
+
+curl -s -X POST http://127.0.0.1:8080/v1/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"Hallo HausKI?"}]}'
+# → HTTP 501 + JSON-Payload {"status":"not_implemented", …}
+```
+
 > **Hinweis:** Setze `HAUSKI_EXPOSE_CONFIG=true`, um die geschützten Routen unter `/config/*` bewusst freizugeben (nur für lokale Tests empfohlen).
+
+### Optional: systemd-User-Service für den Core
+
+Für einen dauerhaften lokalen Betrieb kannst du den Core über systemd (user scope) starten:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cat > ~/.config/systemd/user/hauski-core.service <<'UNIT'
+[Unit]
+Description=HausKI Core (Rust)
+After=network.target
+
+[Service]
+Environment=HAUSKI_ALLOWED_ORIGIN=http://127.0.0.1:8080
+Environment=HAUSKI_MODELS=%h/projects/hauski/configs/models.yml
+Environment=HAUSKI_LIMITS=%h/projects/hauski/policies/limits.yaml
+Environment=HAUSKI_ROUTING=%h/projects/hauski/policies/routing.yaml
+Environment=HAUSKI_FLAGS=%h/projects/hauski/configs/flags.yaml
+ExecStart=%h/.cargo/bin/hauski serve
+WorkingDirectory=%h/projects/hauski
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+UNIT
+
+systemctl --user daemon-reload
+systemctl --user enable --now hauski-core.service
+systemctl --user status hauski-core.service --no-pager
+```
+
+> Passe Pfade und Ports bei Bedarf an deine lokale Umgebung an. `hauski serve` bleibt auf Loopback gebunden, solange keine andere Adresse per `HAUSKI_BIND` gesetzt wird.
 
 ### CORS & Frontend-Integration
 
@@ -212,7 +268,10 @@ docker compose -f infra/compose/compose.core.yml --profile core down
 
 Verfügbare bzw. geplante API-Endpunkte:
 - `GET /health` → "ok"
+- `GET /healthz`
+- `GET /ready`
 - `GET /metrics`
+- `POST /v1/chat` *(501 Stub – LLM-Binding folgt)*
 - *(geplant)* OpenAI-kompatible Routen (`/v1/chat/completions`, `/v1/embeddings`)
 - *(geplant)* Spezialendpunkte: `/asr/transcribe`, `/audio/profile`, `/obsidian/canvas/suggest`
 

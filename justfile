@@ -20,11 +20,11 @@ test:
 
 run-core:
     scripts/check-vendor.sh
-    cargo run -p hauski-core
+    cargo run -p hauski-cli -- serve
 
 run-core-expose:
     scripts/check-vendor.sh
-    HAUSKI_EXPOSE_CONFIG=true cargo run -p hauski-core
+    HAUSKI_EXPOSE_CONFIG=true cargo run -p hauski-cli -- serve
 
 run-cli ARGS='':
     scripts/check-vendor.sh

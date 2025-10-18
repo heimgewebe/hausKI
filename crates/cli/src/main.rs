@@ -1,10 +1,16 @@
 use anyhow::{anyhow, bail, Context, Result};
+use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::{env, net::SocketAddr, path::PathBuf};
+use tokio::{net::TcpListener, runtime::Builder as RuntimeBuilder, signal};
+use tracing::{info, warn};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
-use hauski_core::{load_models, ModelsFile};
+use hauski_core::{
+    build_app_with_state, load_flags, load_limits, load_models, load_routing, ModelsFile,
+};
 
 #[derive(Parser, Debug)]
 #[command(name = "hauski", version, about = "HausKI CLI")]
@@ -23,6 +29,12 @@ enum Commands {
     Models {
         #[command(subcommand)]
         cmd: ModelsCmd,
+    },
+    /// Startet den HausKI-Core-Server
+    Serve {
+        /// Bind-Adresse überschreiben (z. B. 0.0.0.0:8080)
+        #[arg(long)]
+        bind: Option<String>,
     },
     /// ASR-Werkzeuge
     Asr {
@@ -93,6 +105,9 @@ fn main() -> Result<()> {
             }
             ModelsCmd::Pull { id } => println!("(stub) models pull {id}"),
         },
+        Commands::Serve { bind } => {
+            run_core_server(bind)?;
+        }
         Commands::Asr { cmd } => match cmd {
             AsrCmd::Transcribe { input, model, out } => {
                 println!("(stub) asr transcribe {input} --model {model:?} --out {out:?}")
@@ -296,4 +311,111 @@ fn validate_config(file: String) -> Result<()> {
     );
 
     Ok(())
+}
+
+fn run_core_server(bind_override: Option<String>) -> Result<()> {
+    let runtime = RuntimeBuilder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("Tokio Runtime konnte nicht erzeugt werden")?;
+
+    runtime.block_on(async move { run_core_server_async(bind_override).await })
+}
+
+async fn run_core_server_async(bind_override: Option<String>) -> Result<()> {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::layer())
+        .try_init()
+        .ok();
+
+    let limits_path = env::var("HAUSKI_LIMITS").unwrap_or_else(|_| "./policies/limits.yaml".into());
+    let models_path = env::var("HAUSKI_MODELS").unwrap_or_else(|_| "./configs/models.yml".into());
+    let routing_path =
+        env::var("HAUSKI_ROUTING").unwrap_or_else(|_| "./policies/routing.yaml".into());
+    let flags_path = env::var("HAUSKI_FLAGS").unwrap_or_else(|_| "./configs/flags.yaml".into());
+    let expose_config = env::var("HAUSKI_EXPOSE_CONFIG")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    let allowed_origin =
+        env::var("HAUSKI_ALLOWED_ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:8080".into());
+    let allowed_origin_header = HeaderValue::from_str(&allowed_origin).map_err(|e| {
+        anyhow!(
+            "ungültiger Wert für HAUSKI_ALLOWED_ORIGIN '{}': {}",
+            allowed_origin,
+            e
+        )
+    })?;
+
+    let (app, state) = build_app_with_state(
+        load_limits(limits_path)?,
+        load_models(models_path)?,
+        load_routing(routing_path)?,
+        load_flags(flags_path)?,
+        expose_config,
+        allowed_origin_header,
+    );
+
+    let addr = resolve_bind_addr(bind_override, expose_config)?;
+    info!(%addr, expose_config, "starte HausKI-Core (CLI)");
+    let listener = TcpListener::bind(addr).await?;
+    state.set_ready();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
+    Ok(())
+}
+
+fn resolve_bind_addr(bind_override: Option<String>, expose_config: bool) -> Result<SocketAddr> {
+    let bind = bind_override
+        .or_else(|| env::var("HAUSKI_BIND").ok())
+        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
+    let addr: SocketAddr = bind
+        .parse()
+        .map_err(|e| anyhow!("ungültiger Wert für HAUSKI_BIND '{}': {}", bind, e))?;
+
+    let is_loopback = match addr.ip() {
+        std::net::IpAddr::V4(v4) => v4.is_loopback(),
+        std::net::IpAddr::V6(v6) => v6.is_loopback(),
+    };
+
+    if expose_config && !is_loopback {
+        bail!("HAUSKI_EXPOSE_CONFIG erfordert Loopback-Bind; nutze z. B. 127.0.0.1:<port>");
+    }
+
+    if !expose_config && !is_loopback {
+        warn!(
+            "Binde an nicht-Loopback-Adresse ({}); EXPOSE_CONFIG=false",
+            addr
+        );
+    }
+
+    Ok(addr)
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    info!("Stoppsignal empfangen, fahre herunter");
 }

@@ -114,7 +114,7 @@ Clients (TUI • VSCode • Obsidian • CLI • Audio • Comm)
 
 **APIs** (axum, OpenAI-kompatibel):
 
-* `POST /v1/chat/completions`, `POST /v1/embeddings`
+* `POST /v1/chat` (Stub, liefert `501` bis zur LLM-Anbindung), `POST /v1/embeddings` *(geplant)*
 * `POST /asr/transcribe`, `/obsidian/canvas/suggest`, `/code/pr/draft`
 * `GET /health`, `/metrics` (Prometheus)
 
