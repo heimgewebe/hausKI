@@ -4,3 +4,7 @@
 # self-contained. This is intended for local/offline usage or hardening
 # scenarios. Overrides via HAUSKI_SAFE_MODE take precedence over this file.
 safe_mode: false
+# Optional: OpenAI-compatible upstream handling chat requests (e.g. llama.cpp --server)
+# Example:
+#   http://127.0.0.1:8081
+chat_upstream_url: null

@@ -28,6 +28,7 @@ use utoipa::OpenApi;
 
 mod ask;
 mod chat;
+mod chat_upstream;
 mod config;
 mod egress;
 pub use config::{
@@ -53,7 +54,8 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
             ask::AskHit,
             chat::ChatRequest,
             chat::ChatMessage,
-            chat::ChatStubResponse
+            chat::ChatStubResponse,
+            chat::ChatResponse
         )
     ),
     tags((name = "core", description = "Core health & readiness"))
@@ -1102,7 +1104,10 @@ mod tests {
     async fn safe_mode_flag_is_reflected_in_state() {
         let (_app, state) = demo_app_with_origin_and_flags(
             false,
-            FeatureFlags { safe_mode: true },
+            FeatureFlags {
+                safe_mode: true,
+                ..FeatureFlags::default()
+            },
             HeaderValue::from_static("http://127.0.0.1:8080"),
         );
         assert!(state.safe_mode());
