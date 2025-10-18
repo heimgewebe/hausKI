@@ -7,12 +7,28 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{cmp::Ordering, collections::HashMap, sync::Arc, time::Instant};
+use std::{borrow::Cow, cmp::Ordering, collections::HashMap, sync::Arc, time::Instant};
 use tokio::sync::RwLock;
 
 const DEFAULT_NAMESPACE: &str = "default";
 
 pub type MetricsRecorder = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
+
+fn normalize_namespace(input: &str) -> String {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        DEFAULT_NAMESPACE.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn resolve_namespace<'a>(namespace: Option<&'a str>) -> Cow<'a, str> {
+    match namespace {
+        Some(raw) => Cow::Owned(normalize_namespace(raw)),
+        None => Cow::Borrowed(DEFAULT_NAMESPACE),
+    }
+}
 
 #[derive(Clone)]
 pub struct IndexState {
@@ -55,18 +71,23 @@ impl IndexState {
     }
 
     async fn upsert(&self, payload: UpsertRequest) -> usize {
+        let UpsertRequest {
+            doc_id,
+            namespace,
+            chunks,
+            meta,
+        } = payload;
+        let namespace = normalize_namespace(&namespace);
         let mut store = self.inner.store.write().await;
-        let namespace_store = store
-            .entry(payload.namespace.clone())
-            .or_insert_with(HashMap::new);
-        let ingested = payload.chunks.len();
+        let namespace_store = store.entry(namespace.clone()).or_insert_with(HashMap::new);
+        let ingested = chunks.len();
         namespace_store.insert(
-            payload.doc_id.clone(),
+            doc_id.clone(),
             DocumentRecord {
-                doc_id: payload.doc_id,
-                namespace: payload.namespace,
-                chunks: payload.chunks,
-                meta: payload.meta,
+                doc_id,
+                namespace: namespace.clone(),
+                chunks,
+                meta,
             },
         );
         ingested
@@ -79,8 +100,8 @@ impl IndexState {
         }
 
         let store = self.inner.store.read().await;
-        let namespace = request.namespace.as_deref().unwrap_or(DEFAULT_NAMESPACE);
-        let Some(namespace_store) = store.get(namespace) else {
+        let namespace = resolve_namespace(request.namespace.as_deref());
+        let Some(namespace_store) = store.get(namespace.as_ref()) else {
             return Vec::new();
         };
         let limit = request.k.unwrap_or(20).min(100);
@@ -389,5 +410,88 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].doc_id, "doc-rust");
         assert!(results[0].text.to_lowercase().contains("rust"));
+    }
+
+    #[tokio::test]
+    async fn trims_namespace_whitespace_on_upsert_and_search() {
+        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+
+        state
+            .upsert(UpsertRequest {
+                doc_id: "doc-trim".into(),
+                namespace: "  custom  ".into(),
+                chunks: vec![ChunkPayload {
+                    chunk_id: Some("doc-trim#0".into()),
+                    text: Some("Rust namespaces".into()),
+                    embedding: Vec::new(),
+                    meta: json!({"chunk": 0}),
+                }],
+                meta: json!({"doc": "trim"}),
+            })
+            .await;
+
+        let results = state
+            .search(&SearchRequest {
+                query: "rust".into(),
+                k: Some(5),
+                namespace: Some("custom".into()),
+            })
+            .await;
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].namespace, "custom");
+
+        let spaced_results = state
+            .search(&SearchRequest {
+                query: "rust".into(),
+                k: Some(5),
+                namespace: Some("   custom   ".into()),
+            })
+            .await;
+
+        assert_eq!(spaced_results.len(), 1);
+        assert_eq!(spaced_results[0].doc_id, "doc-trim");
+    }
+
+    #[tokio::test]
+    async fn empty_namespace_defaults_to_default_namespace() {
+        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+
+        state
+            .upsert(UpsertRequest {
+                doc_id: "doc-empty".into(),
+                namespace: "".into(),
+                chunks: vec![ChunkPayload {
+                    chunk_id: Some("doc-empty#0".into()),
+                    text: Some("Hello default namespace".into()),
+                    embedding: Vec::new(),
+                    meta: json!({"chunk": 0}),
+                }],
+                meta: json!({"doc": "empty"}),
+            })
+            .await;
+
+        let results = state
+            .search(&SearchRequest {
+                query: "hello".into(),
+                k: Some(5),
+                namespace: None,
+            })
+            .await;
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].namespace, DEFAULT_NAMESPACE);
+
+        let spaced_results = state
+            .search(&SearchRequest {
+                query: "hello".into(),
+                k: Some(5),
+                namespace: Some("   ".into()),
+            })
+            .await;
+
+        assert_eq!(spaced_results.len(), 1);
+        assert_eq!(spaced_results[0].doc_id, "doc-empty");
+        assert_eq!(spaced_results[0].namespace, DEFAULT_NAMESPACE);
     }
 }
