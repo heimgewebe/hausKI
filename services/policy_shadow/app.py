@@ -7,7 +7,7 @@ import platform
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -24,7 +24,7 @@ def _event_dir() -> Path:
     return events_dir
 
 
-def append_event(kind: str, payload: Dict[str, Any]) -> None:
+def append_event(kind: str, payload: dict[str, Any]) -> None:
     """Append an event line using the shared HausKI schema."""
     events_dir = _event_dir()
     now = datetime.now(timezone.utc)
@@ -49,40 +49,40 @@ class MetricsIngest(BaseModel):
 
     ts: int = Field(..., description="Client-side timestamp in milliseconds")
     host: str = Field(..., description="Hostname emitting the metrics")
-    updates: Dict[str, Any]
-    backup: Dict[str, Any]
-    drift: Dict[str, Any]
+    updates: dict[str, Any]
+    backup: dict[str, Any]
+    drift: dict[str, Any]
 
 
 class PolicyDecisionRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    ts: Optional[int] = Field(None, description="Client timestamp in milliseconds")
-    context: Dict[str, Any] = Field(default_factory=dict)
+    ts: int | None = Field(None, description="Client timestamp in milliseconds")
+    context: dict[str, Any] = Field(default_factory=dict)
 
 
 class PolicyDecisionResponse(BaseModel):
     action: str
     score: float
     why: str
-    context: Dict[str, Any]
+    context: dict[str, Any]
 
 
 class PolicyFeedback(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    decision_id: Optional[str] = None
-    rating: Optional[float] = None
-    notes: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    decision_id: str | None = None
+    rating: float | None = None
+    notes: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 app = FastAPI(title="HausKI Shadow Policy API", version=APP_VERSION)
 
-_latest_metrics: Dict[str, Any] = {}
+_latest_metrics: dict[str, Any] = {}
 
 
-def require_token(x_auth: Optional[str] = Header(default=None)) -> None:
+def require_token(x_auth: str | None = Header(default=None)) -> None:
     expected = os.getenv(TOKEN_ENV)
     if expected and x_auth != expected:
         raise HTTPException(
@@ -92,14 +92,18 @@ def require_token(x_auth: Optional[str] = Header(default=None)) -> None:
 
 
 @app.post("/v1/ingest/metrics", dependencies=[Depends(require_token)])
-def ingest_metrics(payload: MetricsIngest) -> Dict[str, str]:
+def ingest_metrics(payload: MetricsIngest) -> dict[str, str]:
     global _latest_metrics
     _latest_metrics = payload.model_dump()
     append_event("metrics.ingest", _latest_metrics)
     return {"status": "ok"}
 
 
-@app.post("/v1/policy/decide", dependencies=[Depends(require_token)], response_model=PolicyDecisionResponse)
+@app.post(
+    "/v1/policy/decide",
+    dependencies=[Depends(require_token)],
+    response_model=PolicyDecisionResponse,
+)
 def policy_decide(request: PolicyDecisionRequest) -> PolicyDecisionResponse:
     now = datetime.now().astimezone()
     hour = now.hour
@@ -125,16 +129,16 @@ def policy_decide(request: PolicyDecisionRequest) -> PolicyDecisionResponse:
 
 
 @app.post("/v1/policy/feedback", dependencies=[Depends(require_token)])
-def policy_feedback(feedback: PolicyFeedback) -> Dict[str, str]:
+def policy_feedback(feedback: PolicyFeedback) -> dict[str, str]:
     append_event("policy.feedback", feedback.model_dump())
     return {"status": "queued"}
 
 
 @app.get("/v1/health/latest", dependencies=[Depends(require_token)])
-def health_latest() -> Dict[str, Any]:
+def health_latest() -> dict[str, Any]:
     return {"status": "ok", "metrics": _latest_metrics or None}
 
 
 @app.get("/version")
-def version() -> Dict[str, str]:
+def version() -> dict[str, str]:
     return {"version": APP_VERSION}
