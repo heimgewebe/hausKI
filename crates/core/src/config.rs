@@ -256,9 +256,33 @@ pub fn load_flags<P: AsRef<Path>>(path: P) -> anyhow::Result<FeatureFlags> {
 mod tests {
     use super::*;
     use serial_test::serial;
-    use std::fs::File;
-    use std::io::Write;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::io::{self, Write};
+    use std::sync::{Arc, Mutex};
+    use tempfile::NamedTempFile;
+    use tracing_subscriber::fmt::MakeWriter;
+
+    struct EnvVarGuard {
+        key: &'static str,
+        original: Option<String>,
+    }
+
+    impl EnvVarGuard {
+        fn removed(key: &'static str) -> Self {
+            let original = std::env::var(key).ok();
+            std::env::remove_var(key);
+            Self { key, original }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            if let Some(value) = &self.original {
+                std::env::set_var(self.key, value);
+            } else {
+                std::env::remove_var(self.key);
+            }
+        }
+    }
 
     #[test]
     fn missing_limits_file_falls_back_to_defaults() {
@@ -269,43 +293,24 @@ mod tests {
 
     #[test]
     fn partial_yaml_merges_with_defaults() {
-        let path = std::env::temp_dir().join(format!(
-            "hauski-test-limits-{}.yaml",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        {
-            let mut file = File::create(&path).unwrap();
-            writeln!(file, "latency:\n  llm_p95_ms: 350\n").unwrap();
-            file.flush().unwrap();
-        }
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "latency:\n  llm_p95_ms: 350\n").unwrap();
+        file.flush().unwrap();
 
-        let limits = load_limits(&path).unwrap();
+        let limits = load_limits(file.path()).unwrap();
         assert_eq!(limits.latency.llm_p95_ms, 350);
         assert_eq!(limits.latency.index_topk20_ms, default_index_topk20_ms());
         assert_eq!(limits.thermal.gpu_max_c, default_gpu_max_c());
         assert_eq!(limits.asr.wer_max_pct, default_wer_max_pct());
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
     fn routing_policy_with_explicit_default_and_no_rules() {
-        let path = std::env::temp_dir().join(format!(
-            "hauski-test-routing-{}.yaml",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "default: deny").unwrap();
+        file.flush().unwrap();
 
-        {
-            let mut file = File::create(&path).unwrap();
-            writeln!(file, "default: deny").unwrap();
-        }
-
-        let routing = load_routing(&path).unwrap();
+        let routing = load_routing(file.path()).unwrap();
         let mapping = routing
             .0
             .as_mapping()
@@ -317,7 +322,6 @@ mod tests {
             Some(&serde_yaml::Value::String("deny".into()))
         );
         assert!(!mapping.contains_key(&allow_key));
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
@@ -328,34 +332,28 @@ mod tests {
 
     #[test]
     fn invalid_models_yaml_falls_back_to_defaults() {
-        let path = std::env::temp_dir().join("hauski-test-invalid-models.yaml");
-        {
-            let mut file = File::create(&path).unwrap();
-            writeln!(file, "models: not-a-list").unwrap();
-            file.flush().unwrap();
-        }
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "models: not-a-list").unwrap();
+        file.flush().unwrap();
 
-        let models = load_models(&path).unwrap();
+        let models = load_models(file.path()).unwrap();
         assert!(models.models.is_empty());
-        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
     fn invalid_routing_yaml_falls_back_to_defaults() {
-        let path = std::env::temp_dir().join("hauski-test-invalid-routing.yaml");
-        {
-            let mut file = File::create(&path).unwrap();
-            write!(file, "routing: [invalid").unwrap();
-            file.flush().unwrap();
-        }
+        let mut file = NamedTempFile::new().unwrap();
+        write!(file, "routing: [invalid").unwrap();
+        file.flush().unwrap();
 
-        let routing = load_routing(&path).unwrap();
+        let routing = load_routing(file.path()).unwrap();
         assert_eq!(routing, RoutingPolicy::default());
-        let _ = std::fs::remove_file(&path);
     }
 
+    #[serial]
     #[test]
     fn missing_flags_file_defaults_to_safe_mode_off() {
+        let _guard = EnvVarGuard::removed("HAUSKI_SAFE_MODE");
         let flags = load_flags("/does/not/exist-flags.yaml").unwrap();
         assert!(!flags.safe_mode);
     }
@@ -363,45 +361,36 @@ mod tests {
     #[serial]
     #[test]
     fn env_override_wins_over_file() {
-        let path = std::env::temp_dir().join(format!(
-            "hauski-test-flags-{}.yaml",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        {
-            let mut file = File::create(&path).unwrap();
-            writeln!(file, "safe_mode: false").unwrap();
-        }
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "safe_mode: false").unwrap();
+        file.flush().unwrap();
 
+        let _guard = EnvVarGuard::removed("HAUSKI_SAFE_MODE");
         std::env::set_var("HAUSKI_SAFE_MODE", "true");
-        let flags = load_flags(&path).unwrap();
+        let flags = load_flags(file.path()).unwrap();
         assert!(flags.safe_mode);
-        std::env::remove_var("HAUSKI_SAFE_MODE");
-        let _ = std::fs::remove_file(path);
     }
 
     #[serial]
     #[test]
-    fn invalid_env_override_keeps_config() {
-        let path = std::env::temp_dir().join(format!(
-            "hauski-test-flags-invalid-env-{}.yaml",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        {
-            let mut file = File::create(&path).unwrap();
-            writeln!(file, "safe_mode: true").unwrap();
-        }
+    fn invalid_env_override_keeps_config_and_logs_warning() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "safe_mode: true").unwrap();
+        file.flush().unwrap();
 
-        std::env::set_var("HAUSKI_SAFE_MODE", "definitely-not-a-bool");
-        let flags = load_flags(&path).unwrap();
+        let _guard = EnvVarGuard::removed("HAUSKI_SAFE_MODE");
+        let (flags, logs) = capture_logs(|| {
+            std::env::set_var("HAUSKI_SAFE_MODE", "definitely-not-a-bool");
+            let flags = load_flags(file.path()).unwrap();
+            std::env::remove_var("HAUSKI_SAFE_MODE");
+            flags
+        });
+
         assert!(flags.safe_mode);
-        std::env::remove_var("HAUSKI_SAFE_MODE");
-        let _ = std::fs::remove_file(path);
+        assert!(
+            logs.contains("invalid boolean for HAUSKI_SAFE_MODE"),
+            "expected warning about invalid boolean, logs were: {logs:?}"
+        );
     }
 
     #[test]
@@ -420,5 +409,50 @@ mod tests {
         for invalid in ["", "maybe", "10", "enable"] {
             assert_eq!(parse_env_bool(invalid), None, "invalid: {invalid:?}");
         }
+    }
+
+    #[derive(Clone, Default)]
+    struct SharedWriter(Arc<Mutex<Vec<u8>>>);
+
+    impl<'a> MakeWriter<'a> for SharedWriter {
+        type Writer = SharedWriterGuard<'a>;
+
+        fn make_writer(&'a self) -> Self::Writer {
+            SharedWriterGuard {
+                guard: self.0.lock().unwrap(),
+            }
+        }
+    }
+
+    struct SharedWriterGuard<'a> {
+        guard: std::sync::MutexGuard<'a, Vec<u8>>,
+    }
+
+    impl<'a> Write for SharedWriterGuard<'a> {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.guard.write(buf)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.guard.flush()
+        }
+    }
+
+    fn capture_logs<F, T>(f: F) -> (T, String)
+    where
+        F: FnOnce() -> T,
+    {
+        let writer = SharedWriter::default();
+        let make_writer = writer.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(make_writer)
+            .with_ansi(false)
+            .with_max_level(tracing::Level::TRACE)
+            .finish();
+
+        let result = tracing::subscriber::with_default(subscriber, f);
+        let bytes = writer.0.lock().unwrap().clone();
+        let logs = String::from_utf8_lossy(&bytes).into_owned();
+        (result, logs)
     }
 }
