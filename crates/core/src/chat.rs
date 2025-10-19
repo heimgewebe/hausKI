@@ -7,7 +7,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use tracing::debug;
+use tracing::{debug, warn};
 use utoipa::ToSchema;
 
 use crate::{chat_upstream::call_openai_compatible, AppState};
@@ -97,34 +97,13 @@ pub async fn chat_handler(
         }
     }
 
-    let mut has_user_message = false;
-    let mut has_assistant_message = false;
-    let mut non_empty_messages = 0usize;
-
-    for message in &chat_request.messages {
-        match message.role.as_str() {
-            "user" => has_user_message = true,
-            "assistant" => has_assistant_message = true,
-            _ => {}
-        }
-
-        if !message.content.trim().is_empty() {
-            non_empty_messages += 1;
-        }
-    }
-
-    debug!(
-        total_messages = chat_request.messages.len(),
-        has_user_message, has_assistant_message, non_empty_messages, "received chat request (stub)"
-    );
+    warn!("chat request received but no chat upstream is configured");
     let started = Instant::now();
     let status = StatusCode::NOT_IMPLEMENTED;
     state.record_http_observation(Method::POST, "/v1/chat", status, started);
-
     let payload = ChatStubResponse {
         status: "not_implemented".to_string(),
-        message: "chat pipeline not wired yet".to_string(),
+        message: "chat pipeline not wired yet, please configure HAUSKI_CHAT_UPSTREAM_URL".to_string(),
     };
-
     (status, Json(payload)).into_response()
 }
