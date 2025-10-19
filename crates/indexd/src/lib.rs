@@ -6,7 +6,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::{borrow::Cow, cmp::Ordering, collections::HashMap, sync::Arc, time::Instant};
 use tokio::sync::RwLock;
 
@@ -196,19 +196,6 @@ async fn upsert_handler(
     Json(payload): Json<UpsertRequest>,
 ) -> Response {
     let started = Instant::now();
-    if payload.namespace.trim().is_empty() {
-        state.record(
-            Method::POST,
-            "/index/upsert",
-            StatusCode::BAD_REQUEST,
-            started,
-        );
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "namespace must not be empty" })),
-        )
-            .into_response();
-    }
     let ingested = state.upsert(payload).await;
     state.record(Method::POST, "/index/upsert", StatusCode::OK, started);
     (
@@ -226,23 +213,6 @@ async fn search_handler(
     Json(payload): Json<SearchRequest>,
 ) -> Response {
     let started = Instant::now();
-    if payload
-        .namespace
-        .as_deref()
-        .is_some_and(|namespace| namespace.trim().is_empty())
-    {
-        state.record(
-            Method::POST,
-            "/index/search",
-            StatusCode::BAD_REQUEST,
-            started,
-        );
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "namespace must not be empty" })),
-        )
-            .into_response();
-    }
     let matches = state.search(&payload).await;
     let latency_ms = started.elapsed().as_secs_f64() * 1000.0;
     state.record(Method::POST, "/index/search", StatusCode::OK, started);
