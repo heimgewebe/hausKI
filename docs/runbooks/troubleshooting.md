@@ -29,3 +29,14 @@ just run-cli -- models pull <model-id>
 
 Replace `<model-id>` with the identifier you need (for example `whisper-base.en`).
 
+## Secret-scanning noise from vendored fixtures
+
+GitHub Advanced Security may flag sample keys or credentials that live in vendored
+dependencies under `vendor/`. We keep the vendor tree intact—deleting files would
+invalidate Cargo's `.cargo-checksum.json` and break builds. Instead, the
+configuration in `.github/secret_scanning.yml` ignores common fixture locations in
+vendored crates. If you encounter alerts for these paths, confirm the files are
+vendored test assets and close the alerts as "ignored by configuration". Never
+remove files from `vendor/`; adjust the ignore list if additional fixture paths
+are needed.
+
