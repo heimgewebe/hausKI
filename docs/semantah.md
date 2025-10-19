@@ -56,6 +56,9 @@ Alle JSON-Beispiele zeigen den erwarteten Body und die Antwortstruktur. Die Impl
 
 ### `POST /index/upsert`
 
+> **Hinweis:** Das Feld `namespace` ist optional. Fehlende, leere oder nur aus Whitespace bestehende Werte werden automatisch auf
+> den Namespace `default` normalisiert.
+
 ```json
 {
   "doc_id": "docs/semantah",
@@ -85,6 +88,9 @@ Antwort:
 ```
 
 ### `POST /index/search`
+
+> **Hinweis:** Das Feld `namespace` ist optional. Fehlende, leere oder nur aus Whitespace bestehende Werte werden automatisch auf
+> den Namespace `default` normalisiert.
 
 ```json
 {

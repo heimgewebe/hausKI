@@ -31,8 +31,8 @@ Der `core`-Dienst bildet die öffentliche HTTP/API-Schicht von HausKI. Er verbin
 | `/metrics` | GET | Prometheus-Metriken inkl. HTTP-Zählern und Histogrammen. |
 | `/ask` | GET | Beispiel-Endpoint für orchestrierte Anfragen (Ask-Flow). |
 | `/v1/chat` | POST | Chat-Stub (Antwort: `501 Not Implemented`, JSON-Schema sichtbar). |
-| `/index/upsert` | POST | Dokument-Chunks registrieren (weitergereicht an `indexd`). |
-| `/index/search` | POST | Volltext-/Substring-Suche gegen den In-Memory-Index. |
+| `/index/upsert` | POST | Dokument-Chunks registrieren (weitergereicht an `indexd`, leere/fehlende Namespaces → `default`). |
+| `/index/search` | POST | Volltext-/Substring-Suche gegen den In-Memory-Index (leere/fehlende Namespaces → `default`). |
 | `/docs`, `/docs/openapi.json` | GET | Menschliche bzw. maschinenlesbare API-Dokumentation. |
 | `/config/*` | GET | Optional freigeschaltete Config-Inspektion (Limits, Models, Routing). |
 
