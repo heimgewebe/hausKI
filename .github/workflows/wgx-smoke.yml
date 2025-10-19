@@ -1,4 +1,5 @@
 name: wgx-smoke (disabled)
+permissions: {}
 on:
   # Only manually startable to keep the file valid,
   # but no longer appears "red" in normal CI.
