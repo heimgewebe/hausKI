@@ -13,6 +13,9 @@ on:
         required: false
 
 env:
+  # Provide the toolchain input in both lowercase and uppercase variants so
+  # that reusable scripts checking `$toolchain` always receive a value.
+  toolchain: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.toolchain != '' && github.event.inputs.toolchain) || 'stable' }}
   RUST_TOOLCHAIN: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.toolchain != '' && github.event.inputs.toolchain) || 'stable' }}
 
 permissions:
@@ -77,7 +80,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          toolchain: ${{ env.toolchain }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Check vendor snapshot
@@ -169,7 +172,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          toolchain: ${{ env.toolchain }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Check vendor snapshot
@@ -213,7 +216,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          toolchain: ${{ env.toolchain }}
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - uses: taiki-e/install-action@v2
