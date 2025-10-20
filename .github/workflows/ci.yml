@@ -13,6 +13,8 @@ on:
         required: false
 
 env:
+  # Provide the toolchain input in both lowercase and uppercase variants so
+  # that reusable scripts checking `$toolchain` always receive a value.
   toolchain: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.toolchain != '' && github.event.inputs.toolchain) || 'stable' }}
   RUST_TOOLCHAIN: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.toolchain != '' && github.event.inputs.toolchain) || 'stable' }}
 
