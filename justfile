@@ -33,10 +33,6 @@ run-cli ARGS='':
 vendor:
     mkdir -p vendor
     cargo vendor --locked --respect-source-config > /dev/null
-    scripts/vendor-prune.sh
-
-vendor-prune:
-    scripts/vendor-prune.sh
 
 vendor-archive:
     rm -f hauski-vendor-snapshot.tar.zst
