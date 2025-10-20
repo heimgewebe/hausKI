@@ -34,3 +34,23 @@
 - Für neue oder geänderte CLI-Kommandos: Hilfetext, Tests (bats oder Rust) und aktualisierte Dokumentation.
 - Policies und Modelle müssen dokumentiert sowie in `configs/` bzw. `policies/` gepflegt werden.
 - GPU-relevante Änderungen dokumentieren (Thermik, Speicher, Limits) und ggf. in der Roadmap ergänzen.
+
+## Development Workflow
+
+Um zur `hauski` beizutragen, folgen Sie bitte diesen Schritten:
+
+1. **Forken Sie das Repository**: Erstellen Sie einen Fork des Haupt-Repositorys in Ihrem eigenen GitHub-Account.
+2. **Klonen Sie den Fork**: Klonen Sie Ihren Fork auf Ihre lokale Maschine.
+3. **Erstellen Sie einen Branch**: Erstellen Sie einen neuen Branch für Ihre Änderungen.
+4. **Nehmen Sie Änderungen vor**: Implementieren Sie Ihre Änderungen und stellen Sie sicher, dass sie den Coding Style Guide einhalten.
+5. **Führen Sie Tests durch**: Führen Sie die Tests aus, um sicherzustellen, dass Ihre Änderungen keine bestehenden Funktionalitäten beeinträchtigen.
+6. **Committen Sie Ihre Änderungen**: Committen Sie Ihre Änderungen mit einer aussagekräftigen Commit-Nachricht.
+7. **Pushen Sie Ihre Änderungen**: Pushen Sie Ihre Änderungen in Ihren Fork.
+8. **Erstellen Sie einen Pull Request**: Erstellen Sie einen Pull Request vom Ihrem Branch in den `main`-Branch des Haupt-Repositorys.
+
+## Coding Style Guide
+
+- **Formatierung**: Der Code sollte mit `cargo fmt` formatiert werden.
+- **Benennung**: Variablen und Funktionsnamen sollten `snake_case` sein. Typnamen sollten `PascalCase` sein.
+- **Dokumentation**: Alle öffentlichen Funktionen und Typen sollten dokumentiert werden.
+- **Fehlerbehandlung**: Verwenden Sie `thiserror` und `anyhow` zur Fehlerbehandlung.

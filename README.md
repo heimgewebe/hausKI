@@ -6,11 +6,11 @@
 HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-GPU.
 
 **Hauptmerkmale:**
-- Hot-Paths laufen in Rust (axum/tokio).
-- Inferenz erfolgt über llama.cpp (FFI).
-- ASR und TTS nutzen whisper-rs bzw. piper-rs.
-- Wissen wird über ein VectorStore-Trait (tantivy + HNSW, optional Qdrant) verwaltet.
-- Netzwerkzugriffe folgen einem "deny by default"-Modell.
+- **Rust-basiert**: Der Kern des Orchestrators ist in Rust implementiert und nutzt `axum` und `tokio` für hohe Performance und Sicherheit.
+- **Offline-First**: Entwickelt für den lokalen Betrieb ohne ständige Internetverbindung.
+- **GPU-Unterstützung**: Optimiert für NVIDIA-GPUs zur Beschleunigung von KI-Inferenz-Aufgaben.
+- **Vektorsuche**: Integrierte Vektorsuche mit `tantivy` und `SQLite` zur effizienten Verarbeitung von Wissen.
+- **Policy-Engine**: Ein regelbasiertes System zur Steuerung von Routing, Speicher und Systemgrenzen.
 ---
 
 ## Inhalt
@@ -21,6 +21,7 @@ HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-
 - [Policies & Budgets](#policies--budgets)
 - [Modelle & Speicherorte](#modelle--speicherorte)
 - [Architektur & Verzeichnisse](#architektur--verzeichnisse)
+- [Projektstruktur](#projektstruktur)
 - [Roadmap-Fokus](#roadmap-fokus)
 - [Contribution & Qualität](#contribution--qualität)
 - [Weiterführende Dokumente](#weiterführende-dokumente)
@@ -384,6 +385,37 @@ hauski audio profile set <profile-name>
 - `crates/cli` – Kommandozeilen-Einstieg (clap)
 - Geplante Erweiterungen: `indexd/` (SQLite + VectorStore), `llm/`, `asr/`, `tts/`, `audio/`, `memory/`, `commentary/`, `bridge/`, `observability/`, `security/`, `adapters/*` (Wasm)
 - Grundsatz: Performance-kritische Pfade in Rust; riskante Adapter laufen isoliert in Wasm (wasmtime, systemd-cgroups/Namespaces).
+
+---
+
+## Projektstruktur
+
+Das `hauski`-Repository ist als Cargo-Workspace organisiert, um eine klare Trennung der Verantwortlichkeiten zu gewährleisten. Jedes Crate erfüllt einen bestimmten Zweck und trägt zur Gesamtarchitektur bei:
+
+- **`crates/cli`**: Die Kommandozeilenschnittstelle (`CLI`), die mit `clap` erstellt wurde. Sie dient als Einstiegspunkt für Benutzerinteraktionen.
+- **`crates/core`**: Der Kern-Service, der mit `axum` entwickelt wurde. Er enthält die zentrale Geschäftslogik, API-Endpunkte und die Policy-Engine.
+- **`crates/embeddings`**: Verantwortlich für die Erstellung von Vektor-Embeddings aus Textdaten.
+- **`crates/indexd`**: Ein Dienst, der `SQLite` und `tantivy` nutzt, um eine effiziente Indizierung und Suche zu ermöglichen.
+- **`crates/policy`**: Definiert die Datenstrukturen und die Logik für das Policy-System.
+- **`crates/policy_api`**: Stellt eine API zur Interaktion mit der Policy-Engine bereit.
+
+---
+
+## Deployment
+
+Das Deployment von `hauski` kann auf verschiedene Weisen erfolgen, je nach den Anforderungen der Zielumgebung.
+
+### Lokales Deployment
+
+Für die lokale Entwicklung und Nutzung wird empfohlen, `hauski` direkt aus den Quellen zu erstellen und auszuführen. Die `justfile` bietet eine Reihe von Befehlen zur Vereinfachung dieses Prozesses.
+
+### Docker-Compose
+
+Für eine produktionsnahe Umgebung kann `hauski` mit `docker-compose` bereitgestellt werden. Das Repository enthält eine `docker-compose.yml`-Datei, die die erforderlichen Dienste definiert.
+
+### Systemd
+
+Für eine dauerhafte Installation kann `hauski` als `systemd`-Dienst konfiguriert werden. Dies stellt sicher, dass der Dienst beim Systemstart automatisch gestartet wird und bei Fehlern neu gestartet wird.
 
 ---
 
