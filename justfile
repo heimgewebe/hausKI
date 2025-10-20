@@ -22,6 +22,17 @@ run-core:
     scripts/check-vendor.sh
     cargo run -p hauski-cli -- serve
 
+# Llama.cpp HTTP-Server lokal starten (einfacher Default)
+# Aufruf: `just llama-server` oder `just llama-server MODEL=/opt/models/llama3.1-8b-q4.gguf PORT=8081`
+llama-server MODEL="/opt/models/llama3.1-8b-q4.gguf" PORT="8081" HOST="127.0.0.1" BIN="./llama.cpp/server":
+    {{BIN}} -m {{MODEL}} --host {{HOST}} --port {{PORT}}
+
+# Demo-Call an /v1/chat (zeigt 200 mit Content, wenn chat_upstream_url gesetzt ist; sonst 501)
+chat-demo TEXT="Hallo HausKI!":
+    curl -s -X POST http://127.0.0.1:8080/v1/chat \
+      -H 'Content-Type: application/json' \
+      -d '{{"messages":[{"role":"user","content":"{{+TEXT+}}"}]}}' | jq
+
 run-core-expose:
     scripts/check-vendor.sh
     HAUSKI_EXPOSE_CONFIG=true cargo run -p hauski-cli -- serve

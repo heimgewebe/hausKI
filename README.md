@@ -215,6 +215,39 @@ curl -s -X POST http://127.0.0.1:8080/v1/chat \
 
 > **Hinweis:** Setze `HAUSKI_EXPOSE_CONFIG=true`, um die geschützten Routen unter `/config/*` bewusst freizugeben (nur für lokale Tests empfohlen).
 
+### Chat-Upstream aktivieren (echte Antworten)
+
+Du kannst `/v1/chat` an einen **OpenAI-kompatiblen lokalen Server** (z. B. `llama.cpp --server`) anbinden:
+
+1. **Llama-Server starten** (Default-Modellpfad bei Bedarf anpassen):
+
+   ```bash
+   just llama-server MODEL=/opt/models/llama3.1-8b-q4.gguf PORT=8081
+   ```
+
+2. **Flag setzen** in `configs/flags.yaml`:
+
+   ```yaml
+   safe_mode: false
+   chat_upstream_url: "http://127.0.0.1:8081"
+   ```
+
+   Alternativ via Env: `export HAUSKI_FLAGS=./configs/flags.yaml`
+
+3. **Core starten**:
+
+   ```bash
+   just run-core
+   ```
+
+4. **Chat testen** (liefert jetzt `200` mit Inhalt):
+
+   ```bash
+   just chat-demo TEXT="Erzähl mir einen kurzen Hauswitz."
+   ```
+
+Ohne laufenden Upstream bleibt `/v1/chat` weiterhin bei `501 Not Implemented` (sicherer Fallback).
+
 ### Optional: systemd-User-Service für den Core
 
 Für einen dauerhaften lokalen Betrieb kannst du den Core über systemd (user scope) starten:
