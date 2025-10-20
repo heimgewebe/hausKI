@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path};
+use std::{env, fs, path::Path};
 
 const fn default_llm_p95_ms() -> u64 {
     400
@@ -235,7 +235,7 @@ pub fn load_flags<P: AsRef<Path>>(path: P) -> anyhow::Result<FeatureFlags> {
         }
     };
 
-    if let Ok(value) = std::env::var("HAUSKI_SAFE_MODE") {
+    if let Ok(value) = env::var("HAUSKI_SAFE_MODE") {
         match parse_env_bool(&value) {
             Some(parsed) => {
                 flags.safe_mode = parsed;
@@ -249,6 +249,14 @@ pub fn load_flags<P: AsRef<Path>>(path: P) -> anyhow::Result<FeatureFlags> {
         }
     }
 
+    if let Ok(url) = env::var("CHAT_UPSTREAM_URL") {
+        if url.trim().is_empty() {
+            flags.chat_upstream_url = None;
+        } else {
+            flags.chat_upstream_url = Some(url);
+        }
+    }
+
     Ok(flags)
 }
 
@@ -256,6 +264,7 @@ pub fn load_flags<P: AsRef<Path>>(path: P) -> anyhow::Result<FeatureFlags> {
 mod tests {
     use super::*;
     use serial_test::serial;
+    use std::env;
     use std::io::{self, Write};
     use std::sync::{Arc, Mutex};
     use tempfile::NamedTempFile;
@@ -268,8 +277,8 @@ mod tests {
 
     impl EnvVarGuard {
         fn removed(key: &'static str) -> Self {
-            let original = std::env::var(key).ok();
-            std::env::remove_var(key);
+            let original = env::var(key).ok();
+            env::remove_var(key);
             Self { key, original }
         }
     }
@@ -277,9 +286,9 @@ mod tests {
     impl Drop for EnvVarGuard {
         fn drop(&mut self) {
             if let Some(value) = &self.original {
-                std::env::set_var(self.key, value);
+                env::set_var(self.key, value);
             } else {
-                std::env::remove_var(self.key);
+                env::remove_var(self.key);
             }
         }
     }
@@ -366,7 +375,7 @@ mod tests {
         file.flush().unwrap();
 
         let _guard = EnvVarGuard::removed("HAUSKI_SAFE_MODE");
-        std::env::set_var("HAUSKI_SAFE_MODE", "true");
+        env::set_var("HAUSKI_SAFE_MODE", "true");
         let flags = load_flags(file.path()).unwrap();
         assert!(flags.safe_mode);
     }
@@ -380,9 +389,9 @@ mod tests {
 
         let _guard = EnvVarGuard::removed("HAUSKI_SAFE_MODE");
         let (flags, logs) = capture_logs(|| {
-            std::env::set_var("HAUSKI_SAFE_MODE", "definitely-not-a-bool");
+            env::set_var("HAUSKI_SAFE_MODE", "definitely-not-a-bool");
             let flags = load_flags(file.path()).unwrap();
-            std::env::remove_var("HAUSKI_SAFE_MODE");
+            env::remove_var("HAUSKI_SAFE_MODE");
             flags
         });
 
@@ -391,6 +400,36 @@ mod tests {
             logs.contains("invalid boolean for HAUSKI_SAFE_MODE"),
             "expected warning about invalid boolean, logs were: {logs:?}"
         );
+    }
+
+    #[serial]
+    #[test]
+    fn chat_upstream_env_override_sets_value() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "chat_upstream_url: \"http://from-file\"").unwrap();
+        file.flush().unwrap();
+
+        let _safe_guard = EnvVarGuard::removed("HAUSKI_SAFE_MODE");
+        let _chat_guard = EnvVarGuard::removed("CHAT_UPSTREAM_URL");
+        env::set_var("CHAT_UPSTREAM_URL", "http://from-env");
+
+        let flags = load_flags(file.path()).unwrap();
+        assert_eq!(flags.chat_upstream_url.as_deref(), Some("http://from-env"));
+    }
+
+    #[serial]
+    #[test]
+    fn empty_chat_upstream_env_override_disables_value() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "chat_upstream_url: \"http://from-file\"").unwrap();
+        file.flush().unwrap();
+
+        let _safe_guard = EnvVarGuard::removed("HAUSKI_SAFE_MODE");
+        let _chat_guard = EnvVarGuard::removed("CHAT_UPSTREAM_URL");
+        env::set_var("CHAT_UPSTREAM_URL", "   ");
+
+        let flags = load_flags(file.path()).unwrap();
+        assert_eq!(flags.chat_upstream_url, None);
     }
 
     #[test]
