@@ -36,6 +36,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
+          toolchain: stable
       - name: Ensure vendor snapshot
         run: bash scripts/ensure-vendor.sh
       - name: Check vendor snapshot
@@ -60,6 +63,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
+          toolchain: stable
       - name: Ensure vendor snapshot
         run: bash scripts/ensure-vendor.sh
       - name: Check vendor snapshot
