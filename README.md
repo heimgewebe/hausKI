@@ -148,7 +148,11 @@ Alternativ steht der Snapshot auch als Artefakt des Workflows
 
 ### Codex-Review-Ablage
 
-Codex-Läufe schreiben ihre Rohdaten nach `~/.hauski/review/hauski/`. Lege dir im Repo optional einen Symlink `ln -s ~/.hauski/review/hauski .hauski-reports` an; dadurch bleiben Logs, Pläne und Canvas-Dateien persistent, ohne ins Repo zu geraten.
+Codex-Läufe schreiben ihre Rohdaten nach `~/.hauski/review/hauski/`. Lege dir im Repo optional einen Symlink von `~/.hauski/review/hauski` auf `.hauski-reports` an; dadurch bleiben Logs, Pläne und Canvas-Dateien persistent, ohne ins Repo zu geraten.
+
+```bash
+ln -s ~/.hauski/review/hauski .hauski-reports
+```
 
 Nutze `just codex:doctor`, um vor einem Run schnell zu prüfen, ob eine lokale `codex`-Installation gefunden wird oder automatisch auf `npx @openai/codex@1.0.0` zurückgefallen wird.
 
@@ -314,7 +318,13 @@ Beispielabfragen für Dashboards oder die Prometheus-Konsole:
 ---
 
 ## Review-Zyklus & Flags
-Siehe [docs/review-cycle.md](docs/review-cycle.md) für Speicherpfade, Index und Hook-Verhalten.
+- Speicherpfade: Reports landen unter `~/.hauski/review/<repo>/`, optionaler Symlink `.hauski-reports` hält sie außerhalb des Repos.
+- Index: `~/.hauski/review/index.json` führt alle Läufe zusammen.
+- Hook & flock: Git-Hooks nutzen `flock` und erkennen Doc-only-Changes.
+- Async-Mode: `HAUSKI_ASYNC=1` legt Läufe in die Queue und gibt schneller frei.
+- Ausblick: `hauski-reviewd` soll als Daemon das Review-Verzeichnis beobachten.
+
+Siehe [docs/review-cycle.md](docs/review-cycle.md) für Details.
 Der optionale Upstream für Chat lässt sich via `chat_upstream_url` setzen.
 
 ---
