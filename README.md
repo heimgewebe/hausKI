@@ -313,6 +313,12 @@ Beispielabfragen für Dashboards oder die Prometheus-Konsole:
 
 ---
 
+## Review-Zyklus & Flags
+Siehe [docs/review-cycle.md](docs/review-cycle.md) für Speicherpfade, Index und Hook-Verhalten.
+Der optionale Upstream für Chat lässt sich via `chat_upstream_url` setzen.
+
+---
+
 ## Memory & semantische Suche
 
 HausKI bringt mit [semantAH](docs/semantah.md) eine semantische Gedächtnisschicht mit. Der Bootstrap enthält Dokumentation, Konfiguration, Skripte und Rust-Scaffolds für Index, Graph und Related-Blöcke. Starte mit dem Quickstart in `docs/semantah.md`, um Ollama einzubinden, Seeds zu laden und die `/index`-Endpunkte zu testen.
