@@ -108,3 +108,21 @@ emit-event id='auto' kind='debug.test' payload='{"ok":true}':
     @echo "Emitting event: {{kind}}"
     if [ "{{id}}" = "auto" ]; then id_arg=""; else id_arg="{{id}}"; fi
     NODE_ID="$(hostname)" KIND="{{kind}}" PAYLOAD='{{payload}}' ./scripts/emit_event_line.sh ${id_arg}
+
+reviewd:install:
+    repo_dir="$$(git rev-parse --show-toplevel)"; \
+    config_dir="$$HOME/.config/systemd/user"; \
+    mkdir -p "$$config_dir"; \
+    if command -v envsubst >/dev/null 2>&1; then \
+        env REPO_DIR="$$repo_dir" envsubst < .systemd/hauski-reviewd.service > "$$config_dir/hauski-reviewd.service"; \
+    else \
+        sed "s|\\$REPO_DIR|$$repo_dir|g" .systemd/hauski-reviewd.service > "$$config_dir/hauski-reviewd.service"; \
+    fi; \
+    cp .systemd/hauski-reviewd.timer "$$config_dir/hauski-reviewd.timer"; \
+    systemctl --user daemon-reload
+
+reviewd:enable:
+    systemctl --user enable --now hauski-reviewd.timer
+
+reviewd:status:
+    systemctl --user status hauski-reviewd.timer hauski-reviewd.service || true
