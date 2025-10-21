@@ -1,0 +1,10 @@
+[Unit]
+Description=hausKI review daemon
+
+[Service]
+Type=oneshot
+Environment=REPO_DIR=$REPO_DIR
+WorkingDirectory=${REPO_DIR}
+ExecStart=${REPO_DIR}/scripts/hauski-reviewd.sh
+StandardOutput=journal
+StandardError=journal

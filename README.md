@@ -349,6 +349,19 @@ Beispielabfragen für Dashboards oder die Prometheus-Konsole:
   - Docs strikt: `just py-docs-build`
   - Hooks lokal prüfen: `just py-pre-commit`
 
+
+## Review-Daemon
+
+Ein systemd-User-Timer startet alle fünf Minuten genau einen Review-Lauf und verhindert Parallelität per Lockfile `~/.hauski/review/hauski.lock`. Logs landen unter `~/.hauski/review/hauski/review-YYYYmmdd-HHMMSS.log`.
+
+```bash
+just reviewd:install
+just reviewd:enable
+just reviewd:status
+```
+
+Der Timer lädt optional Variablen aus `.env` im Repo-Root und bevorzugt `just review-quick` (Fallback auf `just review`). Perspektivisch ist ein Wechsel auf eine Path-Unit oder ein eventgetriebenes Setup (Git-Hook, inotify) vorgesehen.
+
 ---
 
 ## Review-Zyklus & Flags
