@@ -28,11 +28,11 @@ axum = "0.7"
 clap = { version = "4", features = ["derive"] }
 prometheus-client = "0.22"
 walkdir = "2"
-dirs = "5"
+dirs = "6.0.0"
 # sqlx bewusst nicht vorgezogen, bis erste DB-Crate existiert
 reqwest = { version = "0.12", features = ["json"] }
 url = "2"
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.37.0", features = ["bundled"] }
 chrono = { version = "0.4", features = ["clock"] }
 hostname = "0.4"
 ulid = "1"
