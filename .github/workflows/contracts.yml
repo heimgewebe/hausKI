@@ -14,3 +14,6 @@ jobs:
     # Reusable Workflow aus dem metarepo
     uses: heimgewebe/metarepo/.github/workflows/contracts-validate.yml@contracts-v1
     permissions: inherit
+    with:
+      # Explicit input required by reusable workflow to select the Rust toolchain.
+      toolchain: stable
