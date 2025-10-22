@@ -17,10 +17,12 @@ env:
   # that reusable scripts checking `$toolchain` always receive a value.
   #
   # `github.event.inputs.toolchain` is defined for workflow_dispatch events. For
-  # all other event types it resolves to an empty string, so the `|| 'stable'`
-  # fallback ensures that CI still uses the stable toolchain by default.
-  toolchain: ${{ github.event.inputs.toolchain || 'stable' }}
-  RUST_TOOLCHAIN: ${{ github.event.inputs.toolchain || 'stable' }}
+  # all other event types it resolves to an empty string, so the fallback below
+  # ensures that CI still uses the stable toolchain by default. The
+  # `${{ vars.RUST_TOOLCHAIN }}` check lets repository / organization variables
+  # override the default without requiring code changes.
+  toolchain: ${{ github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
+  RUST_TOOLCHAIN: ${{ github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
 
 permissions:
   id-token: write
@@ -84,7 +86,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: ${{ env.toolchain }}
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Check vendor snapshot
@@ -168,7 +170,7 @@ jobs:
     env:
       RUSTFLAGS: -Dwarnings
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
@@ -176,7 +178,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: ${{ env.toolchain }}
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Check vendor snapshot
@@ -211,12 +213,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.toolchain }}
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - uses: Swatinem/rust-cache@v2
       - name: Build hauski-cli
         run: cargo build -p hauski-cli
@@ -227,7 +229,7 @@ jobs:
           pid=$!
           trap 'kill "$pid" 2>/dev/null || true' EXIT
           sleep 1
-          curl -sf http://127.0.0.1:8080/healthz
+          curl -sf http://127.0.0.1:8080/health
           kill "$pid"
           wait "$pid" || true
           trap - EXIT
@@ -241,13 +243,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: ${{ env.toolchain }}
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - uses: taiki-e/install-action@v2
