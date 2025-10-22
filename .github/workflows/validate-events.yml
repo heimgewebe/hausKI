@@ -1,0 +1,32 @@
+name: validate hausKI events
+
+on:
+  push:
+    paths:
+      - "export/**"
+      - "data/**"
+      - "logs/**"
+      - ".github/workflows/validate-events.yml"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-jsonl:
+    if: ${{ hashFiles(matrix.file) != '' }}
+    name: "events.jsonl schema check"
+    uses: heimgewebe/metarepo/.github/workflows/reusable-validate-jsonl.yml@contracts-v1
+    strategy:
+      fail-fast: false
+      matrix:
+        file:
+          - export/events.jsonl
+          - data/events.jsonl
+          - logs/events.jsonl
+    with:
+      jsonl_path: ${{ matrix.file }}
+      schema_url: https://raw.githubusercontent.com/heimgewebe/metarepo/contracts-v1/contracts/event.line.schema.json
+      strict: false
+      validate_formats: true
