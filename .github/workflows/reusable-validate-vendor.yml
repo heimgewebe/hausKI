@@ -1,0 +1,22 @@
+name: validate-vendor
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - name: Check vendor snapshot
+        run: bash scripts/check-vendor.sh
+      - name: Hint when script missing
+        if: failure()
+        run: echo "scripts/check-vendor.sh failed or is missing. Ensure vendor snapshot policy is aligned."
