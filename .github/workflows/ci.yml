@@ -16,10 +16,11 @@ env:
   # Provide the toolchain input in both lowercase and uppercase variants so
   # that reusable scripts checking `$toolchain` always receive a value.
   #
-  # For workflow_dispatch events, prefer the provided input when present; for all
-  # other events (or empty inputs) fall back to the stable toolchain.
-  toolchain: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.toolchain) || 'stable' }}
-  RUST_TOOLCHAIN: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.toolchain) || 'stable' }}
+  # `github.event.inputs.toolchain` is defined for workflow_dispatch events. For
+  # all other event types it resolves to an empty string, so the `|| 'stable'`
+  # fallback ensures that CI still uses the stable toolchain by default.
+  toolchain: ${{ github.event.inputs.toolchain || 'stable' }}
+  RUST_TOOLCHAIN: ${{ github.event.inputs.toolchain || 'stable' }}
 
 permissions:
   id-token: write
@@ -39,7 +40,7 @@ jobs:
       docs:  ${{ steps.filter.outputs.docs }}
       sh:    ${{ steps.filter.outputs.sh }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - uses: dorny/paths-filter@v3
@@ -75,7 +76,7 @@ jobs:
       RUSTFLAGS: -Dwarnings
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
@@ -105,7 +106,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - uses: lycheeverse/lychee-action@v2
@@ -142,7 +143,7 @@ jobs:
        ))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Emit TODO notice
