@@ -74,3 +74,20 @@ Beispiel:
 HAUSKI_TEST_BASE_URL="http://127.0.0.1:8080" \
   cargo test -p hauski-core --test metrics_smoke -- --ignored --nocapture
 ```
+---
+
+## Weiterführende Runbooks
+
+Diese Audit-Ergebnisse sind praxisrelevant und stehen in direkter Verbindung zu den operativen
+Runbooks des hausKI-Ökosystems:
+
+| Runbook | Thema | Bezug |
+|----------|--------|--------|
+| [Upgrade-Guide](runbooks/upgrade-guide.md) | sicheres Aktualisieren von Toolchains, Vendor-Snapshots und Modellen | Umsetzung der Toolchain-Strategie (ADR-0001) |
+| [Incident-Response](runbooks/incident-response.md) | Diagnose und Wiederherstellung bei Laufzeitstörungen | Anwendung der Observability- und Policy-Budgets |
+
+Die Querverweise schließen den Audit-Kreislauf und verbinden Architektur, CI-Governance und Betrieb
+innerhalb des hausKI-Dokumentationssystems.
+
+**Letzte Erweiterung:** 2025-10-23 – Backlinks zu Runbooks ergänzt.
+
