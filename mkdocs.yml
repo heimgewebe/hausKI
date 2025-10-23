@@ -25,6 +25,8 @@ nav:
       - Sprache: process/sprache.md
       - Tests & Qualität: process/testing.md
       - Release: process/release.md
+  - ADRs:
+      - Toolchain-Strategie: adrs/ADR-0001-toolchain-strategy.md
   - Runbooks:
       - Übersicht: runbooks/index.md
       - Lokale Entwicklung: runbooks/local-dev.md
