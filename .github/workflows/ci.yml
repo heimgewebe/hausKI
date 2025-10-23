@@ -11,18 +11,27 @@ on:
         description: 'Rust toolchain version to use'
         default: stable
         required: false
+  workflow_call:
+    inputs:
+      toolchain:
+        description: 'Rust toolchain version to use'
+        required: false
+        default: stable
+        type: string
 
 env:
   # Provide the toolchain input in both lowercase and uppercase variants so
   # that reusable scripts checking `$toolchain` always receive a value.
   #
-  # `github.event.inputs.toolchain` is defined for workflow_dispatch events. For
-  # all other event types it resolves to an empty string, so the fallback below
-  # ensures that CI still uses the stable toolchain by default. The
-  # `${{ vars.RUST_TOOLCHAIN }}` check lets repository / organization variables
-  # override the default without requiring code changes.
-  toolchain: ${{ github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
-  RUST_TOOLCHAIN: ${{ github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
+  # `inputs.toolchain` is set when this workflow is invoked via workflow_call,
+  # `github.event.inputs.toolchain` is set for workflow_dispatch. For all other
+  # event types they resolve to an empty
+  # string, so the fallback below ensures that CI still uses the stable
+  # toolchain by default. The `${{ vars.RUST_TOOLCHAIN }}` check lets repository
+  # / organization variables override the default without requiring code
+  # changes.
+  toolchain: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
+  RUST_TOOLCHAIN: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
 
 permissions:
   id-token: write
@@ -86,7 +95,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Check vendor snapshot
@@ -178,7 +187,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Check vendor snapshot
@@ -218,7 +227,7 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
       - uses: Swatinem/rust-cache@v2
       - name: Build hauski-cli
         run: cargo build -p hauski-cli
@@ -249,7 +258,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - uses: taiki-e/install-action@v2
