@@ -47,3 +47,30 @@ Dieses Dokument ergänzt die bestehende Analyse durch gezielte Empfehlungen zur 
 
 Diese Ergänzungen konsolidieren Toolchains, vereinheitlichen CI-Checks und
 verankern den hausKI-Review-Zyklus direkt in der CI/CD-Pipeline.
+
+
+---
+
+## 5. Verknüpfte Architekturentscheidungen
+
+Die vorliegende Audit-Erweiterung ist mit folgenden Architekturentscheidungen verknüpft:
+
+| ADR | Titel | Status | Bezug |
+|-----|--------|---------|--------|
+| [ADR-0001](adrs/ADR-0001-toolchain-strategy.md) | Einheitliche Toolchain-Strategie | `Accepted` | Definiert zentrale Toolchain-Versionen für CI und lokale Entwicklung |
+
+Diese Entscheidung dient als Basis für alle weiteren CI- und Container-Anpassungen.  
+Künftige ADRs (z. B. für Speicher- und Kommunikationsschichten) sollten diesem Schema folgen.
+
+## 6. Begleitender Smoke-Test
+
+Als technische Verprobung des CI-Health-Flows wurde ein minimaler Integrationstest
+unter `crates/core/tests/metrics_smoke.rs` hinzugefügt.  
+Dieser prüft die Verfügbarkeit von `/metrics` und dient als Ankerpunkt für
+spätere API-Tests (z. B. `/ask`, `/chat`, `/health`).
+
+Beispiel:
+```bash
+HAUSKI_TEST_BASE_URL="http://127.0.0.1:8080" \
+  cargo test -p hauski-core --test metrics_smoke -- --ignored --nocapture
+```
