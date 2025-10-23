@@ -29,6 +29,12 @@ clap = { version = "4", features = ["derive"] }
 prometheus-client = "0.22"
 walkdir = "2"
 dirs = "6.0.0"
+# Abhängigkeiten, die bereits von mehreren Crates genutzt werden, zentralisieren
+tower = "0.5"
+utoipa = { version = "5", features = ["axum_extras"] }
+http-body-util = "0.1"
+serial_test = "3"
+tempfile = "3"
 # sqlx bewusst nicht vorgezogen, bis erste DB-Crate existiert
 reqwest = { version = "0.12", features = ["json"] }
 url = "2"
