@@ -20,6 +20,9 @@ nav:
       - Core: modules/core.md
       - Memory: modules/memory.md
       - Audio: modules/audio.md
+      - Indexd: modules/indexd.md
+      - Observability: modules/observability.md
+      - Policy: modules/policy.md
   - Prozesse:
       - Übersicht: process/README.md
       - Sprache: process/sprache.md
@@ -32,6 +35,8 @@ nav:
       - Lokale Entwicklung: runbooks/local-dev.md
       - semantAH Bootstrap: runbooks/semantah_local.md
       - Troubleshooting: runbooks/troubleshooting.md
+      - Incident-Response: runbooks/incident-response.md
+      - Upgrade-Guide: runbooks/upgrade-guide.md
   - semantAH: semantah.md
   - Audit: audit-hauski.md
 markdown_extensions:
