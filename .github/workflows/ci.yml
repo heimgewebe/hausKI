@@ -92,9 +92,12 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
+      - name: Show resolved toolchain
+        run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
+          # Fall back to "stable" if the workflow-level environment variable is empty.
           toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
@@ -184,9 +187,12 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
+      - name: Show resolved toolchain
+        run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
+          # Fall back to "stable" if the workflow-level environment variable is empty.
           toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
@@ -225,8 +231,11 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
+      - name: Show resolved toolchain
+        run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
       - uses: dtolnay/rust-toolchain@stable
         with:
+          # Fall back to "stable" if the workflow-level environment variable is empty.
           toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
       - uses: Swatinem/rust-cache@v2
       - name: Build hauski-cli
@@ -255,9 +264,12 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
+      - name: Show resolved toolchain
+        run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
+          # Fall back to "stable" if the workflow-level environment variable is empty.
           toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
