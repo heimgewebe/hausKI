@@ -14,10 +14,6 @@
           "file": 1,
           "line": 2,
           "column": 3
-        },
-        {
-          "regexp": "^\\s*\\|\\s*\\^\\s*(.*)$",
-          "message": 1
         }
       ],
       "loop": true
