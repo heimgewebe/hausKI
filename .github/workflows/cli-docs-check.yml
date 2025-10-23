@@ -1,0 +1,80 @@
+name: CLI Docs (consistency)
+
+on:
+  pull_request:
+    branches: [ "**" ]
+    paths:
+      - "scripts/gen-cli-docs.sh"
+      - "wgx"
+      - "docs/cli.md"
+      - "crates/hauski-cli/**"
+      - "crates/hauski-cli/Cargo.toml"
+      - ".github/workflows/cli-docs-check.yml"
+  push:
+    branches: [ "main" ]
+    paths:
+      - "scripts/gen-cli-docs.sh"
+      - "wgx"
+      - "docs/cli.md"
+      - "crates/hauski-cli/**"
+      - "crates/hauski-cli/Cargo.toml"
+      - ".github/workflows/cli-docs-check.yml"
+
+permissions:
+  contents: read
+  # keine artifacts, kein cache -> keine actions:write nötig
+
+jobs:
+  check:
+    name: Regenerate & verify docs/cli.md
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Make generator executable (defensiv)
+        run: |
+          set -euo pipefail
+          chmod +x scripts/gen-cli-docs.sh || true
+          chmod +x wgx || true
+
+      - name: Guard — skip if generator or target missing
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          GEN="scripts/gen-cli-docs.sh"
+          OUT="docs/cli.md"
+          missing=0
+          if [ ! -f "$GEN" ]; then
+            echo "::notice title=CLI docs::$GEN fehlt – Workflow wird übersprungen."
+            missing=1
+          fi
+          if [ ! -f "$OUT" ]; then
+            echo "::notice title=CLI docs::$OUT fehlt – Workflow wird übersprungen."
+            missing=1
+          fi
+          echo "missing=$missing" >> "$GITHUB_OUTPUT"
+
+      - name: Regenerate CLI docs
+        if: steps.guard.outputs.missing == '0'
+        shell: bash
+        run: |
+          scripts/gen-cli-docs.sh
+
+      - name: Verify no diff
+        if: steps.guard.outputs.missing == '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- docs/cli.md; then
+            echo "✅ docs/cli.md ist aktuell."
+          else
+            echo "::error::CLI-Referenz ist nicht aktuell. Bitte lokal 'scripts/gen-cli-docs.sh' ausführen und Änderungen committen."
+            echo ""
+            echo "──── git diff docs/cli.md ────"
+            git --no-pager diff -- docs/cli.md || true
+            exit 1
+          fi
+

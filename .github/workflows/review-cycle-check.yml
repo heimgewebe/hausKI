@@ -1,0 +1,56 @@
+name: review-cycle-check (optional)
+permissions:
+  contents: read
+on:
+  workflow_dispatch:
+    inputs:
+      repo_name:
+        description: 'Lokaler Review-Ordner (~/.hauski/review/<repo>)'
+        required: false
+        default: 'hauski'
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Context
+        run: |
+          echo "Runner HOME: $HOME"
+          echo "Repo: ${{ github.repository }}"
+      # Hinweis: Auf GitHub-Runnern existiert das lokale ~/.hauski i.d.R. nicht.
+      # Dieses Skeleton dient als Startpunkt, falls ihr Runner mit persistenter
+      # HOME-Partition verwendet (Self-hosted).
+      - name: Probe local review index (best effort)
+        run: |
+          set -euo pipefail
+          REPO="${{ github.event.inputs.repo_name }}"
+          BASE="$HOME/.hauski/review"
+          if [ -d "$BASE/$REPO" ]; then
+            echo "::notice title=hauski review::Found $BASE/$REPO"
+            if [ -f "$BASE/index.json" ]; then
+              if command -v jq >/dev/null 2>&1; then
+                jq -r '."last_updated" // "index has no last_updated"' "$BASE/index.json" || true
+              else
+                echo "::notice title=hauski review::jq nicht gefunden – nutze Python-Fallback"
+                python3 - "$BASE/index.json" <<'PY' || true
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    print(data.get("last_updated", "index has no last_updated"))
+except Exception as exc:
+    print(f"warn: could not parse index.json ({exc})")
+PY
+              fi
+            else
+              echo "::warning title=hauski review::No global index.json at $BASE/index.json"
+            fi
+          else
+            echo "::notice title=hauski review::No local review dir on this runner (expected on GitHub-hosted)."
+          fi
+      - name: Done
+        run: echo "Review cycle check completed."

@@ -31,6 +31,7 @@ nav:
       - semantAH Bootstrap: runbooks/semantah_local.md
       - Troubleshooting: runbooks/troubleshooting.md
   - semantAH: semantah.md
+  - Audit: audit-hauski.md
 markdown_extensions:
   - admonition
   - toc:
