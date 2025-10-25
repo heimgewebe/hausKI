@@ -36,6 +36,7 @@ nav:
       - semantAH Bootstrap: runbooks/semantah_local.md
       - Troubleshooting: runbooks/troubleshooting.md
       - Incident-Response: runbooks/incident-response.md
+      - Upgradepfade: runbooks/upgrade.md
       - Upgrade-Guide: runbooks/upgrade-guide.md
   - semantAH: semantah.md
   - Audit: audit-hauski.md
