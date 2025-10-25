@@ -2,6 +2,9 @@
 
 **Ziel:** Sicheres Aktualisieren von hausKI, seinen Modulen und Modellen unter Beibehaltung der Offline-Fähigkeit.
 
+> Dieses How-to ergänzt das Runbook [Upgradepfade](upgrade.md), das den operativen Prozess (Pre-/Postflight, Eskalation) beschreibt.
+> Hier findest du die Schritt-für-Schritt-Anleitung mit konkreten Kommandos für lokale bzw. manuelle Upgrades.
+
 ---
 
 ## 1. Vorbereitung

@@ -1,66 +1,95 @@
 # Runbook: Incident-Response
 
-**Ziel:** Dieses Runbook beschreibt die Schritte zur Diagnose und Behandlung kritischer Störungen im hausKI-Stack.
+Status: _draft_ • Owner: Platform/SRE • Geltungsbereich: hausKI Core + Subdienste (indexd, policy, observability)
 
----
+## 1. Ziele
+- Schnelle Wiederherstellung des Dienstes bei Störungen
+- Klare Eskalationswege, Rollback-Optionen und Nachbereitung (Postmortem)
 
-## 1. Auslöser erkennen
+## 2. Definitionen & Schweregrade
+| Severity | Wirkung | Beispiel |
+|---|---|---|
+| **SEV1** | Vollständiger Ausfall / massive SLA-Verletzung | `/ready` 503 > 5 min; p95-Latenz (ms) > Budget×3 |
+| **SEV2** | Teil-Ausfall / deutliche Degradation | erhöhte Fehlerrate, p95-Latenz (ms) > Budget×2 |
+| **SEV3** | Leichte Degradation | p95-Latenz (ms) > Budget×1.2, vereinzelte 5xx |
 
-Typische Signale:
+**Budget-Referenz:** `policies/limits.yaml` (z. B. LLM p95-Latenz (ms), Index p95-Latenz (ms), Thermal-Limits)
 
-- Prometheus-Alarm zu Latenz-Budgetverletzung (`latency_llm_p95_ms > 400`)
-- Health-Check `/health` liefert `503`
-- Crash-Loop oder nicht erreichbarer Port 8080
-- HausKI-Review-Daemon meldet „stalled“ Runs
+## 3. Erstmaßnahmen (Triage)
+1. **Alarm bestätigen** (Pager/Chat) – *wer übernimmt Incident Commander (IC)?*
+2. **Gesundheit prüfen**
+   - `GET /ready` und `GET /health`
+   - Falls `/ready` (noch) fehlt: `/health` als Primärsignal verwenden
+   - `GET /metrics` (Prometheus-Text): Fehlerraten, p95-Latenz (ms), Thermik
+3. **Kontext sammeln**
+   - Letzte Deployments/Config-Änderungen (PR/Changelog)
+   - Logs (tracing) mit `RUST_LOG=info` bzw. `debug` temporär
+4. **Severity festlegen** (SEV1/2/3) und **Kommunikationskanal** eröffnen (Incident-Thread)
 
----
+## 4. Eskalation
+- **SEV1:** IC + Platform/SRE + Modul-Owner sofort; Kommunikations-Cadence 10 min
+- **SEV2:** IC + betroffener Modul-Owner; Cadence 20–30 min
+- **SEV3:** reguläre Bearbeitung, Status stündlich
 
-## 2. Sofortmaßnahmen
+Owner-Beispiele:
+- **indexd:** Search/Index Team
+- **policy:** Governance Team
+- **observability:** Platform Team
 
-| Bereich | Prüfung | Kommando / Tool |
-|----------|----------|-----------------|
-| **Service-Status** | Läuft der Core-Prozess? | `ps aux | grep hauski-cli` |
-| **Healthcheck** | API verfügbar? | `curl -sf localhost:8080/health` |
-| **Metriken** | Exporte verfügbar? | `curl -sf localhost:8080/metrics | head` |
-| **Logs** | Fehlerquelle | `journalctl -u hauski.service -n 200` |
+## 5. Diagnose-Checkliste
+- **Ressourcen/Thermik**
+  - `gpu_temperature_c`, `dgpu_power_watt` im `/metrics`
+  - Node-Auslastung (CPU/RAM/IO) via Plattform-Tools
+- **Fehlerraten & Latenzen**
+  - HTTP-Fehlerhistogramme (z. B. `http_request_duration_seconds_bucket`)
+  - Index-spezifische Histogramme (Search/Upsert)
+- **Konfiguration**
+  - Letzte Änderungen in `policies/limits.yaml`, `routing.yaml`, `models.yaml`
+  - ENV Overrides (z. B. `HAUSKI_SAFE_MODE`)
+- **Abhängigkeiten**
+  - Downstream/Upstream Reachability (Routing-Policy, DNS, Timeout)
 
-> 🔧 **Hinweis:** In dev-Umgebungen kann mit `RUST_LOG=hauski=trace` temporär mehr Detailtiefe aktiviert werden.
+## 6. Sofortmaßnahmen (Workarounds)
+- **Traffic drosseln/abschalten**: temporäre Rate Limits oder Deny in `routing.yaml`
+- **Safe Mode** aktivieren: `HAUSKI_SAFE_MODE=true` (nur wenn definiert & sinnvoll)
+- **Limits anheben**: Latenzbudget temporär erhöhen (nur wenn notwendig, dokumentieren!)
+- **Feature-Flags** deaktivieren, die akute Last/Fehler pushen
 
----
+## 7. Rollback / Rollforward
+1. **Rollback**
+   - Letztes bekannt gutes Release/Commit ausrollen
+   - Bestätigen: `/ready`, `/health`, p95-Latenz (ms) innerhalb Budget
+2. **Rollforward**
+   - Fix-Branch bauen/deployen
+   - Canary/Smoke: `/health`, `/metrics` prüfen
 
-## 3. Typische Ursachen
+**Wichtig:** Jede Änderung im Incident-Channel notieren (Wer/Was/Wann/Warum)
 
-- **Speicherlimit erreicht:** `index.db` oder `/tmp` voll → `du -sh ~/.hauski` prüfen.  
-- **GPU-Thermik:** `nvidia-smi` zeigt > 80 °C → Policy-Guard greift.  
-- **Policy-Violation:** Eintrag in `~/.hauski/review/index.json` → BudgetCheck-Failure.  
-- **Netzwerkblockade:** `egress`-Policy verhindert externen Aufruf.  
+## 8. Abschluss & Kommunikation
+- **Incident schließen**, wenn Metriken stabil (mind. 30 min im grünen Bereich)
+- **Postmortem** (spätestens 48 h):
+  - Timeline, Root Cause, Impact, Maßnahmen (kurz/mittel/lang)
+  - Ticket-Links, PRs, Follow-ups
 
----
+## 9. Artefakte / Hilfsmittel
+- `/metrics` Prometheus-Format
+- Logs/Tracing (rotierend via `tracing-appender`)
+- Policies unter `policies/*`
+- Runbooks: [Troubleshooting](../runbooks/troubleshooting.md), [Upgradepfade](./upgrade.md)
 
-## 4. Wiederherstellung
+## 10. Beispiel-Kommandos
+```bash
+# Health & Ready
+curl -sf http://127.0.0.1:8080/health
+curl -sf http://127.0.0.1:8080/ready
 
-1. Dienst stoppen: `systemctl --user stop hauski`
-2. Logs sichern: `journalctl -u hauski.service > hauski-crash.log`
-3. Index ggf. komprimieren: `sqlite3 ~/.hauski/index.db VACUUM;`
-4. Dienst starten: `systemctl --user start hauski`
+# Metriken kurz prüfen
+curl -s http://127.0.0.1:8080/metrics | head -n 50
+```
 
----
-
-## 5. Nachbereitung
-
-- Review-Report erzeugen (`hauski review`)  
-- Incident im `leitstand` protokollieren  
-- ggf. ADR-Ergänzung oder Limit-Anpassung dokumentieren  
-
----
-
-**Letzte Aktualisierung:** 2025-10-23
-
----
-
-## Verknüpfte Dokumente
-
-- [Modul: Observability](../modules/observability.md) — beschreibt Metriken, Budgets und Health-Endpunkte  
-- [Audit-Bericht](../audit-hauski.md) — Überblick über CI-/Governance-Audits und Folgeempfehlungen  
-
-Diese Seite ist Teil des operativen Doku-Kreislaufs von **hausKI** (Runbooks ↔ Module ↔ Audit).
+## 11. Checkliste
+- [ ] Incident Commander bestimmt und Kommunikationskanal geöffnet
+- [ ] Severity festgelegt und Eskalation informiert
+- [ ] `/health` (ggf. `/ready`) und zentrale Metriken geprüft
+- [ ] Workaround/Rollback dokumentiert und wirksam
+- [ ] Postmortem-Termin angesetzt, Follow-ups erfasst
