@@ -23,8 +23,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout repository
-        # Use stable v4 tag to ensure checkout availability
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Check .wgx/profile.yml presence
         run: |
@@ -39,7 +38,7 @@ jobs:
       - name: Install PyYAML
         run: |
           pip install --disable-pip-version-check --upgrade pip
-          pip install --disable-pip-version-check pyyaml==6.0.2
+          pip install pyyaml==6.0.2
 
       - name: Run schema-lite check
         run: |

@@ -13,16 +13,18 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  id-token: write
+  # cache writes + reads
+  actions: write
   contents: read
+  id-token: write
 
 jobs:
   tools:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        # Use stable v4 tag to ensure checkout availability
-        uses: actions/checkout@v4
+        # Fixed release tag to keep builds auditable
+        uses: actions/checkout@v4.2.2
 
       - name: Install uv
         run: |
@@ -47,7 +49,10 @@ jobs:
         run: uv sync --group dev --frozen
 
       - name: Install MkDocs plugins
-        run: uv pip install mkdocs-minify-plugin==0.7.2 mkdocs-git-revision-date-localized-plugin==1.2.4
+        run: |
+          uv pip install \
+            mkdocs-minify-plugin==0.7.2 \
+            mkdocs-git-revision-date-localized-plugin==1.2.4
 
       - name: Ruff check
         run: uv run ruff check .

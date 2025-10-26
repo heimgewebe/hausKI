@@ -7,7 +7,8 @@ on:
     branches: [ main ]
 
 permissions:
-  id-token: write
+  # upload-artifact requires actions:write
+  actions: write
   contents: read
 
 concurrency:
@@ -42,11 +43,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        # Use stable v4 tag to ensure checkout availability
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
-      - name: Install jq
+      - name: Ensure jq present (avoid flakes)
         run: sudo apt-get update && sudo apt-get install -y jq
       - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
         with:

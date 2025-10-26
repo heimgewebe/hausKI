@@ -59,40 +59,43 @@ fi
 echo "⏹ Versuche Prozesse ohne tmux zu beenden …"
 # Versuche: Upstream auf PORT
 if command -v lsof >/dev/null 2>&1; then
-  PIDS=$(lsof -tiTCP:"${PORT}" -sTCP:LISTEN || true)
-  if [[ -n "${PIDS:-}" ]]; then
-    echo "• beende Upstream PIDs auf Port ${PORT}: ${PIDS}"
-    kill -TERM ${PIDS} 2>/dev/null || true
+  mapfile -t pids_upstream < <(lsof -tiTCP:"${PORT}" -sTCP:LISTEN 2>/dev/null || true)
+  if ((${#pids_upstream[@]})); then
+    echo "• Beende Upstream-PIDs auf Port ${PORT}: ${pids_upstream[*]}"
+    kill -TERM "${pids_upstream[@]}" 2>/dev/null || true
     sleep 1
-    if kill -0 ${PIDS} 2>/dev/null; then
-      echo "• Erzwinge Upstream-Kill (${PIDS})"
-      kill -KILL ${PIDS} 2>/dev/null || true
+    if kill -0 "${pids_upstream[@]}" 2>/dev/null; then
+      echo "• Erzwinge Upstream-Kill (${pids_upstream[*]})"
+      kill -KILL "${pids_upstream[@]}" 2>/dev/null || true
     fi
   fi
 else
   echo "Hinweis: 'lsof' nicht gefunden – versuche pgrep-Fallback." >&2
-  PIDS=$(pgrep -f "llama-server.*--port[= ]${PORT}" || pgrep -f "llama-server" || true)
-  if [[ -n "${PIDS:-}" ]]; then
-    echo "• beende gefundene 'llama-server'-Prozesse: ${PIDS}"
-    kill -TERM ${PIDS} 2>/dev/null || true
+  mapfile -t pids_upstream < <(pgrep -f "llama-server.*--port[= ]${PORT}" 2>/dev/null || true)
+  if ! ((${#pids_upstream[@]})); then
+    mapfile -t pids_upstream < <(pgrep -f "llama-server" 2>/dev/null || true)
+  fi
+  if ((${#pids_upstream[@]})); then
+    echo "• Beende gefundene 'llama-server'-Prozesse: ${pids_upstream[*]}"
+    kill -TERM "${pids_upstream[@]}" 2>/dev/null || true
     sleep 1
-    if kill -0 ${PIDS} 2>/dev/null; then
-      echo "• Erzwinge Upstream-Kill (${PIDS})"
-      kill -KILL ${PIDS} 2>/dev/null || true
+    if kill -0 "${pids_upstream[@]}" 2>/dev/null; then
+      echo "• Erzwinge Upstream-Kill (${pids_upstream[*]})"
+      kill -KILL "${pids_upstream[@]}" 2>/dev/null || true
     fi
   fi
 fi
 
 # Optional: hauski-core Prozesse (heuristisch)
-pids_core=$(pgrep -f "hauski-cli.*serve" || true)
-if [[ -n "${pids_core}" ]]; then
-  echo "• beende hauski-core PIDs: ${pids_core}"
-  kill -TERM ${pids_core} 2>/dev/null || true
+mapfile -t pids_core < <(pgrep -f "hauski-cli.*serve" 2>/dev/null || true)
+if ((${#pids_core[@]})); then
+  echo "• Beende hauski-core PIDs: ${pids_core[*]}"
+  kill -TERM "${pids_core[@]}" 2>/dev/null || true
   sleep 1
-  if kill -0 ${pids_core} 2>/dev/null; then
-    echo "• Erzwinge hauski-core-Kill (${pids_core})"
-    kill -KILL ${pids_core} 2>/dev/null || true
+  if kill -0 "${pids_core[@]}" 2>/dev/null; then
+    echo "• Erzwinge hauski-core-Kill (${pids_core[*]})"
+    kill -KILL "${pids_core[@]}" 2>/dev/null || true
   fi
 fi
 
-echo "✓ Stop versucht. Prüfe ggf. mit: ps aux | egrep '(llama-server|hauski-cli)'"
+echo "✓ Stop-Vorgang abgeschlossen. Prüfe ggf. mit: ps aux | egrep '(llama-server|hauski-cli)'"

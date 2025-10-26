@@ -217,9 +217,15 @@ fi
 wait_for_upstream() {
   local attempt
   for attempt in {1..30}; do
+    echo "🔁 Versuch ${attempt}/30 …"
     if bash -lc "exec 3<>/dev/tcp/127.0.0.1/${PORT}" 2>/dev/null; then
       echo "✓ Upstream erreichbar auf 127.0.0.1:${PORT}"
       return 0
+    elif command -v curl >/dev/null 2>&1; then
+      if curl --silent --connect-timeout 1 "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
+        echo "✓ Upstream erreichbar (per curl) auf 127.0.0.1:${PORT}"
+        return 0
+      fi
     fi
     sleep 0.3
   done

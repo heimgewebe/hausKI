@@ -20,8 +20,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        # Use stable v4 tag to ensure checkout availability
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
       - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.

@@ -16,8 +16,7 @@ jobs:
     if: ${{ github.event.pull_request.draft == false }}
     steps:
       - name: Checkout repository
-        # Use stable v4 tag to ensure checkout availability
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - name: Quick checks
