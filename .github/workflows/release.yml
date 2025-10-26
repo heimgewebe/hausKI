@@ -13,8 +13,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
-        # Use stable v4 tag to ensure checkout availability
-        uses: actions/checkout@v4
+        # Pin to fixed v4.1.6 release to keep builds deterministic
+        uses: actions/checkout@v4.1.6
       - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
