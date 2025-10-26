@@ -23,8 +23,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
 
       - name: Check .wgx/profile.yml presence
         run: |
@@ -37,7 +37,9 @@ jobs:
           python-version: '3.12'
 
       - name: Install PyYAML
-        run: pip install --disable-pip-version-check --upgrade pip pyyaml
+        run: |
+          pip install --disable-pip-version-check --upgrade pip
+          pip install --disable-pip-version-check pyyaml==6.0.2
 
       - name: Run schema-lite check
         run: |

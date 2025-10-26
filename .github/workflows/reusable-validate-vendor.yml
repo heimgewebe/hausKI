@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.sha }}
       - name: Check vendor snapshot

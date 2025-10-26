@@ -37,12 +37,17 @@ jobs:
     if: needs.gate.outputs.run_heavy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
       - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
