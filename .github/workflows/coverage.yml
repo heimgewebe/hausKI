@@ -26,8 +26,10 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: stable
@@ -37,7 +39,7 @@ jobs:
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: Cache cargo + target
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
         with:
           cache-on-failure: true
           shared-key: ${{ runner.os }}-cov-${{ hashFiles('**/Cargo.lock') }}
@@ -53,7 +55,7 @@ jobs:
           cargo llvm-cov $PKGS --lcov --output-path lcov.info
       - name: Upload lcov
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@0b8b5fa3f19d6324db82a651c01fb9b31c764cb5
         with:
           name: lcov.info
           path: lcov.info

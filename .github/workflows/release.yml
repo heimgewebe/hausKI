@@ -12,8 +12,10 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: stable
@@ -48,9 +50,37 @@ jobs:
               (cd dist && shasum -a 256 * > "SHA256SUMS-${tag}-${suffix}.txt")
             fi
           fi
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
-          generate_release_notes: true
+      - name: Publish release artifacts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ ! -d dist ]; then
+            echo "No dist directory found; skipping release upload." >&2
+            exit 0
+          fi
+
+          shopt -s nullglob
+          assets=(dist/*)
+          shopt -u nullglob
+
+          if [ ${#assets[@]} -eq 0 ]; then
+            echo "No artifacts to upload." >&2
+            exit 0
+          fi
+
+          tag="${GITHUB_REF_NAME:-}"
+          if [ -z "$tag" ]; then
+            tag="${GITHUB_REF##*/}"
+          fi
+          if [ -z "$tag" ]; then
+            echo "Unable to determine release tag" >&2
+            exit 1
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${assets[@]}" --clobber
+          else
+            gh release create "$tag" "${assets[@]}" --generate-notes
+          fi

@@ -12,12 +12,16 @@ __pycache__/
 
 # Logs and misc
 .env
+configs/.env
 .direnv/
 **/*.log
 *.log
 .DS_Store
 .coverage
 coverage.xml
+
+# Modelle (lokal gehalten)
+models/
 
 # Project specific
 .wgx/profile.local.yml

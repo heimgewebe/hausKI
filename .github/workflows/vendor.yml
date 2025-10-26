@@ -16,8 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: stable
@@ -28,7 +30,7 @@ jobs:
       - name: Pack vendor snapshot
         run: tar --zstd -cvf hauski-vendor-snapshot.tar.zst vendor
       - name: Upload vendor artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@0b8b5fa3f19d6324db82a651c01fb9b31c764cb5
         with:
           name: hauski-vendor-snapshot
           path: hauski-vendor-snapshot.tar.zst

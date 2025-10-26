@@ -22,7 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
 
       - name: Check .wgx/profile.yml presence
         run: |
@@ -30,7 +32,7 @@ jobs:
           echo "found .wgx/profile.yml"
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@64d81c650b05e6446f8aeaf6bb2e2eca1e2ef3dc
         with:
           python-version: '3.12'
 
