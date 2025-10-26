@@ -33,6 +33,7 @@ nav:
   - Runbooks:
       - Übersicht: runbooks/index.md
       - Lokale Entwicklung: runbooks/local-dev.md
+      - Lokaler Chat: runbooks/local-chat.md
       - semantAH Bootstrap: runbooks/semantah_local.md
       - Troubleshooting: runbooks/troubleshooting.md
       - Incident-Response: runbooks/incident-response.md

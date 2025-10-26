@@ -20,7 +20,9 @@ jobs:
   tools:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
 
       - name: Install uv
         run: |
@@ -33,7 +35,7 @@ jobs:
           uv --version
 
       - name: Cache uv
-        uses: actions/cache@v4
+        uses: actions/cache@69b5f8c5e3a745449f6d753c868763ac08d5e4ab
         with:
           path: |
             ~/.cache/uv

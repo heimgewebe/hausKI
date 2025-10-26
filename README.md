@@ -11,6 +11,33 @@ HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-
 - **GPU-Unterstützung**: Optimiert für NVIDIA-GPUs zur Beschleunigung von KI-Inferenz-Aufgaben.
 - **Vektorsuche**: Integrierte Vektorsuche mit `tantivy` und `SQLite` zur effizienten Verarbeitung von Wissen.
 - **Policy-Engine**: Ein regelbasiertes System zur Steuerung von Routing, Speicher und Systemgrenzen.
+
+### Lokaler Chat (llama.cpp Upstream)
+
+**Voraussetzungen:**
+- `tmux` (für parallele Upstream-/Core-Sitzung)
+- `lsof` (für das Stop-Skript)
+- Optional: `just` (verkürzt Startaufrufe)
+
+Für einen lokalen, OpenAI-kompatiblen Chat-Pfad nutze das Runbook unter  
+`docs/runbooks/local-chat.md` **oder** starte alles per:
+
+```bash
+scripts/start-all.sh --model "$HOME/models/your-model.gguf" --port 8081
+```
+
+**Extras**:
+- `--tmux` startet eine Session `hauski` (Fenster: `upstream`, `core`) – ideal zum Debuggen.
+- `.env`/`configs/.env` erlauben Start ohne Flags (siehe `.env.example`).
+- `--upstream-url` oder `UPSTREAM_URL=…` verbindet gegen einen bestehenden Dienst; externe URLs deaktivieren den lokalen Start automatisch (optional mit `--no-upstream` erzwingbar).
+- Schreibt eine Flags-Datei (unter `~/.config/hauski/hauski-flags.yaml`) und setzt `HAUSKI_FLAGS` automatisch auf `chat_upstream_url` (bestehende `HAUSKI_FLAGS`-Werte werden weiterverwendet).
+- Logs inkl. einfacher Rotation unter `~/.local/state/hauski/logs/`.
+- Stoppen mit:
+
+```bash
+scripts/stop-all.sh        # nutzt tmux, sonst Ports/PIDs
+```
+
 ---
 
 ## Inhalt

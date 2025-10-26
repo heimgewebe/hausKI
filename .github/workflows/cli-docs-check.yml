@@ -31,7 +31,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
 
       - name: Make generator executable (defensiv)
         run: |

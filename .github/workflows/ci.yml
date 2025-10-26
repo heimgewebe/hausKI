@@ -51,23 +51,54 @@ jobs:
       docs:  ${{ steps.filter.outputs.docs }}
       sh:    ${{ steps.filter.outputs.sh }}
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
-      - uses: dorny/paths-filter@v3
+      - name: Detect changed paths
         id: filter
-        with:
-          filters: |
-            rust:
-              - '**/*.rs'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            docs:
-              - '**/*.md'
-              - 'docs/**'
-            sh:
-              - '**/*.sh'
-              - '.github/workflows/**'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+
+          base_branch="${BASE_REF:-main}"
+          git fetch --no-tags --depth=1 origin "$base_branch"
+          base_ref="origin/${base_branch}"
+          echo "Using base ref: ${base_ref}" >&2
+
+          rust=false
+          docs=false
+          sh=false
+
+          git diff --name-only "${base_ref}"...HEAD | while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              *.rs|Cargo.toml|Cargo.lock)
+                rust=true
+                ;;
+            esac
+            case "$file" in
+              *.md|docs/*)
+                docs=true
+                ;;
+            esac
+            case "$file" in
+              *.sh|*.bash|.github/workflows/*)
+                sh=true
+                ;;
+            esac
+            if $rust && $docs && $sh; then
+              break
+            fi
+          done
+
+          {
+            printf 'rust=%s\n' "$rust"
+            printf 'docs=%s\n' "$docs"
+            printf 'sh=%s\n'   "$sh"
+          } >> "$GITHUB_OUTPUT"
 
   repo-lint:
     name: Repo — Markdown & Shell
@@ -87,26 +118,53 @@ jobs:
       RUSTFLAGS: -Dwarnings
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - name: Show resolved toolchain
         run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           # Fall back to "stable" if the workflow-level environment variable is empty.
           toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: rustfmt (check)
         run: cargo fmt --all --check
       - name: clippy (deny warnings)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  shellcheck:
+    name: Shell — lint scripts
+    needs: changes
+    if: >
+      (github.event_name == 'merge_group') ||
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.draft == false &&
+       (
+         needs.changes.outputs.sh == 'true' ||
+         contains(join(github.event.pull_request.labels.*.name), 'full-ci')
+       ))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        with:
+          ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: shellcheck
+        run: git ls-files '*.sh' '*.bash' | xargs -r shellcheck -x
 
   links:
     name: docs link check (lychee)
@@ -120,10 +178,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
-      - uses: lycheeverse/lychee-action@v2
+      - uses: lycheeverse/lychee-action@cc141a2dd1b94f572cca40a6e7d1c2255b21f621
         with:
           args: >-
             --no-progress
@@ -137,7 +197,7 @@ jobs:
             "**/*.md"
       - name: Upload lychee report (on failure)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@0b8b5fa3f19d6324db82a651c01fb9b31c764cb5
         with:
           name: lychee-report
           path: ./.lycheecache
@@ -157,19 +217,19 @@ jobs:
        ))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Emit TODO notice
-        run: |
-          sudo apt-get update && sudo apt-get install -y shellcheck
-          git ls-files '*.sh' | xargs -r shellcheck -x
+        run: echo "index budget gate placeholder"
       - name: Lychee (links)
         if: >-
           github.event_name == 'merge_group' ||
           github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
-        uses: lycheeverse/lychee-action@v2
+        uses: lycheeverse/lychee-action@cc141a2dd1b94f572cca40a6e7d1c2255b21f621
         with:
           args: --no-progress --verbose --retry-wait-time 2 --max-redirects 5 -- "**/*.md"
 
@@ -182,27 +242,29 @@ jobs:
     env:
       RUSTFLAGS: -Dwarnings
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - name: Show resolved toolchain
         run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           # Fall back to "stable" if the workflow-level environment variable is empty.
           toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: Cargo fmt
         run: cargo fmt --all -- --check
       - name: Cargo clippy
         run: cargo clippy --all-targets -- -D warnings
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@7a11182e3a1a996a96f2ef749398a422c9b6f4ff
         with:
           tool: nextest
       - name: Tests
@@ -214,7 +276,7 @@ jobs:
           fi
       - name: Upload target (on failure)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@0b8b5fa3f19d6324db82a651c01fb9b31c764cb5
         with:
           name: rust-check-target
           path: target
@@ -228,16 +290,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Show resolved toolchain
         run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
         with:
           # Fall back to "stable" if the workflow-level environment variable is empty.
           toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
       - name: Build hauski-cli
         run: cargo build -p hauski-cli
       - name: Health smoke
@@ -261,19 +325,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout repository
+        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Show resolved toolchain
         run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           # Fall back to "stable" if the workflow-level environment variable is empty.
           toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@7a11182e3a1a996a96f2ef749398a422c9b6f4ff
         with:
           tool: cargo-deny
       - name: cargo deny (advisories/bans/licenses)
@@ -281,4 +347,4 @@ jobs:
           cargo deny check advisories
           cargo deny check bans
           cargo deny check licenses
-      - uses: rustsec/audit-check@v2
+      - uses: rustsec/audit-check@618c2437de90585c33833719fdcddc50271940ad
