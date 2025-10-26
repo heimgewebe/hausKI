@@ -21,8 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        # Use stable v4 tag to ensure checkout availability
-        uses: actions/checkout@v4
+        # Pin to fixed v4.1.6 release to keep builds deterministic
+        uses: actions/checkout@v4.1.6
 
       - name: Install uv
         run: |

@@ -31,8 +31,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout
-        # Use stable v4 tag to ensure checkout availability
-        uses: actions/checkout@v4
+        # Pin to fixed v4.1.6 release to keep builds deterministic
+        uses: actions/checkout@v4.1.6
 
       - name: Make generator executable (defensiv)
         run: |

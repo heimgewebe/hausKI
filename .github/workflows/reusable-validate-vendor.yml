@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        # Use stable v4 tag to ensure checkout availability
-        uses: actions/checkout@v4
+        # Pin to fixed v4.1.6 release to keep builds deterministic
+        uses: actions/checkout@v4.1.6
         with:
           ref: ${{ inputs.ref || github.sha }}
       - name: Check vendor snapshot
