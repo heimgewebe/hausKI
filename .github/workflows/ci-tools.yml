@@ -21,8 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
 
       - name: Install uv
         run: |
@@ -47,7 +47,7 @@ jobs:
         run: uv sync --group dev --frozen
 
       - name: Install MkDocs plugins
-        run: uv pip install mkdocs-minify-plugin mkdocs-git-revision-date-localized-plugin
+        run: uv pip install mkdocs-minify-plugin==0.7.2 mkdocs-git-revision-date-localized-plugin==1.2.4
 
       - name: Ruff check
         run: uv run ruff check .

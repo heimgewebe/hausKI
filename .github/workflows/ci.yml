@@ -52,8 +52,8 @@ jobs:
       sh:    ${{ steps.filter.outputs.sh }}
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Detect changed paths
@@ -114,13 +114,18 @@ jobs:
          contains(join(github.event.pull_request.labels.*.name), 'full-ci')
        ))
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      id-token: write
+      pull-requests: read
     env:
       RUSTFLAGS: -Dwarnings
     timeout-minutes: 12
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
@@ -157,8 +162,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Install shellcheck
@@ -176,11 +181,16 @@ jobs:
        github.event.pull_request.draft == false &&
        (needs.changes.outputs.docs == 'true' || contains(join(github.event.pull_request.labels.*.name), 'full-ci')))
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      id-token: write
+      pull-requests: read
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - uses: lycheeverse/lychee-action@cc141a2dd1b94f572cca40a6e7d1c2255b21f621
@@ -218,8 +228,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Emit TODO notice
@@ -238,13 +248,18 @@ jobs:
     needs: changes
     if: needs.changes.outputs.rust == 'true' || github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      id-token: write
+      pull-requests: read
     timeout-minutes: 20
     env:
       RUSTFLAGS: -Dwarnings
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
@@ -288,11 +303,16 @@ jobs:
     needs: changes
     if: needs.changes.outputs.rust == 'true' || github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      id-token: write
+      pull-requests: read
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Show resolved toolchain
@@ -326,8 +346,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Show resolved toolchain

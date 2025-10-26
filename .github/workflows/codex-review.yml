@@ -16,8 +16,8 @@ jobs:
     if: ${{ github.event.pull_request.draft == false }}
     steps:
       - name: Checkout repository
-        # Commit pin (matches v4 release) to prevent tag drift and ensure reproducibility
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a96968112b
+        # Use stable v4 tag to ensure checkout availability
+        uses: actions/checkout@v4
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - name: Quick checks
@@ -29,7 +29,11 @@ jobs:
             npm test -s || true
           fi
           if [ -f pyproject.toml ]; then
-            uv run pytest -q || true
+            if command -v uv >/dev/null 2>&1; then
+              uv run pytest -q || true
+            else
+              echo "uv not available – skipping Python tests"
+            fi
           fi
       - name: Collect PR diff
         id: diff
