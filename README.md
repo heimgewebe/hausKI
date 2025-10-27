@@ -84,8 +84,11 @@ cargo test --workspace -- --nocapture
 1. Optional die Python-Extras synchronisieren (uv verwaltet automatisch eine lokale Umgebung):
 
    ```bash
-   uv sync --extra dev
+   uv sync --extra dev --frozen
    ```
+
+   > 💡 Tipp: `--frozen` stellt sicher, dass exakt die im `uv.lock` festgeschriebenen Versionen
+   > installiert werden – identisch zu unseren CI-Läufen.
 
 2. Den FastAPI-Dienst lokal starten:
 
@@ -365,7 +368,7 @@ Beispielabfragen für Dashboards oder die Prometheus-Konsole:
 - **Python-Tooling (optional):**
   - Setup:
     ```bash
-    uv sync --group dev --frozen
+    uv sync --extra dev --frozen
     uv run pre-commit install
     ```
   - Init: `just py-init`

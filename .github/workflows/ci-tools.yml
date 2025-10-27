@@ -9,51 +9,60 @@ on:
       - 'uv.lock'
       - '**/*.py'
       - 'docs/**'
+      - 'mkdocs.yml'
       - '.github/workflows/ci-tools.yml'
   workflow_dispatch: {}
 
 permissions:
-  id-token: write
+  actions: write
   contents: read
 
 jobs:
   tools:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout repository
         # Pin to fixed v4.1.6 release to keep builds deterministic
         uses: actions/checkout@v4.1.6
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         run: |
+          set -euo pipefail
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Ensure uv version
-        run: |
-          uv self update
-          uv --version
+        run: uv --version
 
       - name: Cache uv
-        uses: actions/cache@69b5f8c5e3a745449f6d753c868763ac08d5e4ab
+        uses: actions/cache@v4.0.2
         with:
           path: |
             ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock', 'mkdocs.yml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
 
       - name: Sync dev deps
-        run: uv sync --group dev --frozen
+        run: uv sync --extra dev --frozen
 
-      - name: Install MkDocs plugins
-        run: uv pip install mkdocs-minify-plugin==0.7.2 mkdocs-git-revision-date-localized-plugin==1.2.4
+      - name: Show Ruff version
+        run: uv run ruff --version
+
+      - name: Show MkDocs version
+        run: uv run mkdocs --version
 
       - name: Ruff check
         run: uv run ruff check .
 
       - name: Pytests
         run: |
+          set -euo pipefail
           if [ -f "pytest.ini" ] || [ -d "tests" ] || ls tests_*.py 1> /dev/null 2>&1; then
             uv run pytest -q
           else
@@ -62,6 +71,7 @@ jobs:
 
       - name: Build docs
         run: |
+          set -euo pipefail
           if [ -f "mkdocs.yml" ]; then
             uv run mkdocs build --strict --clean
           else
