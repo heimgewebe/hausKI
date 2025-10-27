@@ -19,7 +19,7 @@ Die Abhängigkeiten werden mit `uv` verwaltet. Das lokale Setup erfolgt via:
 
 ```bash
 cd services/minimal-server
-uv sync
+uv sync --frozen
 ```
 
 Weitere Details folgen in den nächsten Implementierungsphasen.

@@ -16,7 +16,7 @@ required-version = ">=0.7.0"
 ## Note:
 ## Dev tools are now only maintained here under the PEP 621-compliant extras.
 ## Installation:
-##   - uv:  `uv sync --extra dev`
+##   - uv:  `uv sync --extra dev --frozen`
 ##   - pip: `pip install .[dev]`
 dev = [
   "fastapi>=0.115",
