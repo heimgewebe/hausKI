@@ -11,6 +11,9 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::AppState;
 
+/// Maximum number of matches returned by the `/ask` endpoint.
+const MAX_K: usize = 100;
+
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct AskHit {
     pub doc_id: String,
@@ -33,10 +36,10 @@ pub struct AskResponse {
 pub struct AskParams {
     /// The query string for semantic search.
     pub q: String,
-    /// Number of matches to return (server caps the value at 100).
+    /// Number of matches to return (server clamps the value between 1 and [`MAX_K`]).
     #[serde(default = "default_k")]
-    #[param(default = 5)]
-    #[schema(default = 5)]
+    #[param(default = 5, minimum = 1, maximum = 100)]
+    #[schema(default = 5, minimum = 1, maximum = 100)]
     pub k: usize,
     /// Namespace to query within the index.
     #[serde(default = "default_ns")]
@@ -69,9 +72,11 @@ pub async fn ask_handler(
     let AskParams { q, k, ns } = params;
     let started = Instant::now();
 
+    let limit = k.clamp(1, MAX_K);
+
     let request = SearchRequest {
         query: q.clone(),
-        k: Some(k),
+        k: Some(limit),
         namespace: Some(ns.clone()),
     };
 
@@ -91,7 +96,7 @@ pub async fn ask_handler(
 
     Json(AskResponse {
         query: q,
-        k,
+        k: limit,
         namespace: ns,
         hits,
     })

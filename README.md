@@ -417,7 +417,7 @@ HausKI bringt mit [semantAH](docs/semantah.md) eine semantische Gedächtnisschic
 curl -s "http://localhost:8080/ask?q=dein+text&k=5&ns=default" | jq
 ```
 
-Der Endpoint liefert die Top-k-Treffer mit Score, Snippet und Metadaten aus dem lokalen Index. Der Server begrenzt `k` serverseitig auf maximal 100 Treffer.
+Der Endpoint liefert die Top-k-Treffer mit Score, Snippet und Metadaten aus dem lokalen Index. Der Server begrenzt `k` serverseitig auf den Bereich 1–100 Treffer und spiegelt das effektive Limit im Response-Feld `k` wider.
 
 ---
 
