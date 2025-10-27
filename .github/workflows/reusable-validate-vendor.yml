@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        # Pin to fixed v4.1.6 release to keep builds deterministic
-        uses: actions/checkout@v4.1.6
+        # Pin to fixed v4.2.2 release to keep builds deterministic
+        uses: actions/checkout@v4.2.2
         with:
           ref: ${{ inputs.ref || github.sha }}
       - name: Check vendor snapshot

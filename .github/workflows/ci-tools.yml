@@ -51,6 +51,7 @@ jobs:
             ~/.local/share/uv
           key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock', 'mkdocs.yml') }}
           restore-keys: |
+            ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}-
             ${{ runner.os }}-uv-
 
       - name: Sync dev deps

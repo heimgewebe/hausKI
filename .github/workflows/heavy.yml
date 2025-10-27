@@ -42,8 +42,8 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        # Pin to fixed v4.1.6 release to keep builds deterministic
-        uses: actions/checkout@v4.1.6
+        # Pin to fixed v4.2.2 release to keep builds deterministic
+        uses: actions/checkout@v4.2.2
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - name: Install jq
@@ -104,7 +104,7 @@ jobs:
           echo "::notice::index search budget p95 target: 60ms (observability to be enforced later)"
       - name: Upload logs/artifacts
         if: always()
-        uses: actions/upload-artifact@0b8b5fa3f19d6324db82a651c01fb9b31c764cb5
+        uses: actions/upload-artifact@v4
         with:
           name: hauski-heavy-artifacts
           path: |

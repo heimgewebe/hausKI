@@ -31,8 +31,8 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout
-        # Pin to fixed v4.1.6 release to keep builds deterministic
-        uses: actions/checkout@v4.1.6
+        # Pin to fixed v4.2.2 release to keep builds deterministic
+        uses: actions/checkout@v4.2.2
 
       - name: Make generator executable (defensiv)
         run: |
