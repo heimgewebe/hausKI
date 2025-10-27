@@ -36,6 +36,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
+          cache-dependency-path: pyproject.toml
 
       - name: Install PyYAML
         run: |
@@ -67,11 +68,18 @@ jobs:
       - name: (Optional) UV bootstrap (pyproject present)
         if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
+          set -euo pipefail
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          uv self update 0.1.44
-          uv --version
+          # Pin auf 0.7.x entsprechend .wgx/profile.yml
+          uv self update 0.7.*
+          ver="$(uv --version || true)"
+          echo "uv version: $ver"
+          case "$ver" in
+            "uv 0.7."*) : ;;  # ok
+            *) echo "::error::uv 0.7.x erwartet, gefunden: $ver"; exit 1 ;;
+          esac
           uv sync --frozen
 
       - name: Done

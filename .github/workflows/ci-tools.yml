@@ -37,7 +37,11 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Ensure uv version
-        run: uv --version
+        run: |
+          set -euo pipefail
+          version="$(uv --version)"
+          echo "$version"
+          grep -E '^uv 0\.7\.' <<<"$version"
 
       - name: Cache uv
         uses: actions/cache@v4
@@ -51,7 +55,7 @@ jobs:
             ${{ runner.os }}-uv-
 
       - name: Sync dev deps
-        run: uv sync --extra dev --frozen
+        run: uv sync --extra dev --locked --frozen
 
       - name: Show Ruff version
         run: uv run ruff --version
