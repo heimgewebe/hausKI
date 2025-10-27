@@ -53,7 +53,7 @@ vendor-archive:
 # Python tooling via uv
 
 py-init:
-    uv sync --group dev --frozen
+    uv sync --extra dev --locked --frozen
 
 py-lint:
     uv run ruff check .
