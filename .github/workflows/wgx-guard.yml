@@ -32,9 +32,11 @@ jobs:
           echo "found .wgx/profile.yml"
 
       - name: Setup Python
-        uses: actions/setup-python@64d81c650b05e6446f8aeaf6bb2e2eca1e2ef3dc
+        uses: actions/setup-python@v4
         with:
           python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
 
       - name: Install PyYAML
         run: |
