@@ -25,8 +25,8 @@ jobs:
         shell: bash
     steps:
       - name: Checkout repository
-        # Pin to fixed v4.1.6 release to keep builds deterministic
-        uses: actions/checkout@v4.1.6
+        # Pin to fixed v4.2.2 release to keep builds deterministic
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
 
@@ -37,19 +37,24 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Ensure uv version
-        run: uv --version
+        run: |
+          set -euo pipefail
+          version="$(uv --version)"
+          echo "$version"
+          grep -E '^uv 0\.7\.' <<<"$version"
 
       - name: Cache uv
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/uv
+            ~/.local/share/uv
           key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock', 'mkdocs.yml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
 
       - name: Sync dev deps
-        run: uv sync --extra dev --frozen
+        run: uv sync --extra dev --locked --frozen
 
       - name: Show Ruff version
         run: uv run ruff --version
