@@ -15,6 +15,7 @@ theme:
     - search.highlight
 nav:
   - Start: index.md
+  - CLI: cli.md
   - Module:
       - Übersicht: modules/index.md
       - Core: modules/core.md

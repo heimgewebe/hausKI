@@ -20,6 +20,10 @@ configs/.env
 .coverage
 coverage.xml
 
+# Local caches (ignored by default; README is explicitly tracked below)
+.local/*
+!.local/README.md
+
 # Modelle (lokal gehalten)
 models/
 
@@ -39,3 +43,4 @@ node_modules/
 observability/k6/summary.json
 .lycheecache
 .hauski-reports
+artifacts/
