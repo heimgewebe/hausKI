@@ -1,0 +1,10 @@
+[Unit]
+Description=sichter review daemon
+
+[Service]
+Type=oneshot
+Environment=REPO_DIR=$REPO_DIR
+WorkingDirectory=${REPO_DIR}
+ExecStart=${REPO_DIR}/scripts/sichterd.sh
+StandardOutput=journal
+StandardError=journal
