@@ -39,26 +39,43 @@ jobs:
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: Cache cargo + target
-        uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
+        # Pin to a specific release for reproducibility
+        uses: Swatinem/rust-cache@v2.7.7
         with:
           cache-on-failure: true
           shared-key: ${{ runner.os }}-cov-${{ hashFiles('**/Cargo.lock') }}
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked --version 0.6.9
+      - name: Clean coverage profiles
+        run: cargo llvm-cov clean --workspace
       - name: Run coverage (focused)
         env:
           # sufficient for llvm-cov; slightly faster than debuginfo=2
           RUSTFLAGS: "-C debuginfo=1"
+          CARGO_INCREMENTAL: "0"
+          RUST_BACKTRACE: "1"
+          CARGO_TERM_COLOR: "always"
         run: |
           # measure only the runtime-relevant crates
           PKGS="--package hauski-core --package hauski-indexd"
-          cargo llvm-cov $PKGS --lcov --output-path lcov.info
+          mkdir -p target/coverage/html
+          cargo llvm-cov $PKGS --all-features --doctests --fail-under-lines 65 \
+            --html --output-path target/coverage/html \
+            --lcov --output-path lcov.info
       - name: Upload lcov
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lcov.info
           path: lcov.info
+          retention-days: 7
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: target/coverage/html
+          retention-days: 7
       # Coveralls optional – ein-/auskommentieren je nach Bedarf:
       # - uses: coverallsapp/github-action@v2
       #   with:
