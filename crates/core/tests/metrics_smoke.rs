@@ -1,5 +1,5 @@
 //! Minimaler Smoke-Test für `/metrics`.
-//! 
+//!
 //! Dieser Test ist bewusst als `#[ignore]` markiert, damit reguläre CI-Läufe
 //! nicht scheitern, wenn kein Server läuft. Er kann gezielt aktiviert werden:
 //!
@@ -29,7 +29,11 @@ async fn metrics_endpoint_exposes_prometheus_text() {
         .await
         .expect("request to /metrics failed");
 
-    assert_eq!(resp.status(), StatusCode::OK, "unexpected status for /metrics");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "unexpected status for /metrics"
+    );
 
     // Content-Type sollte Prometheus-Textformat sein
     let ctype = resp
@@ -53,4 +57,3 @@ async fn metrics_endpoint_exposes_prometheus_text() {
         &body.as_bytes().get(0..64)
     );
 }
-

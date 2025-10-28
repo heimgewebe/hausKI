@@ -7,6 +7,7 @@ use axum::{
 };
 use hauski_indexd::SearchRequest;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use utoipa::{IntoParams, ToSchema};
 
 use crate::AppState;
@@ -14,7 +15,17 @@ use crate::AppState;
 /// Maximum number of matches returned by the `/ask` endpoint.
 const MAX_K: usize = 100;
 
-#[derive(Serialize, Deserialize, Debug, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
+#[schema(
+    title = "AskHit",
+    example = json!({
+        "doc_id": "doc-42",
+        "namespace": "default",
+        "score": 0.87,
+        "snippet": "HausKI keeps your knowledge organized.",
+        "meta": {"source": "docs/intro.md"}
+    })
+)]
 pub struct AskHit {
     pub doc_id: String,
     pub namespace: String,
@@ -23,7 +34,24 @@ pub struct AskHit {
     pub meta: serde_json::Value,
 }
 
-#[derive(Serialize, Deserialize, Debug, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
+#[schema(
+    title = "AskResponse",
+    example = json!({
+        "query": "What is HausKI?",
+        "k": 5,
+        "namespace": "default",
+        "hits": [
+            {
+                "doc_id": "doc-42",
+                "namespace": "default",
+                "score": 0.87,
+                "snippet": "HausKI keeps your knowledge organized.",
+                "meta": {"source": "docs/intro.md"}
+            }
+        ]
+    })
+)]
 pub struct AskResponse {
     pub query: String,
     pub k: usize,
@@ -31,7 +59,7 @@ pub struct AskResponse {
     pub hits: Vec<AskHit>,
 }
 
-#[derive(Deserialize, IntoParams, ToSchema)]
+#[derive(Deserialize, Clone, IntoParams, ToSchema)]
 #[into_params(parameter_in = Query)]
 pub struct AskParams {
     /// The query string for semantic search.

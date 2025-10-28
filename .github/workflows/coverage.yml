@@ -1,9 +1,8 @@
 name: coverage
 permissions:
   contents: read
-  actions: write
+  actions: write # required for rust-cache and upload-artifact
 
-# actions:write is required for rust-cache and upload-artifact to work
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -25,44 +24,76 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 25
+
     steps:
       - name: Checkout repository
-        # Pin to fixed v4.2.2 release to keep builds deterministic
+        # Pin to fixed release for deterministic builds
         uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: stable
           components: llvm-tools-preview
+
       - name: Ensure vendor snapshot
         run: bash scripts/ensure-vendor.sh
+
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
+
       - name: Cache cargo + target
+        # Pin to a specific release for reproducibility
         uses: Swatinem/rust-cache@v2.7.7
         with:
           cache-on-failure: true
           shared-key: ${{ runner.os }}-cov-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked --version 0.6.9
-      - name: Clean coverage artifacts
+
+      - name: Clean coverage profiles
         run: cargo llvm-cov clean --workspace
+
       - name: Run coverage (focused)
         env:
-          # sufficient for llvm-cov; slightly faster than debuginfo=2
+          # slightly faster than debuginfo=2; sufficient for llvm-cov
           RUSTFLAGS: "-C debuginfo=1"
+          CARGO_INCREMENTAL: "0"
+          RUST_BACKTRACE: "1"
+          CARGO_TERM_COLOR: "always"
         run: |
-          # measure only the runtime-relevant crates
+          # Measure only the runtime-relevant crates
           PKGS="--package hauski-core --package hauski-indexd"
-          cargo llvm-cov $PKGS --lcov --output-path lcov.info
-      - name: Upload lcov
+
+          # 1) Run full coverage with HTML report
+          cargo llvm-cov $PKGS \
+            --all-features \
+            --doctests \
+            --fail-under-lines 65 \
+            --html --output-path target/coverage/html
+
+          # 2) Generate LCOV report from existing profiles
+          cargo llvm-cov report \
+            --lcov --output-path lcov.info
+
+      - name: Upload LCOV report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lcov.info
           path: lcov.info
           retention-days: 7
-      # Coveralls optional – ein-/auskommentieren je nach Bedarf:
+
+      - name: Upload HTML coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: target/coverage/html
+          retention-days: 7
+
+      # Coveralls (optional)
       # - uses: coverallsapp/github-action@v2
       #   with:
       #     github-token: ${{ secrets.GITHUB_TOKEN }}

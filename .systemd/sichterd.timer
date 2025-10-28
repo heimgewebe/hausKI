@@ -1,0 +1,11 @@
+[Unit]
+Description=sichter review daemon timer
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=sichterd.service
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target
