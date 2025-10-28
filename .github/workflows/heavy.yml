@@ -48,7 +48,7 @@ jobs:
         run: echo "::add-matcher::.github/rust.json"
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
-      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
+      - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: stable
