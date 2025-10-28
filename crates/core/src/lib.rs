@@ -47,7 +47,7 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(health, healthz, ready, ask::ask_handler, chat::chat_handler),
+    paths(health, healthz, ready, ask::ask_handler, chat::post_chat),
     components(
         schemas(
             ask::AskResponse,
@@ -81,6 +81,7 @@ struct AppStateInner {
     models: ModelsFile,
     routing: RoutingPolicy,
     flags: FeatureFlags,
+    chat_cfg: Arc<chat::ChatCfg>,
     http_requests: Family<HttpLabels, Counter<u64>>,
     http_latency: Family<HttpDurationLabels, Histogram>,
     metrics_recorder: Arc<MetricsCallback>,
@@ -103,7 +104,7 @@ pub struct BuildInfoLabels {
 impl EncodeLabelSet for BuildInfoLabels {
     fn encode(
         &self,
-        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
+        encoder: &mut prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("service", self.service).encode(encoder.encode_label())?;
         Ok(())
@@ -119,6 +120,10 @@ impl AppState {
         expose_config: bool,
     ) -> Self {
         let mut registry = Registry::default();
+
+        let chat_cfg = Arc::new(chat::ChatCfg::from_env_and_flags(
+            flags.chat_upstream_url.clone(),
+        ));
 
         let build_info = Family::<BuildInfoLabels, Gauge>::default();
         build_info
@@ -169,6 +174,7 @@ impl AppState {
             models,
             routing,
             flags,
+            chat_cfg,
             http_requests,
             http_latency,
             metrics_recorder,
@@ -194,6 +200,10 @@ impl AppState {
 
     pub fn flags(&self) -> FeatureFlags {
         self.0.flags.clone()
+    }
+
+    pub fn chat_cfg(&self) -> Arc<chat::ChatCfg> {
+        self.0.chat_cfg.clone()
     }
 
     pub fn index(&self) -> IndexState {
@@ -248,7 +258,7 @@ impl HttpDurationLabels {
 impl EncodeLabelSet for HttpDurationLabels {
     fn encode(
         &self,
-        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
+        encoder: &mut prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("method", self.method.as_str()).encode(encoder.encode_label())?;
         ("path", self.path).encode(encoder.encode_label())?;
@@ -276,7 +286,7 @@ impl HttpLabels {
 impl EncodeLabelSet for HttpLabels {
     fn encode(
         &self,
-        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
+        encoder: &mut prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("method", self.method.as_str()).encode(encoder.encode_label())?;
         ("path", self.path).encode(encoder.encode_label())?;
@@ -503,7 +513,7 @@ fn core_routes() -> Router<AppState> {
         .route("/ready", get(ready))
         .route("/metrics", get(metrics))
         .route("/ask", get(ask::ask_handler))
-        .route("/v1/chat", post(chat::chat_handler))
+        .route("/v1/chat", post(chat::post_chat))
 }
 
 fn docs_routes() -> Router<AppState> {
@@ -938,10 +948,7 @@ mod tests {
         assert_eq!(response.k, 1);
         assert!(response.hits.len() <= 1);
         assert!(
-            response
-                .hits
-                .iter()
-                .any(|hit| hit.doc_id == "ask-doc-min"),
+            response.hits.iter().any(|hit| hit.doc_id == "ask-doc-min"),
             "expected a hit with doc_id ask-doc-min"
         );
     }
