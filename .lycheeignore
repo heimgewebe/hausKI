@@ -1,2 +1,10 @@
+# Lines specify URLs or regex patterns that Lychee should skip.
+# Keep dynamic or rate-limited endpoints here to avoid flaky CI runs.
+#
+# Examples:
+# https://example.com/some-path?token=*
+# ^https://api\.github\.com/.*
+# ^https://.*\.cloudfront\.net/.*
+
 https://github.com/heimgewebe/hausKI/actions/workflows/coverage.yml?query=branch%3Amain
 https://github.com/heimgewebe/hausKI/actions/workflows/security.yml?query=branch%3Amain
