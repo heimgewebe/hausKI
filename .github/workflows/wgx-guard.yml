@@ -65,24 +65,69 @@ jobs:
           print("schema-lite ok")
           PY
 
+      - name: (Optional) Cache uv & venv
+        if: ${{ hashFiles('pyproject.toml') != '' }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: uv-${{ runner.os }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}-
+            uv-${{ runner.os }}-
+
       - name: (Optional) UV bootstrap (pyproject present)
         if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
           set -euo pipefail
-          # Installer erwartet exakte Release-Tags; installiere ohne Wildcard
-          curl -LsSf https://astral.sh/uv/install.sh | sh
+          # Installer mit einfachem Retry gegen temporäre Netzflaps
+          export UV_INSTALL_TIMEOUT=60
+          for i in 1 2 3; do
+            if curl -LsSf https://astral.sh/uv/install.sh | sh; then break; fi
+            if [ "$i" -eq 3 ]; then
+              echo "::error::uv installation failed after retries"
+              exit 1
+            fi
+            echo "retry $i/3"; sleep $((2*i));
+          done
+          command -v uv >/dev/null || { echo "::error::uv installation failed"; exit 1; }
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Für diesen Step PATH sofort setzen und gezielt auf 0.7.x bringen
+          # Für diesen Step PATH sofort setzen und auf ≥0.8 bringen
           export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-          uv self update 0.7.*
           ver="$(uv --version || true)"
           echo "uv version: $ver"
-          case "$ver" in
-            "uv 0.7."*) : ;;  # ok
-            *) echo "::error::uv 0.7.x erwartet, gefunden: $ver"; exit 1 ;;
-          esac
-          uv sync --frozen
+          if [[ "$ver" =~ ^uv\ ([0-9]+)\.([0-9]+)\. ]]; then
+            major="${BASH_REMATCH[1]}"
+            minor="${BASH_REMATCH[2]}"
+            if ! { [ "$major" -gt 0 ] || { [ "$major" -eq 0 ] && [ "$minor" -ge 8 ]; }; }; then
+              echo "uv version <0.8 detected → attempting self update"
+              uv self update 0.8.* || uv self update || true
+              ver="$(uv --version || true)"
+              echo "uv version after update: $ver"
+              if [[ "$ver" =~ ^uv\ ([0-9]+)\.([0-9]+)\. ]]; then
+                major="${BASH_REMATCH[1]}"
+                minor="${BASH_REMATCH[2]}"
+              fi
+              if ! { [ "$major" -gt 0 ] || { [ "$major" -eq 0 ] && [ "$minor" -ge 8 ]; }; }; then
+                echo "::error::uv 0.8.x oder höher erwartet, gefunden: $ver"
+                exit 1
+              fi
+            fi
+          else
+            echo "::error::uv version konnte nicht geparst werden: $ver"
+            exit 1
+          fi
+
+          if [ -f uv.lock ]; then
+            echo "using existing uv.lock → sync --frozen"
+            uv sync --frozen
+          else
+            echo "no uv.lock → creating lock + sync"
+            uv lock
+            uv sync
+          fi
 
       - name: Done
         run: echo "wgx-guard passed ✅"
