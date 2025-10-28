@@ -27,13 +27,13 @@ on:
 
 permissions:
   contents: read
-  # Für PR-Kommentare:
-  pull-requests: write
+  pull-requests: write  # erlaubt PR-Kommentare
 
 jobs:
   lychee:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
     steps:
       - name: Ensure report directory
         run: mkdir -p lychee
@@ -41,9 +41,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
 
-      - name: Check links
+      - name: Check links with Lychee
         id: lychee
-        uses: lycheeverse/lychee-action@v2
+        uses: lycheeverse/lychee-action@5b84becd9d3980d9d8716da68816c9bd1d4e0d96 # v2.1.0, stabiler Commit
         continue-on-error: ${{ github.event_name == 'pull_request' }}
         with:
           args: >
@@ -60,13 +60,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: PR comment with report
+      - name: Comment on PR if broken links
         if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && steps.lychee.outputs.exit_code != 0 }}
         uses: thollander/actions-comment-pull-request@v3
         with:
           message: |
-            ⚠️ Lychee meldet Probleme. Exit: ${{ steps.lychee.outputs.exit_code }}
-            Datei: **lychee/out.md** (Artefakt)
+            ⚠️ **Lychee meldet fehlerhafte Links**
+            Exit Code: `${{ steps.lychee.outputs.exit_code }}`
+            Siehe Artefakt: **lychee/out.md**
 
       - name: Upload report artifact
         if: ${{ always() && steps.lychee.outputs.exit_code != 0 && hashFiles('lychee/out.md') != '' }}
@@ -74,3 +75,4 @@ jobs:
         with:
           name: lychee-report
           path: lychee/out.md
+          retention-days: 7
