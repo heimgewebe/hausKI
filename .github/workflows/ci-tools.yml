@@ -32,31 +32,35 @@ jobs:
 
       # --- uv bootstrap -------------------------------------------------------
       - name: Install uv
+        if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
           set -euo pipefail
           # Installiere die neueste verfügbare uv-Version (Installer erwartet exakte Tags, daher ohne Wildcard)
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Für diesen Step PATH sofort setzen und auf 0.7.x pinnen
+          # Für diesen Step PATH sofort setzen und auf exakt 0.7.6 pinnen
           export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
           uv --version || true
-          uv self update 0.7.*
+          uv self update 0.7.6
 
-      - name: Ensure uv version (expect 0.7.x)
+      - name: Ensure uv version (expect 0.7.6)
+        if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
           set -euo pipefail
           export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
           version="$(uv --version)"
           echo "$version"
-          grep -E '^uv 0\.7\.' <<<"$version"
+          grep -E '^uv 0\.7\.6$' <<<"$version"
 
       # --- Sanity check: lock must exist and be in sync for dev extra ----------
       - name: Check uv.lock presence
+        if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
-          test -f uv.lock || { echo "Missing uv.lock. Run: uv lock --extra dev"; exit 1; }
+          test -f uv.lock || { echo "Missing uv.lock. Run locally: uv lock --extra dev"; exit 1; }
 
       - name: Assert jsonschema pinned in uv.lock
+        if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
           python3 - <<'PY'
           from __future__ import annotations
@@ -122,7 +126,8 @@ jobs:
           PY
 
       - name: Cache uv
-        uses: actions/cache@v4
+        if: ${{ hashFiles('pyproject.toml') != '' }}
+        uses: actions/cache@v4.0.2
         with:
           path: |
             ~/.cache/uv
@@ -132,22 +137,28 @@ jobs:
             ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}-
             ${{ runner.os }}-uv-
 
-      - name: Sync dev deps
-        run: uv sync --extra dev
+      - name: Sync dev deps (locked & frozen)
+        if: ${{ hashFiles('pyproject.toml') != '' }}
+        run: uv sync --extra dev --locked --frozen
 
       - name: Show Ruff version
+        if: ${{ hashFiles('pyproject.toml') != '' }}
         run: uv run ruff --version
 
       - name: Show MkDocs version
+        if: ${{ hashFiles('pyproject.toml') != '' }}
         run: uv run mkdocs --version
 
       - name: Ruff check
+        if: ${{ hashFiles('pyproject.toml') != '' }}
         run: uv run ruff check .
 
       - name: Validate JSON Schemas
+        if: ${{ hashFiles('pyproject.toml') != '' }}
         run: uv run python scripts/validate-jsonschemas.py
 
       - name: Pytests
+        if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
           set -euo pipefail
           if [ -f "pytest.ini" ] || [ -d "tests" ] || ls tests_*.py 1> /dev/null 2>&1; then
@@ -157,6 +168,7 @@ jobs:
           fi
 
       - name: Build docs
+        if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
           set -euo pipefail
           if [ -f "mkdocs.yml" ]; then
