@@ -132,7 +132,7 @@ jobs:
         run: echo "::add-matcher::.github/rust.json"
       - name: Show resolved toolchain
         run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
-      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
+      - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           # Fall back to "stable" if the workflow-level environment variable is empty.
@@ -266,7 +266,7 @@ jobs:
         run: echo "::add-matcher::.github/rust.json"
       - name: Show resolved toolchain
         run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
-      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
+      - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           # Fall back to "stable" if the workflow-level environment variable is empty.
@@ -317,7 +317,7 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Show resolved toolchain
         run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
-      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
+      - uses: dtolnay/rust-toolchain@stable
         with:
           # Fall back to "stable" if the workflow-level environment variable is empty.
           toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
@@ -352,7 +352,7 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Show resolved toolchain
         run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
-      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
+      - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           # Fall back to "stable" if the workflow-level environment variable is empty.

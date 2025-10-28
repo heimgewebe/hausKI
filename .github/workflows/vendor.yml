@@ -22,7 +22,7 @@ jobs:
       - name: Checkout repository
         # Pin to fixed v4.2.2 release to keep builds deterministic
         uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@3dc12f6bf0c8abca9015ae04963144c46cf9d9b5 # stable snapshot
+      - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: stable
