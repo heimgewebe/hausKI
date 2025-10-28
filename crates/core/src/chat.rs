@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 use utoipa::ToSchema;
 
-use crate::{chat_upstream::call_openai_compatible, AppState};
+use crate::{chat_upstream::call_ollama_chat, AppState};
 
 #[derive(Debug, Clone)]
 pub struct ChatCfg {
@@ -174,6 +174,7 @@ pub async fn post_chat(
     Json(chat_request): Json<ChatRequest>,
 ) -> axum::response::Response {
     let chat_cfg = state.chat_cfg();
+
     if let Some(base_url) = chat_cfg.upstream_url.clone() {
         let started = Instant::now();
         let client = chat_cfg.client.clone();
@@ -182,11 +183,16 @@ pub async fn post_chat(
             .clone()
             .unwrap_or_else(|| DEFAULT_MODEL.to_string());
 
-        match call_openai_compatible(&client, &base_url, &model, &chat_request.messages).await {
+        match call_ollama_chat(&client, &base_url, &model, &chat_request.messages).await {
             Ok(content) => {
                 let status = StatusCode::OK;
                 state.record_http_observation(Method::POST, "/v1/chat", status, started);
-                debug!(base_url = %base_url, status = %status, "chat upstream succeeded");
+                debug!(
+                    base_url = %base_url,
+                    status = %status,
+                    model = %model,
+                    "chat upstream succeeded"
+                );
                 return (status, Json(ChatResponse { content, model })).into_response();
             }
             Err(err) => {
