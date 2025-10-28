@@ -5,43 +5,35 @@ use serde::{Deserialize, Serialize};
 use crate::chat::ChatMessage;
 
 #[derive(Debug, Serialize)]
-struct OpenAIChatRequest<'a> {
+struct OllamaChatRequest<'a> {
     model: &'a str,
     messages: &'a [ChatMessage],
     #[serde(skip_serializing_if = "Option::is_none")]
-    temperature: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_tokens: Option<u32>,
+    stream: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
-struct OpenAIChatResponse {
-    choices: Vec<Choice>,
+struct OllamaChatResponse {
+    message: Option<OllamaMessage>,
 }
 
 #[derive(Debug, Deserialize)]
-struct Choice {
-    message: ChoiceMessage,
-}
-
-#[derive(Debug, Deserialize)]
-struct ChoiceMessage {
+struct OllamaMessage {
     content: String,
 }
 
-/// Call an OpenAI-compatible `/v1/chat/completions` endpoint and return the first choice.
-pub async fn call_openai_compatible(
+/// Call an Ollama-compatible `/api/chat` endpoint and return the first message.
+pub async fn call_ollama_chat(
     client: &Client,
     base_url: &str,
     model: &str,
     messages: &[ChatMessage],
 ) -> Result<String> {
-    let url = format!("{}/v1/chat/completions", base_url.trim_end_matches('/'));
-    let request = OpenAIChatRequest {
+    let url = format!("{}/api/chat", base_url.trim_end_matches('/'));
+    let request = OllamaChatRequest {
         model,
         messages,
-        temperature: None,
-        max_tokens: None,
+        stream: Some(false),
     };
 
     let response = client
@@ -55,15 +47,15 @@ pub async fn call_openai_compatible(
         return Err(anyhow!("upstream status {}", response.status()));
     }
 
-    let parsed: OpenAIChatResponse = response
+    let parsed: OllamaChatResponse = response
         .json()
         .await
         .context("parse upstream json response")?;
-    let first = parsed
-        .choices
-        .into_iter()
-        .next()
-        .ok_or_else(|| anyhow!("upstream returned no choices"))?;
+    let reply = parsed
+        .message
+        .map(|m| m.content)
+        .filter(|content| !content.is_empty())
+        .unwrap_or_else(|| "(leer)".to_string());
 
-    Ok(first.message.content)
+    Ok(reply)
 }
