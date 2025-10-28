@@ -30,6 +30,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      # --- uv bootstrap -------------------------------------------------------
       - name: Install uv
         run: |
           set -euo pipefail
@@ -49,6 +50,76 @@ jobs:
           version="$(uv --version)"
           echo "$version"
           grep -E '^uv 0\.7\.' <<<"$version"
+
+      # --- Sanity check: lock must exist and be in sync for dev extra ----------
+      - name: Check uv.lock presence
+        run: |
+          test -f uv.lock || { echo "Missing uv.lock. Run: uv lock --extra dev"; exit 1; }
+
+      - name: Assert jsonschema pinned in uv.lock
+        run: |
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import sys
+          from pathlib import Path
+
+          lock_path = Path("uv.lock")
+          if not lock_path.exists():
+            print("uv.lock not found. Run: uv lock --extra dev", file=sys.stderr)
+            sys.exit(1)
+
+          raw_text = lock_path.read_text(encoding="utf-8")
+
+          def has_jsonschema_from_toml() -> bool:
+            try:
+              try:
+                import tomllib  # type: ignore[attr-defined]
+              except ModuleNotFoundError:
+                import tomli as tomllib  # type: ignore[no-redef]
+            except ModuleNotFoundError:
+              return False
+
+            try:
+              data = tomllib.loads(raw_text)
+            except Exception:
+              return False
+
+            packages = data.get("package", [])
+            for package in packages:
+              name = package.get("name")
+              if isinstance(name, str) and name.lower() == "jsonschema":
+                return True
+            return False
+
+          def has_jsonschema_from_json() -> bool:
+            try:
+              data = json.loads(raw_text)
+            except json.JSONDecodeError:
+              return False
+            packages = data.get("package", [])
+            for package in packages:
+              name = package.get("name")
+              if isinstance(name, str) and name.lower() == "jsonschema":
+                return True
+            return False
+
+          def has_jsonschema_from_text() -> bool:
+            lowered = raw_text.lower()
+            return 'name = "jsonschema"' in lowered or '"name": "jsonschema"' in lowered
+
+          if not (
+              has_jsonschema_from_toml()
+              or has_jsonschema_from_json()
+              or has_jsonschema_from_text()
+          ):
+            print("jsonschema not found in uv.lock.")
+            print("Fix locally:")
+            print("  uv lock --upgrade-package jsonschema==4.23.0")
+            print("  # oder gesamtes Dev-Set refreshen: uv lock --extra dev")
+            sys.exit(1)
+          PY
 
       - name: Cache uv
         uses: actions/cache@v4
