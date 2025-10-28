@@ -103,7 +103,7 @@ pub struct BuildInfoLabels {
 impl EncodeLabelSet for BuildInfoLabels {
     fn encode(
         &self,
-        mut encoder: &mut prometheus_client::encoding::LabelSetEncoder<'_>,
+        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("service", self.service).encode(encoder.encode_label())?;
         Ok(())
@@ -248,7 +248,7 @@ impl HttpDurationLabels {
 impl EncodeLabelSet for HttpDurationLabels {
     fn encode(
         &self,
-        mut encoder: &mut prometheus_client::encoding::LabelSetEncoder<'_>,
+        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("method", self.method.as_str()).encode(encoder.encode_label())?;
         ("path", self.path).encode(encoder.encode_label())?;
@@ -276,7 +276,7 @@ impl HttpLabels {
 impl EncodeLabelSet for HttpLabels {
     fn encode(
         &self,
-        mut encoder: &mut prometheus_client::encoding::LabelSetEncoder<'_>,
+        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("method", self.method.as_str()).encode(encoder.encode_label())?;
         ("path", self.path).encode(encoder.encode_label())?;
