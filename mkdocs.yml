@@ -29,6 +29,7 @@ nav:
       - Sprache: process/sprache.md
       - Tests & Qualität: process/testing.md
       - Release: process/release.md
+  - Vision: vision/multi-agent-rag.md
   - ADRs:
       - Toolchain-Strategie: adrs/ADR-0001-toolchain-strategy.md
   - Runbooks:
