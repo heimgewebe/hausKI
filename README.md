@@ -523,4 +523,15 @@ Für eine dauerhafte Installation kann `hauski` als `systemd`-Dienst konfigurier
 ## Weiterführende Dokumente
 - [`hauski-skizze.md`](hauski-skizze.md) – Vision, Funktionsumfang, Performance-Budgets, Security-Ansatz.
 - [`hauski-stack.md`](hauski-stack.md) – Technologiewahl, Tooling, CI-Strategie und Testpyramide.
+- [`docs/vision/multi-agent-rag.md`](docs/vision/multi-agent-rag.md) – Orchestrierung der spezialisierten Agenten inkl. Contracts.
+  Einstieg über `just agents.sync` (Template spiegeln) und `just agents.run` (Dry-Run).
 
+### Python-Dev Abhängigkeiten & Lockfile (uv)
+- CI erwartet **reproduzierbare** Installs: `uv sync --extra dev --locked --frozen`.
+- Wenn du `pyproject.toml` änderst (z. B. neue Dev-Lib wie `jsonschema==4.23.0`):
+  1. `uv lock --extra dev`  
+     _oder gezielt:_ `uv lock --upgrade-package jsonschema==4.23.0`
+  2. `git add uv.lock`
+  3. commit & push
+
+Ohne aktualisiertes `uv.lock` bricht CI mit einem klaren Hinweis ab.

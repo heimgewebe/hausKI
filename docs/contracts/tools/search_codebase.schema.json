@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.heimgewebe.org/tools/search_codebase.schema.json",
+  "title": "search_codebase tool call",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["query"],
+  "properties": {
+    "query": { "type": "string", "minLength": 1 },
+    "repos": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "top_k": { "type": "integer", "minimum": 1, "maximum": 50, "default": 8 }
+  }
+}

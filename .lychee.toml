@@ -1,0 +1,41 @@
+# Lychee configuration (see https://lychee.cli.rs/)
+
+# Caching
+cache = true
+max_cache_age = "1d"
+cache_path = ".lycheecache"
+
+# Networking & robustness
+timeout = "10s"
+max_retries = 2
+retry_wait_time = "2s"
+max_redirects = 5
+accept = ["200..399"]
+user_agent = "heimgewebe-lychee-ci"
+require_https = true
+
+# Inputs are provided via workflow arguments; only exclude directories here.
+exclude_path = [
+  ".git",
+  "target",
+  "vendor",
+  "node_modules",
+  ".venv",
+  "site",
+  "dist",
+  "build"
+]
+
+# Exclude localhost-style URLs and ephemeral dev environments.
+exclude = [
+  "http://localhost(:[0-9]+)?",
+  "https://localhost(:[0-9]+)?",
+  "http://127\\.0\\.0\\.1(:[0-9]+)?",
+  "https://127\\.0\\.0\\.1(:[0-9]+)?",
+  "http://0\\.0\\.0\\.0(:[0-9]+)?",
+  "https://0\\.0\\.0\\.0(:[0-9]+)?",
+  ".*://(dev|test|staging)\\.[^\\s/]+"
+]
+
+# Ignore email addresses to reduce noise.
+exclude_email = true

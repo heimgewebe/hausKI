@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{env, time::Instant};
 
 use axum::{
     extract::State,
@@ -10,7 +10,47 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 use utoipa::ToSchema;
 
-use crate::{chat_upstream::call_openai_compatible, AppState};
+use crate::{chat_upstream::call_ollama_chat, AppState};
+
+#[derive(Debug, Clone)]
+pub struct ChatCfg {
+    pub upstream_url: Option<String>,
+    pub model: Option<String>,
+    pub client: reqwest::Client,
+}
+
+impl ChatCfg {
+    pub fn new(upstream_url: Option<String>, model: Option<String>) -> Self {
+        Self {
+            upstream_url,
+            model,
+            client: reqwest::Client::new(),
+        }
+    }
+
+    pub fn from_env_and_flags(flag_upstream: Option<String>) -> Self {
+        let upstream_env =
+            env_var("HAUSKI_CHAT_UPSTREAM_URL").or_else(|| env_var("CHAT_UPSTREAM_URL"));
+        let upstream_url = upstream_env.or(flag_upstream);
+        let model = env_var("HAUSKI_CHAT_MODEL");
+
+        Self::new(upstream_url, model)
+    }
+}
+
+fn env_var(key: &str) -> Option<String> {
+    match env::var(key) {
+        Ok(value) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        Err(_) => None,
+    }
+}
 
 const DEFAULT_MODEL: &str = "llama";
 
@@ -44,6 +84,68 @@ pub struct ChatStubResponse {
     pub message: String,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+
+    fn clear_env_vars() {
+        for key in [
+            "HAUSKI_CHAT_UPSTREAM_URL",
+            "CHAT_UPSTREAM_URL",
+            "HAUSKI_CHAT_MODEL",
+        ] {
+            std::env::remove_var(key);
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn from_env_prefers_primary_env_over_flag() {
+        clear_env_vars();
+        std::env::set_var("HAUSKI_CHAT_UPSTREAM_URL", " https://example.invalid/chat ");
+        std::env::set_var("HAUSKI_CHAT_MODEL", " llama-3.1 ");
+
+        let cfg = ChatCfg::from_env_and_flags(Some("https://flag.invalid".to_string()));
+
+        assert_eq!(
+            cfg.upstream_url.as_deref(),
+            Some("https://example.invalid/chat")
+        );
+        assert_eq!(cfg.model.as_deref(), Some("llama-3.1"));
+
+        clear_env_vars();
+    }
+
+    #[test]
+    #[serial]
+    fn from_env_uses_legacy_variable_when_new_is_missing() {
+        clear_env_vars();
+        std::env::set_var("CHAT_UPSTREAM_URL", "http://legacy.invalid");
+
+        let cfg = ChatCfg::from_env_and_flags(None);
+
+        assert_eq!(cfg.upstream_url.as_deref(), Some("http://legacy.invalid"));
+        assert!(cfg.model.is_none());
+
+        clear_env_vars();
+    }
+
+    #[test]
+    #[serial]
+    fn from_env_falls_back_to_flag_when_env_empty() {
+        clear_env_vars();
+        std::env::set_var("HAUSKI_CHAT_UPSTREAM_URL", "   ");
+
+        let cfg = ChatCfg::from_env_and_flags(Some("https://flag.invalid".to_string()));
+
+        assert_eq!(cfg.upstream_url.as_deref(), Some("https://flag.invalid"));
+        assert!(cfg.model.is_none());
+
+        clear_env_vars();
+    }
+}
+
 #[utoipa::path(
     post,
     path = "/v1/chat",
@@ -67,21 +169,30 @@ pub struct ChatStubResponse {
     ),
     tag = "core"
 )]
-pub async fn chat_handler(
+pub async fn post_chat(
     State(state): State<AppState>,
     Json(chat_request): Json<ChatRequest>,
 ) -> axum::response::Response {
-    let flags = state.flags();
-    if let Some(base_url) = flags.chat_upstream_url.clone() {
-        let started = Instant::now();
-        let client = reqwest::Client::new();
-        let model = DEFAULT_MODEL.to_string();
+    let chat_cfg = state.chat_cfg();
 
-        match call_openai_compatible(&client, &base_url, &model, &chat_request.messages).await {
+    if let Some(base_url) = chat_cfg.upstream_url.clone() {
+        let started = Instant::now();
+        let client = chat_cfg.client.clone();
+        let model = chat_cfg
+            .model
+            .clone()
+            .unwrap_or_else(|| DEFAULT_MODEL.to_string());
+
+        match call_ollama_chat(&client, &base_url, &model, &chat_request.messages).await {
             Ok(content) => {
                 let status = StatusCode::OK;
                 state.record_http_observation(Method::POST, "/v1/chat", status, started);
-                debug!(base_url = %base_url, status = %status, "chat upstream succeeded");
+                debug!(
+                    base_url = %base_url,
+                    status = %status,
+                    model = %model,
+                    "chat upstream succeeded"
+                );
                 return (status, Json(ChatResponse { content, model })).into_response();
             }
             Err(err) => {
@@ -103,7 +214,8 @@ pub async fn chat_handler(
     state.record_http_observation(Method::POST, "/v1/chat", status, started);
     let payload = ChatStubResponse {
         status: "not_implemented".to_string(),
-        message: "chat pipeline not wired yet, please configure HAUSKI_CHAT_UPSTREAM_URL".to_string(),
+        message: "chat pipeline not wired yet, please configure HAUSKI_CHAT_UPSTREAM_URL"
+            .to_string(),
     };
     (status, Json(payload)).into_response()
 }
