@@ -30,22 +30,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install uv 0.7.x
+      - name: Install uv
         run: |
           set -euo pipefail
-          curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_VERSION="0.7.*" sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          # Installiere die neueste verfügbare uv-Version (Installer erwartet exakte Tags, daher ohne Wildcard)
+          curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          # Für diesen Step PATH sofort setzen und auf 0.7.x pinnen
+          export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+          uv --version || true
+          uv self update 0.7.*
 
       - name: Ensure uv version (expect 0.7.x)
         run: |
           set -euo pipefail
+          export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
           version="$(uv --version)"
           echo "$version"
           grep -E '^uv 0\.7\.' <<<"$version"
 
       - name: Cache uv
-        uses: actions/cache@13ea82a3905a986a1a4b52ebb478c82172884294
+        uses: actions/cache@13c3b5c0b52e77e8fa7b4e3d6a238602b25e9a3a # actions/cache@v4.0.2 (pinned)
         with:
           path: |
             ~/.cache/uv

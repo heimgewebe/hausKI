@@ -69,10 +69,13 @@ jobs:
         if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
           set -euo pipefail
-          curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_VERSION="0.7.*" sh
+          # Installer erwartet exakte Release-Tags; installiere ohne Wildcard
+          curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Installation direkt auf 0.7.x entsprechend .wgx/profile.yml
+          # Für diesen Step PATH sofort setzen und gezielt auf 0.7.x bringen
+          export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+          uv self update 0.7.*
           ver="$(uv --version || true)"
           echo "uv version: $ver"
           case "$ver" in
