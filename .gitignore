@@ -3,6 +3,12 @@ target/
 .venv/
 .uv/
 
+# Agent-Kit sync (local virtualenvs & caches)
+agent-kit/.venv/
+agent-kit/.uv/
+agent-kit/.pytest_cache/
+agent-kit/.mypy_cache/
+
 # Python caches
 __pycache__/
 .pytest_cache/

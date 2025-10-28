@@ -523,4 +523,6 @@ Für eine dauerhafte Installation kann `hauski` als `systemd`-Dienst konfigurier
 ## Weiterführende Dokumente
 - [`hauski-skizze.md`](hauski-skizze.md) – Vision, Funktionsumfang, Performance-Budgets, Security-Ansatz.
 - [`hauski-stack.md`](hauski-stack.md) – Technologiewahl, Tooling, CI-Strategie und Testpyramide.
+- [`docs/vision/multi-agent-rag.md`](docs/vision/multi-agent-rag.md) – Orchestrierung der spezialisierten Agenten inkl. Contracts.
+  Einstieg über `just agents.sync` (Template spiegeln) und `just agents.run` (Dry-Run).
 
