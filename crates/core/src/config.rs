@@ -126,6 +126,7 @@ pub type RoutingDecision = serde_yaml::Value;
 pub struct FeatureFlags {
     pub safe_mode: bool,
     pub chat_upstream_url: Option<String>,
+    pub chat_model: Option<String>,
 }
 
 fn parse_env_bool(value: &str) -> Option<bool> {
@@ -249,11 +250,21 @@ pub fn load_flags<P: AsRef<Path>>(path: P) -> anyhow::Result<FeatureFlags> {
         }
     }
 
-    if let Ok(url) = env::var("CHAT_UPSTREAM_URL") {
+    let upstream_env =
+        env::var("HAUSKI_CHAT_UPSTREAM_URL").or_else(|_| env::var("CHAT_UPSTREAM_URL"));
+    if let Ok(url) = upstream_env {
         if url.trim().is_empty() {
             flags.chat_upstream_url = None;
         } else {
             flags.chat_upstream_url = Some(url);
+        }
+    }
+
+    if let Ok(model) = env::var("HAUSKI_CHAT_MODEL") {
+        if model.trim().is_empty() {
+            flags.chat_model = None;
+        } else {
+            flags.chat_model = Some(model);
         }
     }
 
@@ -410,8 +421,8 @@ mod tests {
         file.flush().unwrap();
 
         let _safe_guard = EnvVarGuard::removed("HAUSKI_SAFE_MODE");
-        let _chat_guard = EnvVarGuard::removed("CHAT_UPSTREAM_URL");
-        env::set_var("CHAT_UPSTREAM_URL", "http://from-env");
+        let _chat_guard = EnvVarGuard::removed("HAUSKI_CHAT_UPSTREAM_URL");
+        env::set_var("HAUSKI_CHAT_UPSTREAM_URL", "http://from-env");
 
         let flags = load_flags(file.path()).unwrap();
         assert_eq!(flags.chat_upstream_url.as_deref(), Some("http://from-env"));
@@ -425,11 +436,58 @@ mod tests {
         file.flush().unwrap();
 
         let _safe_guard = EnvVarGuard::removed("HAUSKI_SAFE_MODE");
-        let _chat_guard = EnvVarGuard::removed("CHAT_UPSTREAM_URL");
-        env::set_var("CHAT_UPSTREAM_URL", "   ");
+        let _chat_guard = EnvVarGuard::removed("HAUSKI_CHAT_UPSTREAM_URL");
+        env::set_var("HAUSKI_CHAT_UPSTREAM_URL", "   ");
 
         let flags = load_flags(file.path()).unwrap();
         assert_eq!(flags.chat_upstream_url, None);
+    }
+
+    #[serial]
+    #[test]
+    fn legacy_chat_upstream_env_override_is_supported() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "chat_upstream_url: null").unwrap();
+        file.flush().unwrap();
+
+        let _safe_guard = EnvVarGuard::removed("HAUSKI_SAFE_MODE");
+        let _new_guard = EnvVarGuard::removed("HAUSKI_CHAT_UPSTREAM_URL");
+        let _legacy_guard = EnvVarGuard::removed("CHAT_UPSTREAM_URL");
+        env::set_var("CHAT_UPSTREAM_URL", "http://legacy-env");
+
+        let flags = load_flags(file.path()).unwrap();
+        assert_eq!(
+            flags.chat_upstream_url.as_deref(),
+            Some("http://legacy-env")
+        );
+    }
+
+    #[serial]
+    #[test]
+    fn chat_model_env_override_sets_value() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "chat_model: llama2").unwrap();
+        file.flush().unwrap();
+
+        let _model_guard = EnvVarGuard::removed("HAUSKI_CHAT_MODEL");
+        env::set_var("HAUSKI_CHAT_MODEL", "mistral");
+
+        let flags = load_flags(file.path()).unwrap();
+        assert_eq!(flags.chat_model.as_deref(), Some("mistral"));
+    }
+
+    #[serial]
+    #[test]
+    fn empty_chat_model_env_override_disables_value() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "chat_model: llama2").unwrap();
+        file.flush().unwrap();
+
+        let _model_guard = EnvVarGuard::removed("HAUSKI_CHAT_MODEL");
+        env::set_var("HAUSKI_CHAT_MODEL", "   ");
+
+        let flags = load_flags(file.path()).unwrap();
+        assert_eq!(flags.chat_model, None);
     }
 
     #[test]

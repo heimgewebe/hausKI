@@ -10,9 +10,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 use utoipa::ToSchema;
 
-use crate::{chat_upstream::call_openai_compatible, AppState};
-
-const DEFAULT_MODEL: &str = "llama";
+use crate::{chat_upstream::call_ollama_chat, AppState};
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct ChatMessage {
@@ -73,28 +71,39 @@ pub async fn chat_handler(
 ) -> axum::response::Response {
     let flags = state.flags();
     if let Some(base_url) = flags.chat_upstream_url.clone() {
-        let started = Instant::now();
-        let client = reqwest::Client::new();
-        let model = DEFAULT_MODEL.to_string();
+        if let Some(model) = flags.chat_model.clone() {
+            let started = Instant::now();
+            let client = reqwest::Client::new();
 
-        match call_openai_compatible(&client, &base_url, &model, &chat_request.messages).await {
-            Ok(content) => {
-                let status = StatusCode::OK;
-                state.record_http_observation(Method::POST, "/v1/chat", status, started);
-                debug!(base_url = %base_url, status = %status, "chat upstream succeeded");
-                return (status, Json(ChatResponse { content, model })).into_response();
-            }
-            Err(err) => {
-                let status = StatusCode::BAD_GATEWAY;
-                state.record_http_observation(Method::POST, "/v1/chat", status, started);
-                debug!(base_url = %base_url, error = %err, "chat upstream failed");
-                let payload = ChatStubResponse {
-                    status: "upstream_error".to_string(),
-                    message: format!("chat upstream failed: {err}"),
-                };
-                return (status, Json(payload)).into_response();
+            match call_ollama_chat(&client, &base_url, &model, &chat_request.messages).await {
+                Ok(content) => {
+                    let status = StatusCode::OK;
+                    state.record_http_observation(Method::POST, "/v1/chat", status, started);
+                    debug!(base_url = %base_url, status = %status, model = %model, "chat upstream succeeded");
+                    return (status, Json(ChatResponse { content, model })).into_response();
+                }
+                Err(err) => {
+                    let status = StatusCode::BAD_GATEWAY;
+                    state.record_http_observation(Method::POST, "/v1/chat", status, started);
+                    debug!(base_url = %base_url, error = %err, "chat upstream failed");
+                    let payload = ChatStubResponse {
+                        status: "upstream_error".to_string(),
+                        message: format!("chat upstream failed: {err}"),
+                    };
+                    return (status, Json(payload)).into_response();
+                }
             }
         }
+
+        warn!("chat request received but no chat model is configured");
+        let started = Instant::now();
+        let status = StatusCode::NOT_IMPLEMENTED;
+        state.record_http_observation(Method::POST, "/v1/chat", status, started);
+        let payload = ChatStubResponse {
+            status: "not_implemented".to_string(),
+            message: "missing HAUSKI_CHAT_MODEL".to_string(),
+        };
+        return (status, Json(payload)).into_response();
     }
 
     warn!("chat request received but no chat upstream is configured");
@@ -103,7 +112,8 @@ pub async fn chat_handler(
     state.record_http_observation(Method::POST, "/v1/chat", status, started);
     let payload = ChatStubResponse {
         status: "not_implemented".to_string(),
-        message: "chat pipeline not wired yet, please configure HAUSKI_CHAT_UPSTREAM_URL".to_string(),
+        message: "chat pipeline not wired yet, please configure HAUSKI_CHAT_UPSTREAM_URL"
+            .to_string(),
     };
     (status, Json(payload)).into_response()
 }
