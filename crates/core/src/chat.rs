@@ -28,11 +28,11 @@ impl ChatCfg {
         }
     }
 
-    pub fn from_env_and_flags(flag_upstream: Option<String>) -> Self {
+    pub fn from_env_and_flags(flag_upstream: Option<String>, flag_model: Option<String>) -> Self {
         let upstream_env =
             env_var("HAUSKI_CHAT_UPSTREAM_URL").or_else(|| env_var("CHAT_UPSTREAM_URL"));
         let upstream_url = upstream_env.or(flag_upstream);
-        let model = env_var("HAUSKI_CHAT_MODEL");
+        let model = env_var("HAUSKI_CHAT_MODEL").or(flag_model);
 
         Self::new(upstream_url, model)
     }
@@ -106,7 +106,10 @@ mod tests {
         std::env::set_var("HAUSKI_CHAT_UPSTREAM_URL", " https://example.invalid/chat ");
         std::env::set_var("HAUSKI_CHAT_MODEL", " llama-3.1 ");
 
-        let cfg = ChatCfg::from_env_and_flags(Some("https://flag.invalid".to_string()));
+        let cfg = ChatCfg::from_env_and_flags(
+            Some("https://flag.invalid".to_string()),
+            Some("flag-model".to_string()),
+        );
 
         assert_eq!(
             cfg.upstream_url.as_deref(),
@@ -123,10 +126,10 @@ mod tests {
         clear_env_vars();
         std::env::set_var("CHAT_UPSTREAM_URL", "http://legacy.invalid");
 
-        let cfg = ChatCfg::from_env_and_flags(None);
+        let cfg = ChatCfg::from_env_and_flags(None, Some("flag-model".to_string()));
 
         assert_eq!(cfg.upstream_url.as_deref(), Some("http://legacy.invalid"));
-        assert!(cfg.model.is_none());
+        assert_eq!(cfg.model.as_deref(), Some("flag-model"));
 
         clear_env_vars();
     }
@@ -137,9 +140,25 @@ mod tests {
         clear_env_vars();
         std::env::set_var("HAUSKI_CHAT_UPSTREAM_URL", "   ");
 
-        let cfg = ChatCfg::from_env_and_flags(Some("https://flag.invalid".to_string()));
+        let cfg = ChatCfg::from_env_and_flags(
+            Some("https://flag.invalid".to_string()),
+            Some("flag-model".to_string()),
+        );
 
         assert_eq!(cfg.upstream_url.as_deref(), Some("https://flag.invalid"));
+        assert_eq!(cfg.model.as_deref(), Some("flag-model"));
+
+        clear_env_vars();
+    }
+
+    #[test]
+    #[serial]
+    fn from_env_returns_none_when_flags_absent() {
+        clear_env_vars();
+
+        let cfg = ChatCfg::from_env_and_flags(None, None);
+
+        assert!(cfg.upstream_url.is_none());
         assert!(cfg.model.is_none());
 
         clear_env_vars();

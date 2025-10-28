@@ -112,13 +112,10 @@ impl AppState {
         models: ModelsFile,
         routing: RoutingPolicy,
         flags: FeatureFlags,
+        chat_cfg: Arc<chat::ChatCfg>,
         expose_config: bool,
     ) -> Self {
         let mut registry = Registry::default();
-
-        let chat_cfg = Arc::new(chat::ChatCfg::from_env_and_flags(
-            flags.chat_upstream_url.clone(),
-        ));
 
         let build_info = Family::<BuildInfoLabels, Gauge>::default();
         build_info
@@ -420,7 +417,11 @@ pub fn build_app_with_state(
     expose_config: bool,
     allowed_origin: HeaderValue,
 ) -> (Router, AppState) {
-    let state = AppState::new(limits, models, routing, flags, expose_config);
+    let chat_cfg = Arc::new(chat::ChatCfg::from_env_and_flags(
+        flags.chat_upstream_url.clone(),
+        flags.chat_model.clone(),
+    ));
+    let state = AppState::new(limits, models, routing, flags, chat_cfg, expose_config);
     let allowed_origin = Arc::new(allowed_origin);
 
     // --- Request guards ------------------------------------------------------
