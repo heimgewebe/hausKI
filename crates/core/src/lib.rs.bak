@@ -47,7 +47,7 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(health, healthz, ready, ask::ask_handler, chat::post_chat),
+    paths(health, healthz, ready, ask::ask_handler, chat::chat_handler),
     components(
         schemas(
             ask::AskResponse,
@@ -63,6 +63,11 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
 struct ApiDoc;
 
 /// Creates a latency histogram with predefined buckets.
+///
+/// The bucket values are defined in the `LATENCY_BUCKETS` constant (in seconds).
+/// These were chosen to provide fine granularity for low-latency requests and broader
+/// coverage for higher latencies, matching typical HTTP request latency distributions.
+/// Adjust `LATENCY_BUCKETS` if your workload characteristics differ.
 fn create_latency_histogram() -> Histogram {
     Histogram::new(LATENCY_BUCKETS.into_iter())
 }
@@ -76,7 +81,6 @@ struct AppStateInner {
     models: ModelsFile,
     routing: RoutingPolicy,
     flags: FeatureFlags,
-    chat_cfg: Arc<chat::ChatCfg>,
     http_requests: Family<HttpLabels, Counter<u64>>,
     http_latency: Family<HttpDurationLabels, Histogram>,
     metrics_recorder: Arc<MetricsCallback>,
@@ -99,7 +103,7 @@ pub struct BuildInfoLabels {
 impl EncodeLabelSet for BuildInfoLabels {
     fn encode(
         &self,
-        encoder: &mut prometheus_client::encoding::LabelSetEncoder<'_>,
+        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("service", self.service).encode(encoder.encode_label())?;
         Ok(())
@@ -115,10 +119,6 @@ impl AppState {
         expose_config: bool,
     ) -> Self {
         let mut registry = Registry::default();
-
-        let chat_cfg = Arc::new(chat::ChatCfg::from_env_and_flags(
-            flags.chat_upstream_url.clone(),
-        ));
 
         let build_info = Family::<BuildInfoLabels, Gauge>::default();
         build_info
@@ -169,7 +169,6 @@ impl AppState {
             models,
             routing,
             flags,
-            chat_cfg,
             http_requests,
             http_latency,
             metrics_recorder,
@@ -195,10 +194,6 @@ impl AppState {
 
     pub fn flags(&self) -> FeatureFlags {
         self.0.flags.clone()
-    }
-
-    pub fn chat_cfg(&self) -> Arc<chat::ChatCfg> {
-        self.0.chat_cfg.clone()
     }
 
     pub fn index(&self) -> IndexState {
@@ -253,7 +248,7 @@ impl HttpDurationLabels {
 impl EncodeLabelSet for HttpDurationLabels {
     fn encode(
         &self,
-        encoder: &mut prometheus_client::encoding::LabelSetEncoder<'_>,
+        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("method", self.method.as_str()).encode(encoder.encode_label())?;
         ("path", self.path).encode(encoder.encode_label())?;
@@ -281,7 +276,7 @@ impl HttpLabels {
 impl EncodeLabelSet for HttpLabels {
     fn encode(
         &self,
-        encoder: &mut prometheus_client::encoding::LabelSetEncoder<'_>,
+        mut encoder: prometheus_client::encoding::LabelSetEncoder<'_>,
     ) -> Result<(), fmt::Error> {
         ("method", self.method.as_str()).encode(encoder.encode_label())?;
         ("path", self.path).encode(encoder.encode_label())?;
@@ -508,7 +503,7 @@ fn core_routes() -> Router<AppState> {
         .route("/ready", get(ready))
         .route("/metrics", get(metrics))
         .route("/ask", get(ask::ask_handler))
-        .route("/v1/chat", post(chat::post_chat))
+        .route("/v1/chat", post(chat::chat_handler))
 }
 
 fn docs_routes() -> Router<AppState> {
@@ -547,7 +542,10 @@ async fn api_docs() -> Html<&'static str> {
 
 /// Serve OpenAPI as JSON with robust error handling.
 async fn openapi_json() -> Response {
+    // 1) Build the OpenAPI struct (infallible in `utoipa`).
     let spec = ApiDoc::openapi();
+
+    // 2) Serialize explicitly so we can handle failures gracefully.
     match serde_json::to_vec(&spec) {
         Ok(bytes) => (
             StatusCode::OK,
@@ -559,7 +557,9 @@ async fn openapi_json() -> Response {
         )
             .into_response(),
         Err(err) => {
+            // Log for operators.
             tracing::error!("failed to serialize OpenAPI JSON: {err}");
+            // Compact JSON error payload for clients.
             let body =
                 format!("{{\"error\":\"failed to serialize openapi\",\"details\":\"{err}\"}}");
             (
@@ -706,6 +706,7 @@ mod tests {
     async fn health_ok_and_metrics_increment() {
         let app = demo_app(false);
 
+        // Hit /health to generate a metric.
         let res = app
             .clone()
             .oneshot(Request::get("/health").body(Body::empty()).unwrap())
@@ -713,6 +714,7 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
 
+        // Hit /metrics once. This will report the /health metric and increment its own counter.
         let res = app
             .clone()
             .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
@@ -721,6 +723,7 @@ mod tests {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let text_one = String::from_utf8(body.to_vec()).unwrap();
 
+        // Assert that the first /metrics call reported the /health call.
         let expected_health = [
             r#"http_requests_total{method="GET",path="/health",status="200"} 1"#,
             r#"http_requests_total_total{method="GET",path="/health",status="200"} 1"#,
@@ -732,6 +735,7 @@ mod tests {
             "metrics missing labeled health counter:\n{text_one}"
         );
 
+        // Hit /metrics a second time. This will report the metric from the first /metrics call.
         let res = app
             .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
             .await
@@ -739,6 +743,7 @@ mod tests {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let text_two = String::from_utf8(body.to_vec()).unwrap();
 
+        // Assert that the second /metrics call reported the first /metrics call.
         let expected_metrics = [
             r#"http_requests_total{method="GET",path="/metrics",status="200"} 1"#,
             r#"http_requests_total_total{method="GET",path="/metrics",status="200"} 1"#,
@@ -933,7 +938,10 @@ mod tests {
         assert_eq!(response.k, 1);
         assert!(response.hits.len() <= 1);
         assert!(
-            response.hits.iter().any(|hit| hit.doc_id == "ask-doc-min"),
+            response
+                .hits
+                .iter()
+                .any(|hit| hit.doc_id == "ask-doc-min"),
             "expected a hit with doc_id ask-doc-min"
         );
     }
