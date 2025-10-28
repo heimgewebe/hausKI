@@ -850,6 +850,103 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ask_route_clamps_k_to_100() {
+        let app = demo_app(false);
+
+        let upsert_payload = json!({
+            "doc_id": "ask-doc-large",
+            "namespace": "default",
+            "chunks": [
+                {"chunk_id": "ask-doc-large#0", "text": "Hallo Hauski", "embedding": []}
+            ],
+            "meta": {"kind": "markdown"}
+        });
+
+        let upsert_res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/index/upsert")
+                    .method("POST")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(upsert_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(upsert_res.status(), StatusCode::OK);
+
+        let ask_res = app
+            .oneshot(
+                Request::builder()
+                    .uri("/ask?q=Hauski&k=250&ns=default")
+                    .method("GET")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ask_res.status(), StatusCode::OK);
+
+        let body = ask_res.into_body().collect().await.unwrap().to_bytes();
+        let response: AskResponse = from_slice(&body).unwrap();
+        assert_eq!(response.k, 100);
+        assert!(response.hits.len() <= 100);
+    }
+
+    #[tokio::test]
+    async fn ask_route_clamps_k_to_minimum() {
+        let app = demo_app(false);
+
+        let upsert_payload = json!({
+            "doc_id": "ask-doc-min",
+            "namespace": "default",
+            "chunks": [
+                {"chunk_id": "ask-doc-min#0", "text": "Hallo Hauski", "embedding": []}
+            ],
+            "meta": {"kind": "markdown"}
+        });
+
+        let upsert_res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/index/upsert")
+                    .method("POST")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(upsert_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(upsert_res.status(), StatusCode::OK);
+
+        let ask_res = app
+            .oneshot(
+                Request::builder()
+                    .uri("/ask?q=Hauski&k=0&ns=default")
+                    .method("GET")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ask_res.status(), StatusCode::OK);
+
+        let body = ask_res.into_body().collect().await.unwrap().to_bytes();
+        let response: AskResponse = from_slice(&body).unwrap();
+        assert_eq!(response.k, 1);
+        assert!(response.hits.len() <= 1);
+        assert!(
+            response
+                .hits
+                .iter()
+                .any(|hit| hit.doc_id == "ask-doc-min"),
+            "expected a hit with doc_id ask-doc-min"
+        );
+    }
+
+    #[tokio::test]
     async fn metrics_include_index_search() {
         let app = demo_app(false);
 
