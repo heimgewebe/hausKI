@@ -7,12 +7,20 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use tracing::{debug, warn};
 use utoipa::ToSchema;
 
 use crate::{chat_upstream::call_ollama_chat, AppState};
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+#[schema(
+    title = "ChatMessage",
+    example = json!({
+        "role": "user",
+        "content": "Summarize the latest build status."
+    })
+)]
 pub struct ChatMessage {
     /// Role of the message author (e.g. user, system, assistant).
     pub role: String,
@@ -20,7 +28,14 @@ pub struct ChatMessage {
     pub content: String,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(
+    title = "ChatResponse",
+    example = json!({
+        "content": "Build succeeded on commit abc123.",
+        "model": "llama3:latest"
+    })
+)]
 pub struct ChatResponse {
     /// Assistant message content produced by the upstream model.
     pub content: String,
@@ -28,13 +43,29 @@ pub struct ChatResponse {
     pub model: String,
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[schema(
+    title = "ChatRequest",
+    example = json!({
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Summarize the latest build status."}
+        ]
+    })
+)]
 pub struct ChatRequest {
     /// Sequence of messages forming the current conversation turn.
     pub messages: Vec<ChatMessage>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[schema(
+    title = "ChatStubResponse",
+    example = json!({
+        "status": "not_implemented",
+        "message": "chat pipeline not wired yet"
+    })
+)]
 pub struct ChatStubResponse {
     /// Static status marker highlighting that the endpoint is not wired yet.
     pub status: String,

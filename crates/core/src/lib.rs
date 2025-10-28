@@ -938,10 +938,7 @@ mod tests {
         assert_eq!(response.k, 1);
         assert!(response.hits.len() <= 1);
         assert!(
-            response
-                .hits
-                .iter()
-                .any(|hit| hit.doc_id == "ask-doc-min"),
+            response.hits.iter().any(|hit| hit.doc_id == "ask-doc-min"),
             "expected a hit with doc_id ask-doc-min"
         );
     }
