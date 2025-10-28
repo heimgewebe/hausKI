@@ -39,12 +39,14 @@ jobs:
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: Cache cargo + target
-        uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
+        uses: Swatinem/rust-cache@v2.7.7
         with:
           cache-on-failure: true
           shared-key: ${{ runner.os }}-cov-${{ hashFiles('**/Cargo.lock') }}
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked --version 0.6.9
+      - name: Clean coverage artifacts
+        run: cargo llvm-cov clean --workspace
       - name: Run coverage (focused)
         env:
           # sufficient for llvm-cov; slightly faster than debuginfo=2
@@ -59,6 +61,7 @@ jobs:
         with:
           name: lcov.info
           path: lcov.info
+          retention-days: 7
       # Coveralls optional – ein-/auskommentieren je nach Bedarf:
       # - uses: coverallsapp/github-action@v2
       #   with:
