@@ -51,7 +51,7 @@ jobs:
           grep -E '^uv 0\.7\.' <<<"$version"
 
       - name: Cache uv
-        uses: actions/cache@13c3b5c0b52e77e8fa7b4e3d6a238602b25e9a3a # actions/cache@v4.0.2 (pinned)
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cache/uv
