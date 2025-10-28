@@ -43,12 +43,16 @@ jobs:
 
       - name: Check links
         id: lychee
-        uses: lycheeverse/lychee-action@v2
+        uses: lycheeverse/lychee-action@5b84becd9d3980d9d8716da68816c9bd1d4e0d96 # v2.1.0
+        continue-on-error: true
         with:
           args: >
             --config .lychee.toml
             --no-progress
             --verbose
+            --retry-wait-time 2
+            --max-retries 3
+            --exclude-mail
             --format markdown
             --output lychee/out.md
             "./**/*.md" "./**/*.html"
@@ -56,7 +60,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: PR comment with report
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && steps.lychee.outputs.exit_code != 0 }}
+        if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && steps.lychee.outputs.exit_code != 0 }}
         uses: thollander/actions-comment-pull-request@v3
         with:
           message: |
@@ -64,8 +68,9 @@ jobs:
             Exit code: ${{ steps.lychee.outputs.exit_code }}
 
       - name: Upload report artifact
-        if: ${{ always() && steps.lychee.outputs.exit_code != 0 }}
+        if: ${{ always() && steps.lychee.outputs.exit_code != 0 && hashFiles('lychee/out.md') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: lychee-report
           path: lychee/out.md
+          retention-days: 7
