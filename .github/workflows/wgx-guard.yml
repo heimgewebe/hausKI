@@ -91,11 +91,13 @@ jobs:
             fi
             echo "retry $i/3"; sleep $((2*i));
           done
-          command -v uv >/dev/null || { echo "::error::uv installation failed"; exit 1; }
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Für diesen Step PATH sofort setzen und auf ≥0.8 bringen
+          # Für diesen Step PATH sofort setzen (Installer dropt in ~/.local/bin / ~/.cargo/bin)
           export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+          # Installation validieren NACH PATH-Update
+          command -v uv >/dev/null 2>&1 || { echo "::error::uv installation failed"; exit 1; }
+          # Auf ≥0.8 bringen, falls Runner ältere Version gecached hatte
           ver="$(uv --version || true)"
           echo "uv version: $ver"
           if [[ "$ver" =~ ^uv\ ([0-9]+)\.([0-9]+)\. ]]; then
@@ -120,13 +122,15 @@ jobs:
             exit 1
           fi
 
+          export UV_NO_SYNC_DOWNLOADS=1
+
           if [ -f uv.lock ]; then
             echo "using existing uv.lock → sync --frozen"
-            uv sync --frozen
+            uv sync --frozen --python-preference=only-managed
           else
             echo "no uv.lock → creating lock + sync"
             uv lock
-            uv sync
+            uv sync --python-preference=only-managed
           fi
 
       - name: Done
