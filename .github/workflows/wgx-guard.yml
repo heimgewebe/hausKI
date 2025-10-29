@@ -38,6 +38,14 @@ jobs:
           cache: 'pip'
           cache-dependency-path: pyproject.toml
 
+      - name: Cache pip downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
       - name: Install PyYAML
         run: |
           pip install --disable-pip-version-check --upgrade pip
@@ -81,21 +89,13 @@ jobs:
         if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
           set -euo pipefail
-          # Installer mit einfachem Retry gegen temporäre Netzflaps
-          export UV_INSTALL_TIMEOUT=60
-          for i in 1 2 3; do
-            if curl -LsSf https://astral.sh/uv/install.sh | sh; then break; fi
-            if [ "$i" -eq 3 ]; then
-              echo "::error::uv installation failed after retries"
-              exit 1
-            fi
-            echo "retry $i/3"; sleep $((2*i));
-          done
-          command -v uv >/dev/null || { echo "::error::uv installation failed"; exit 1; }
+          python -m pip install --user --disable-pip-version-check 'uv>=0.8,<0.9'
           echo "$HOME/.local/bin" >> $GITHUB_PATH
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Für diesen Step PATH sofort setzen und auf ≥0.8 bringen
-          export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          if ! command -v uv >/dev/null 2>&1; then
+            echo "::error::uv not found after pip install"
+            exit 1
+          fi
           ver="$(uv --version || true)"
           echo "uv version: $ver"
           if [[ "$ver" =~ ^uv\ ([0-9]+)\.([0-9]+)\. ]]; then
@@ -120,13 +120,92 @@ jobs:
             exit 1
           fi
 
+          if [ -f .wgx/profile.yml ] && [ -f pyproject.toml ]; then
+            WGX_PY="$(python - <<'PY'
+try:
+    import yaml  # type: ignore
+except Exception:
+    yaml = None
+
+def manual_parse(text: str) -> str:
+    fallback = "3.12"
+    lines = text.splitlines()
+    tooling = False
+    python = False
+    tooling_indent = None
+    python_indent = None
+    for line in lines:
+        raw = line.rstrip("\n")
+        stripped = raw.lstrip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        indent = len(raw) - len(stripped)
+        if indent == 0:
+            tooling = stripped.startswith('tooling:')
+            python = False
+            tooling_indent = indent if tooling else None
+            continue
+        if tooling and tooling_indent is not None:
+            if indent <= tooling_indent:
+                tooling = False
+                python = False
+            elif stripped.startswith('python:'):
+                python = True
+                python_indent = indent
+                continue
+        if python and python_indent is not None:
+            if indent <= python_indent:
+                python = False
+            elif stripped.startswith('version:'):
+                value = stripped.split(':', 1)[1].strip().strip("'\"")
+                return value or fallback
+    return fallback
+
+try:
+    with open('.wgx/profile.yml', 'r', encoding='utf-8') as f:
+        content = f.read()
+except FileNotFoundError:
+    content = ''
+
+version = "3.12"
+if yaml:
+    try:
+        data = yaml.safe_load(content) or {}
+        version = str(data.get('tooling', {}).get('python', {}).get('version', '3.12'))
+    except Exception:
+        version = manual_parse(content)
+else:
+    version = manual_parse(content)
+
+version = '.'.join(version.split('.')[:2]) or '3.12'
+print(version)
+PY
+)"
+          else
+            WGX_PY="3.12"
+          fi
+
+          echo "WGX_PY=${WGX_PY}" >> "$GITHUB_ENV"
+
+          if [ -n "${WGX_PY:-}" ] && [ -f pyproject.toml ]; then
+            echo "Desired Python: ${WGX_PY}"
+            if ! uv python list --format json | grep -q "\"version\": \"${WGX_PY}"; then
+              echo "Installing managed Python ${WGX_PY} via uv…"
+              uv python install "${WGX_PY}"
+            else
+              echo "Managed Python ${WGX_PY} already present."
+            fi
+          fi
+
+          export UV_NO_SYNC_DOWNLOADS=1
+
           if [ -f uv.lock ]; then
             echo "using existing uv.lock → sync --frozen"
-            uv sync --frozen
+            uv sync --frozen --python-preference=only-managed
           else
             echo "no uv.lock → creating lock + sync"
             uv lock
-            uv sync
+            uv sync --python-preference=only-managed
           fi
 
       - name: Done
