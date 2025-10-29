@@ -58,23 +58,31 @@ jobs:
         run: |
           # measure only the runtime-relevant crates
           PKGS="--package hauski-core --package hauski-indexd"
+          echo "PKGS=$PKGS"
           mkdir -p target/coverage/html
-          cargo llvm-cov $PKGS --all-features --doctests --fail-under-lines 65 \
-            --html --output-path target/coverage/html \
+          # 1) Erzeuge HTML-Report (inkl. Testlauf)
+          cargo llvm-cov $PKGS \
+            --all-features \
+            --doctests \
+            --fail-under-lines 65 \
+            --html --output-path target/coverage/html
+
+          # 2) Erzeuge LCOV-Report aus den bereits gesammelten Profilen
+          cargo llvm-cov report \
             --lcov --output-path lcov.info
+      - name: Upload HTML coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: target/coverage/html
+          retention-days: 7
       - name: Upload lcov
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lcov.info
           path: lcov.info
-          retention-days: 7
-      - name: Upload HTML report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-html
-          path: target/coverage/html
           retention-days: 7
       # Coveralls optional – ein-/auskommentieren je nach Bedarf:
       # - uses: coverallsapp/github-action@v2
