@@ -6,7 +6,11 @@ targets = [
 
 [advisories]
 version = 2
+vulnerability = "deny"
+unmaintained = "warn"
+unsound = "deny"
 yanked = "warn"
+ignore = []
 
 [licenses]
 version = 2
@@ -15,6 +19,7 @@ allow = [
     "Apache-2.0",
     "BSD-3-Clause",
     "BSD-2-Clause",
+    "BSD-3-Clause-Clear",
     "MPL-2.0",
     # Präziser Unicode-Identifier, den viele Crates nutzen:
     "Unicode-DFS-2016",
@@ -23,14 +28,17 @@ allow = [
     "Zlib",
     "ISC",
     "OpenSSL",
+    "CC0-1.0",
 ]
 confidence-threshold = 0.9
 # Wie mit problematischen Klassen umgehen:
 unlicensed = "deny"
 unknown-license = "deny"
-copyleft = "warn"
+copyleft = "warn" # auf "deny" setzen, wenn du harte Ausschlüsse willst
 # Optional: lokale Eigenlizenz (für hausKI-Repos)
-private = "allow"
+# Optional: Private Crates im Monorepo vom Lizenz-Gate ausnehmen
+#   (nur Sichtbarkeitsflag; öffentl. Crates bleiben streng)
+private = { ignore = true }
 
 [bans]
 multiple-versions = "warn"
