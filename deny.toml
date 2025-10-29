@@ -1,5 +1,8 @@
 [graph]
-targets = [{ triple = "x86_64-unknown-linux-gnu" }]
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+]
 
 [advisories]
 version = 2
@@ -7,8 +10,25 @@ yanked = "warn"
 
 [licenses]
 version = 2
-allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "MPL-2.0", "Unicode-3.0", "Zlib"]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "BSD-2-Clause",
+    "MPL-2.0",
+    # Präziser Unicode-Identifier, den viele Crates nutzen:
+    "Unicode-DFS-2016",
+    # Für ältere Crates zusätzlich erlaubt:
+    "Unicode-3.0",
+    "Zlib",
+    "ISC",
+    "OpenSSL",
+]
 confidence-threshold = 0.9
+# Wie mit problematischen Klassen umgehen:
+unlicensed = "deny"
+unknown = "deny"
+copyleft = "warn"
 
 [bans]
 multiple-versions = "warn"
@@ -16,3 +36,19 @@ wildcards = "deny"
 deny = []
 skip = []
 skip-tree = []
+
+# Optional: Quellen-Policy (nur crates.io und Git mit Pinnen zulassen)
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+
+# Lizenz-Mapping/Exceptions für verbreitete Kombis (nur falls nötig):
+[[licenses.exceptions]]
+name = "ring"
+allow = ["MIT", "ISC", "OpenSSL"]
+
+[[licenses.exceptions]]
+name = "openssl"
+allow = ["Apache-2.0", "OpenSSL"]
