@@ -158,3 +158,5 @@ reviewd-enable:
 
 reviewd-status:
     systemctl --user status hauski-reviewd.timer hauski-reviewd.service || true
+run-local:
+    bash scripts/hauski-run.sh
