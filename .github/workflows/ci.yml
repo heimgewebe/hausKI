@@ -322,19 +322,8 @@ jobs:
           # Fall back to "stable" if the workflow-level environment variable is empty.
           toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
       - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
-      - name: Build hauski-cli
-        run: cargo build -p hauski-cli
-      - name: Health smoke
-        run: |
-          set -euo pipefail
-          cargo run -p hauski-cli -- serve &
-          pid=$!
-          trap 'kill "$pid" 2>/dev/null || true' EXIT
-          sleep 1
-          curl -sf http://127.0.0.1:8080/health
-          kill "$pid"
-          wait "$pid" || true
-          trap - EXIT
+      - name: Health & chat smoke (mock ollama)
+        run: bash scripts/ci-smoke-chat.sh
   security:
     name: Rust — deny & audit
     needs: changes
