@@ -66,15 +66,13 @@ jobs:
           # measure only the runtime-relevant crates
           PKGS="--package hauski-core --package hauski-indexd"
           echo "PKGS=$PKGS"
-          mkdir -p target/coverage/html
-
           # 1) Erzeuge HTML-Report (inkl. Testlauf)
           cargo llvm-cov $PKGS \
             --all-features \
             --doctests \
             --fail-under-lines 65 \
-            --html --output-path target/coverage/html
-          echo "HTML report: target/coverage/html/index.html"
+            --html
+          echo "HTML report: target/llvm-cov/html/index.html"
 
           # 2) Erzeuge LCOV-Report aus den bereits gesammelten Profilen
           cargo llvm-cov report \
@@ -85,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-html
-          path: target/coverage/html
+          path: target/llvm-cov/html
           retention-days: 7
 
       - name: Upload lcov
