@@ -27,8 +27,10 @@ allow = [
 confidence-threshold = 0.9
 # Wie mit problematischen Klassen umgehen:
 unlicensed = "deny"
-unknown = "deny"
+unknown-license = "deny"
 copyleft = "warn"
+# Optional: lokale Eigenlizenz (für hausKI-Repos)
+private = "allow"
 
 [bans]
 multiple-versions = "warn"
