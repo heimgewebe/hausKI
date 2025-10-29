@@ -81,6 +81,7 @@ struct AppStateInner {
     models: ModelsFile,
     routing: RoutingPolicy,
     flags: FeatureFlags,
+    chat_cfg: Arc<chat::ChatCfg>,
     http_requests: Family<HttpLabels, Counter<u64>>,
     http_latency: Family<HttpDurationLabels, Histogram>,
     metrics_recorder: Arc<MetricsCallback>,
@@ -116,6 +117,7 @@ impl AppState {
         models: ModelsFile,
         routing: RoutingPolicy,
         flags: FeatureFlags,
+        chat_cfg: Arc<chat::ChatCfg>,
         expose_config: bool,
     ) -> Self {
         let mut registry = Registry::default();
@@ -169,6 +171,7 @@ impl AppState {
             models,
             routing,
             flags,
+            chat_cfg,
             http_requests,
             http_latency,
             metrics_recorder,
@@ -194,6 +197,10 @@ impl AppState {
 
     pub fn flags(&self) -> FeatureFlags {
         self.0.flags.clone()
+    }
+
+    pub fn chat_cfg(&self) -> Arc<chat::ChatCfg> {
+        self.0.chat_cfg.clone()
     }
 
     pub fn index(&self) -> IndexState {
@@ -415,7 +422,11 @@ pub fn build_app_with_state(
     expose_config: bool,
     allowed_origin: HeaderValue,
 ) -> (Router, AppState) {
-    let state = AppState::new(limits, models, routing, flags, expose_config);
+    let chat_cfg = Arc::new(chat::ChatCfg::from_env_and_flags(
+        flags.chat_upstream_url.clone(),
+        flags.chat_model.clone(),
+    ));
+    let state = AppState::new(limits, models, routing, flags, chat_cfg, expose_config);
     let allowed_origin = Arc::new(allowed_origin);
 
     // --- Request guards ------------------------------------------------------
@@ -938,10 +949,7 @@ mod tests {
         assert_eq!(response.k, 1);
         assert!(response.hits.len() <= 1);
         assert!(
-            response
-                .hits
-                .iter()
-                .any(|hit| hit.doc_id == "ask-doc-min"),
+            response.hits.iter().any(|hit| hit.doc_id == "ask-doc-min"),
             "expected a hit with doc_id ask-doc-min"
         );
     }
