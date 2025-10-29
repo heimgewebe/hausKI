@@ -63,7 +63,7 @@ hauski/
 
 ## 3) APIs, Policies, Modelle
 
-* **Chat (MVP):** `POST /v1/chat` (stub → `501 Not Implemented`, OpenAI-kompatible Routen folgen)
+* **Chat (MVP):** `POST /v1/chat` → nutzt `ChatCfg` + Ollama-Upstream; setzt `HAUSKI_CHAT_UPSTREAM_URL` (+ optional `HAUSKI_CHAT_MODEL`), sonst `503` mit `Retry-After` (siehe `crates/core/tests/chat_unconfigured.rs`)
 * **Spezial:** `POST /asr/transcribe`, `/obsidian/canvas/suggest`, `/code/pr/draft`, `/audio/profile`
 * **Policies:**
 

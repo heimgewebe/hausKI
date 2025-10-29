@@ -47,7 +47,7 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(health, healthz, ready, ask::ask_handler, chat::post_chat),
+    paths(health, healthz, ready, ask::ask_handler, chat::chat_handler),
     components(
         schemas(
             ask::AskResponse,
@@ -509,7 +509,7 @@ fn core_routes() -> Router<AppState> {
         .route("/ready", get(ready))
         .route("/metrics", get(metrics))
         .route("/ask", get(ask::ask_handler))
-        .route("/v1/chat", post(chat::post_chat))
+        .route("/v1/chat", post(chat::chat_handler))
 }
 
 fn docs_routes() -> Router<AppState> {
