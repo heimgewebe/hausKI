@@ -63,9 +63,11 @@ echo "[smoke] check /health"
 curl -fsS "${HOST}/health" | grep -qi "ok"
 
 echo "[smoke] check /v1/chat"
-RESP="$(curl -sSf --max-time 10 -X POST "${HOST}/v1/chat" \
+RESP=$(curl -sSf --max-time 10 -X POST "${HOST}/v1/chat" \
   -H 'Content-Type: application/json' \
-  -d '{"messages":[{"role":"user","content":"Ping?"}]}')"
+  -d '{"messages":[{"role":"user","content":"Ping?"}]}')
+
+echo "${RESP}" | jq . >/dev/null 2>&1 || { echo "Non-JSON response: ${RESP}"; exit 1; }
 
 python3 - "$RESP" "$MODEL" <<'PY'
 import json, sys
