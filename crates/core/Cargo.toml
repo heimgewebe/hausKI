@@ -24,6 +24,7 @@ url.workspace = true
 hauski-indexd = { path = "../indexd", version = "0.1.0" }
 tower = { workspace = true, features = ["limit", "timeout"] }
 utoipa.workspace = true
+utoipa-swagger-ui.workspace = true
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }

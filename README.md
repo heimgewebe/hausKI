@@ -229,7 +229,7 @@ Nach dem Start stehen folgende Kern-Endpunkte zur Verfügung:
 | `/ready` | GET | Signalisiert, dass Limits, Modelle & Routing geladen wurden. |
 | `/metrics` | GET | Prometheus-kompatible Metriken (HTTP, Budgets). |
 | `/v1/chat` | POST | Erster Chat-Stub. Gibt aktuell `501 Not Implemented` zurück und demonstriert den JSON-Schema-Fluss. |
-| `/docs`, `/docs/openapi.json` | GET | Menschliche bzw. maschinenlesbare API-Dokumentation. |
+| `/docs`, `/api-docs/openapi.json` | GET | Menschliche bzw. maschinenlesbare API-Dokumentation. |
 
 Beispiel-Aufrufe:
 

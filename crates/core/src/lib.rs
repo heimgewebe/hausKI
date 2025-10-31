@@ -5,7 +5,7 @@ use axum::{
     extract::State,
     http::{header, HeaderValue, Method, Request, StatusCode},
     middleware::{from_fn_with_state, Next},
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -25,6 +25,7 @@ use std::{
 };
 use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, BoxError, ServiceBuilder};
 use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 mod ask;
 mod chat;
@@ -450,7 +451,8 @@ pub fn build_app_with_state(
         .nest("/index", index_router::<AppState>());
 
     if state.expose_config() {
-        app = app.merge(config_routes()).merge(docs_routes());
+        let swagger = SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi());
+        app = app.merge(config_routes()).merge(swagger);
     }
 
     if state.safe_mode() {
@@ -510,70 +512,6 @@ fn core_routes() -> Router<AppState> {
         .route("/metrics", get(metrics))
         .route("/ask", get(ask::ask_handler))
         .route("/v1/chat", post(chat::chat_handler))
-}
-
-fn docs_routes() -> Router<AppState> {
-    Router::new()
-        .route("/docs", get(api_docs))
-        .route("/docs/openapi.json", get(openapi_json))
-}
-
-const SWAGGER_UI_HTML: &str = r#"<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>HausKI OpenAPI</title>
-    <link rel="stylesheet" href="/static/swagger-ui/swagger-ui.css" />
-  </head>
-  <body>
-    <div id="swagger-ui"></div>
-    <script src="/static/swagger-ui/swagger-ui-bundle.js"></script>
-    <script>
-      window.onload = () => {
-        window.ui = SwaggerUIBundle({
-          url: '/docs/openapi.json',
-          dom_id: '#swagger-ui',
-          presets: [SwaggerUIBundle.presets.apis],
-        });
-      };
-    </script>
-  </body>
-</html>
-"#;
-
-async fn api_docs() -> Html<&'static str> {
-    Html(SWAGGER_UI_HTML)
-}
-
-/// Serve OpenAPI as JSON with robust error handling.
-async fn openapi_json() -> Response {
-    let spec = ApiDoc::openapi();
-    match serde_json::to_vec(&spec) {
-        Ok(bytes) => (
-            StatusCode::OK,
-            [(
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("application/json"),
-            )],
-            bytes,
-        )
-            .into_response(),
-        Err(err) => {
-            tracing::error!("failed to serialize OpenAPI JSON: {err}");
-            let body =
-                format!("{{\"error\":\"failed to serialize openapi\",\"details\":\"{err}\"}}");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                [(
-                    header::CONTENT_TYPE,
-                    HeaderValue::from_static("application/json"),
-                )],
-                body,
-            )
-                .into_response()
-        }
-    }
 }
 
 fn config_routes() -> Router<AppState> {
