@@ -5,7 +5,7 @@ use axum::{
     extract::State,
     http::{header, HeaderValue, Method, Request, StatusCode},
     middleware::{from_fn_with_state, Next},
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -515,7 +515,8 @@ fn core_routes() -> Router<AppState> {
 fn docs_routes() -> Router<AppState> {
     Router::new()
         .route("/docs", get(api_docs))
-        .route("/docs/openapi.json", get(openapi_json))
+        .route("/api-docs/openapi.json", get(openapi_json))
+        .route("/docs/openapi.json", get(|| async { Redirect::permanent("/api-docs/openapi.json") }))
 }
 
 const SWAGGER_UI_HTML: &str = r#"<!DOCTYPE html>
@@ -532,7 +533,7 @@ const SWAGGER_UI_HTML: &str = r#"<!DOCTYPE html>
     <script>
       window.onload = () => {
         window.ui = SwaggerUIBundle({
-          url: '/docs/openapi.json',
+          url: '/api-docs/openapi.json',
           dom_id: '#swagger-ui',
           presets: [SwaggerUIBundle.presets.apis],
         });
