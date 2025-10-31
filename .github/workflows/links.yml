@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  actions: write   # erforderlich, damit actions/cache@v4 Ergebnisse speichern kann
   pull-requests: write  # erlaubt PR-Kommentare
 
 jobs:
@@ -46,10 +47,12 @@ jobs:
         with:
           path: ~/.cache/lychee
           key: lychee-${{ runner.os }}-${{ hashFiles('.lychee.toml') }}
+          restore-keys: |
+            lychee-${{ runner.os }}-
 
       - name: Check links with Lychee
         id: lychee
-        uses: lycheeverse/lychee-action@5b84becd9d3980d9d8716da68816c9bd1d4e0d96 # v2.1.0, stabiler Commit
+        uses: lycheeverse/lychee-action@v1.10.0 # official release tag
         continue-on-error: ${{ github.event_name == 'pull_request' }}
         with:
           args: >
@@ -65,6 +68,12 @@ jobs:
             "./**/*.md" "./**/*.html"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print lychee exit code
+        if: >-
+          ${{ always()
+            && steps.lychee.outputs.exit_code != '' }}
+        run: echo "Lychee exit code: ${{ steps.lychee.outputs.exit_code }}"
 
       - name: Comment on PR if broken links
         if: >-
