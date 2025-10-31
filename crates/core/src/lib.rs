@@ -1192,6 +1192,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn chat_stub_not_implemented_payload_matches_message() {
+        let app = demo_app(false);
+        let payload = json!({
+            "messages": [
+                {"role": "user", "content": "Hallo HausKI?"}
+            ]
+        });
+
+        let res = app
+            .oneshot(
+                Request::post("/v1/chat")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let stub: ChatStubResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            stub.message,
+            "chat pipeline not wired yet, please configure HAUSKI_CHAT_UPSTREAM_URL"
+        );
+    }
+
+    #[tokio::test]
     async fn safe_mode_flag_is_reflected_in_state() {
         let (_app, state) = demo_app_with_origin_and_flags(
             false,
