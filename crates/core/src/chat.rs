@@ -101,7 +101,7 @@ pub struct ChatRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 #[schema(title = "ChatStubResponse", example = json!({
-    "status": "unavailable",
+    "status": "not_implemented",
     "message": "chat pipeline not wired yet, please configure HAUSKI_CHAT_UPSTREAM_URL"
 }))]
 pub struct ChatStubResponse {
@@ -256,6 +256,11 @@ fn validate_chat_request(req: &ChatRequest) -> Result<(), ChatStubResponse> {
             body = ChatStubResponse
         ),
         (
+            status = 501,
+            description = "Chat endpoint not implemented",
+            body = ChatStubResponse
+        ),
+        (
             status = 503,
             description = "Chat endpoint not currently available",
             body = ChatStubResponse,
@@ -324,17 +329,12 @@ pub async fn chat_handler(
     }
 
     warn!("chat request received but no chat upstream is configured");
-    let status = StatusCode::SERVICE_UNAVAILABLE;
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        axum::http::header::RETRY_AFTER,
-        HeaderValue::from_static(RETRY_AFTER_SECS),
-    );
+    let status = StatusCode::NOT_IMPLEMENTED;
     state.record_http_observation(Method::POST, "/v1/chat", status, started);
     let payload = ChatStubResponse {
-        status: "unavailable".to_string(),
+        status: "not_implemented".to_string(),
         message: "chat pipeline not wired yet, please configure HAUSKI_CHAT_UPSTREAM_URL"
             .to_string(),
     };
-    (status, headers, Json(payload)).into_response()
+    (status, Json(payload)).into_response()
 }
