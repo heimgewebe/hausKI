@@ -54,7 +54,7 @@ jobs:
           grep -E '^uv 0\.7\.6$' <<<"$version"
 
       # --- Sanity check: lock must exist and be in sync for dev extra ----------
-      - name: Sanity: uv.lock present when schema sources exist
+      - name: Sanity: require uv.lock when schema sources exist
         if: ${{ hashFiles('pyproject.toml') != '' }}
         shell: bash
         run: |
@@ -72,6 +72,7 @@ def has_jsonschema_from_json() -> bool:
 
 
 def has_jsonschema_from_text() -> bool:
+    # Platzhalter für spätere Textquellen (README-Anker etc.)
     return False
 
 
@@ -80,8 +81,13 @@ ok = (
     or has_jsonschema_from_json()
     or has_jsonschema_from_text()
 )
+# Wenn keine Schema-Quelle vorhanden ist, überspringen wir die Lock-Prüfung.
 if not ok:
-    print("uv.lock not found. Run uv lock --extra dev")
+    print("No schema source detected; skipping uv.lock check")
+    sys.exit(0)
+# Liegt eine Schema-Quelle vor, MUSS uv.lock existieren.
+if not os.path.exists("uv.lock"):
+    print("uv.lock not found. Run uv lock --extra dev", file=sys.stderr)
     sys.exit(1)
 PY
 
