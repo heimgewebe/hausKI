@@ -72,26 +72,17 @@ def has_jsonschema_from_json() -> bool:
 
 
 def has_jsonschema_from_text() -> bool:
-    # Platzhalter für spätere Textquellen (README-Anker etc.)
     return False
 
 
-def main() -> None:
-    ok = (
-        has_jsonschema_from_toml()
-        or has_jsonschema_from_json()
-        or has_jsonschema_from_text()
-    )
-    if not ok:
-        print("No schema source detected; skipping uv.lock check")
-        sys.exit(0)
-    if not os.path.exists("uv.lock"):
-        print("uv.lock not found. Run: uv lock --extra dev")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
+ok = (
+    has_jsonschema_from_toml()
+    or has_jsonschema_from_json()
+    or has_jsonschema_from_text()
+)
+if not ok:
+    print("uv.lock not found. Run uv lock --extra dev")
+    sys.exit(1)
 PY
 
       - name: Assert jsonschema pinned in uv.lock

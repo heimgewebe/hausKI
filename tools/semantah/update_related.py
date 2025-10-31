@@ -136,20 +136,9 @@ def build_related_map(
         getattr(block, label_list).append((target_node.title, edge.score))
 
     for block in related.values():
-        # Sort: Score absteigend, Key aufsteigend (case-insensitive)
-        # item ist ein Tupel/Liste: (key, score) oder kompatibel
-        block.auto.sort(
-            key=lambda item: (
-                -item[1],
-                (item[0] if isinstance(item[0], str) else str(item[0])).casefold(),
-            )
-        )
-        block.review.sort(
-            key=lambda item: (
-                -item[1],
-                (item[0] if isinstance(item[0], str) else str(item[0])).casefold(),
-            )
-        )
+        # Sortierung: erst Score absteigend, dann Name alphabetisch
+        block.auto.sort(key=lambda item: (-item[1], item[0]))
+        block.review.sort(key=lambda item: (-item[1], item[0]))
 
     return related
 

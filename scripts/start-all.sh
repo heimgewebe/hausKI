@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# --- rotatelog helper ---
+rotatelog() {
+  local logfile="$1"
+  if [[ -f "$logfile" ]]; then
+    mv "$logfile" "${logfile}.$(date +%Y%m%d_%H%M%S)"
+  fi
+}
+
 # Start: (1) Upstream (llama.cpp --server) (optional) + (2) HausKI Core
 # Features:
 #   - OpenAI-kompatibler Upstream (PORT, MODEL, --upstream-url)
@@ -115,6 +123,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 source scripts/lib/logging.bash
+if ! declare -F rotate_log >/dev/null 2>&1; then
+  rotate_log() {
+    rotatelog "$@"
+  }
+fi
 init_logs
 UPSTREAM_LOG="${LOG_DIR}/upstream.log"
 CORE_LOG="${LOG_DIR}/core.log"
@@ -123,6 +136,12 @@ mkdir -p "${CONFIG_DIR}"
 
 DEFAULT_UPSTREAM_URL="http://127.0.0.1:${PORT}"
 UPSTREAM_URL_RAW="${UPSTREAM_URL}"
+
+if [[ -n "${UPSTREAM_URL:-}" ]] && \
+   [[ "${UPSTREAM_URL}" != "${DEFAULT_UPSTREAM_URL:-}" ]] && \
+   [[ "${NO_UPSTREAM:-0}" -eq 0 ]]; then
+  echo "[info] Using upstream: ${UPSTREAM_URL}"
+fi
 
 if [[ -n "${UPSTREAM_URL}" && "${UPSTREAM_URL}" != "${DEFAULT_UPSTREAM_URL}" && "${NO_UPSTREAM}" = "0" ]]; then
   echo "ℹ️  Externe Upstream-URL erkannt – überspringe lokalen llama.cpp-Start. Nutze --no-upstream explizit, um das Verhalten festzulegen."
@@ -162,9 +181,9 @@ if ! (command -v just >/dev/null 2>&1 && just --list 2>/dev/null | grep -qE '^\s
   CORE_CMD=("cargo" "run" "-p" "hauski-cli" "--" "serve")
 fi
 
-rotate_log "${CORE_LOG}"
+rotatelog "${CORE_LOG}"
 if [[ "${NO_UPSTREAM}" = "0" ]]; then
-  rotate_log "${UPSTREAM_LOG}"
+  rotatelog "${UPSTREAM_LOG}"
 fi
 
 if [[ -z "${HAUSKI_FLAGS-}" ]]; then
