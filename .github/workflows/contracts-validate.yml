@@ -1,0 +1,79 @@
+name: contracts-validate
+
+on:
+  push:
+    paths:
+      - '.github/workflows/contracts-validate.yml'
+      - 'fixtures/**'
+      - 'contracts/**'
+      - 'schemas/**'
+  pull_request:
+    paths:
+      - '.github/workflows/contracts-validate.yml'
+      - 'fixtures/**'
+      - 'contracts/**'
+      - 'schemas/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout (full history for diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce centralized contracts policy
+        env:
+          # Set ALLOW_LOCAL_CONTRACTS=1 in repo variables to skip the guard (rare exceptions).
+          ALLOW_LOCAL_CONTRACTS: ${{ vars.ALLOW_LOCAL_CONTRACTS }}
+        run: |
+          set -euo pipefail
+          if [[ "${ALLOW_LOCAL_CONTRACTS:-0}" == "1" ]]; then
+            echo "::notice::ALLOW_LOCAL_CONTRACTS=1 - guard skipped."
+            exit 0
+          fi
+
+          # Determine base for diff
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            # parent of HEAD on push
+            BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+
+          # List changed paths relevant to forbidden dirs
+          CHANGED=$(git diff --name-only "${BASE_SHA}"...HEAD | grep -E '^(contracts/|schemas/)' || true)
+
+          # If repo already contains these dirs but they are not part of the change, warn only.
+          EXISTING=()
+          for d in contracts schemas; do
+            [[ -d "$d" ]] && EXISTING+=("$d")
+          done
+
+          if [[ -n "${CHANGED}" ]]; then
+            echo "::error::Changes detected under 'contracts/' or 'schemas/'. These must live in heimgewebe/contracts."
+            echo "${CHANGED}"
+            exit 1
+          elif (( ${#EXISTING[@]} )); then
+            echo "::warning::Repository currently contains: ${EXISTING[*]}. Please migrate to heimgewebe/contracts."
+          else
+            echo "No local contracts/schemas detected or changed."
+          fi
+
+  validate:
+    needs: guard
+    permissions:
+      contents: read
+      workflows: read
+    uses: heimgewebe/contracts/.github/workflows/contracts-ajv-reusable.yml@${{ vars.CONTRACTS_WORKFLOW_REF || 'v0.1.0' }}
+    with:
+      contracts_ref: ${{ vars.CONTRACTS_REF || 'v0.1.0' }}
+      fixtures_glob: ${{ vars.FIXTURES_GLOB || 'fixtures/**/*.jsonl,fixtures/**/*.json' }}
