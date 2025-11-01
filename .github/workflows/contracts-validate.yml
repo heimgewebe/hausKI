@@ -230,7 +230,7 @@ jobs:
   validate:
     name: Validate JSON fixtures with reusable workflow
     needs: [compute-inputs, version-sync-check, guard]
-    uses: heimgewebe/contracts/.github/workflows/contracts-ajv-reusable.yml@contracts-v1
+    uses: heimgewebe/contracts/.github/workflows/contracts-ajv-reusable.yml@${{ needs.compute-inputs.outputs.contracts_ref }}
     # Keine Secret-Vererbung per Default; bei Bedarf gezielt setzen:
     # secrets:
     #   SOME_SECRET: ${{ secrets.SOME_SECRET }}
