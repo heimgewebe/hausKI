@@ -13,12 +13,12 @@ on:
     paths:
       - "contracts/**"
       - "schemas/**"
-      - ".github/workflows/**"
+      - ".github/workflows/contracts-validate.yml"
   pull_request:
     paths:
       - "contracts/**"
       - "schemas/**"
-      - ".github/workflows/**"
+      - ".github/workflows/contracts-validate.yml"
 
 defaults:
   run:
