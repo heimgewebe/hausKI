@@ -59,7 +59,7 @@ jobs:
             line="${line##+([[:space:]])}"
             line="${line%%+([[:space:]])}"
 
-            # FIX: single quotes im Regex escapen
+            # Escape single quotes in regex
             if [[ "$line" =~ ^(-[[:space:]]*)?uses:[[:space:]]*\'([^']+)\' ]]; then
               echo "${BASH_REMATCH[2]}"; return 0
             fi
