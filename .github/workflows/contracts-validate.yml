@@ -154,7 +154,7 @@ jobs:
 
           blocked_file="$(mktemp)"; trap 'rm -f "$blocked_file"' EXIT
 
-          # Direct while loop instead of redundant awk
+          # Process git diff output to detect deletions and renames in protected directories
           while IFS=$'\t' read -r status p1 p2; do
             [[ "$status" =~ ^[DR] ]] || continue
             [[ "$p1" =~ ^(contracts|schemas)/ ]] || continue
