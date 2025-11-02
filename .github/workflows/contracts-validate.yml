@@ -1,0 +1,163 @@
+name: "contracts-validate"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - "contracts/**"
+      - "schemas/**"
+      - ".github/workflows/contracts-validate.yml"
+  pull_request:
+    paths:
+      - "contracts/**"
+      - "schemas/**"
+      - ".github/workflows/contracts-validate.yml"
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+env:
+  FAIL_ON_NO_BASE: "1"
+  ALLOW_REMOVALS: "0"
+  FIXTURES_GLOB: ${{ vars.FIXTURES_GLOB || 'fixtures/**/*.jsonl' }}
+
+jobs:
+  version-sync-check:
+    name: "Security: enforce static pin for contracts reusable workflow"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify 'uses:' pins for heimgewebe/contracts
+        env:
+          REQUIRED_REPO: "heimgewebe/contracts/.github/workflows/contracts-ajv-reusable.yml"
+          REQUIRED_REF: "contracts-v1"
+        run: |
+          set -euo pipefail
+          
+          # Find all YAML workflow files
+          failed=0
+          for file in .github/workflows/*.{yml,yaml}; do
+            [[ -f "$file" ]] || continue
+            
+            # Extract all uses: lines
+            while IFS= read -r line; do
+              [[ $line == *"uses:"* ]] || continue
+              [[ $line == *"$REQUIRED_REPO"* ]] || continue
+              
+              # Extract ref (everything after @)
+              if [[ $line =~ @([a-zA-Z0-9._-]+) ]]; then
+                ref="${BASH_REMATCH[1]}"
+                
+                # Reject dynamic refs
+                [[ $ref == *"$"* ]] && {
+                  echo "::error file=$file::Dynamic ref not allowed"
+                  failed=1
+                  continue
+                }
+                
+                # Check version
+                [[ $ref == "$REQUIRED_REF" ]] || {
+                  echo "::error file=$file::Pin mismatch: expected $REQUIRED_REF, got $ref"
+                  failed=1
+                }
+              fi
+            done < "$file"
+          done
+          
+          [[ $failed -eq 0 ]] || exit 1
+          echo "::notice::✅ Version pins validated"
+
+  guard:
+    name: "Security: guard deletion policy (contracts/schemas)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      GH_DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
+      GH_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      GH_PUSH_BEFORE: ${{ github.event.before }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Enforce guard policy
+        run: |
+          set -euo pipefail
+
+          # Find merge base
+          base=""
+          
+          if [[ -n "${GH_PR_BASE_SHA:-}" ]]; then
+            git rev-parse "${GH_PR_BASE_SHA}^{commit}" &>/dev/null && base="$GH_PR_BASE_SHA"
+          fi
+          
+          if [[ -z "$base" && -n "${GH_PUSH_BEFORE:-}" && ! "${GH_PUSH_BEFORE}" =~ ^0+$ ]]; then
+            git rev-parse "${GH_PUSH_BEFORE}^{commit}" &>/dev/null && base="$GH_PUSH_BEFORE"
+          fi
+          
+          if [[ -z "$base" ]]; then
+            git fetch -q --depth=1 origin "${GH_DEFAULT_BRANCH}" 2>/dev/null || true
+            base="origin/${GH_DEFAULT_BRANCH}"
+          fi
+          
+          # Verify base exists
+          if ! git rev-parse "${base}^{commit}" &>/dev/null; then
+            if [[ "$FAIL_ON_NO_BASE" == "1" ]]; then
+              echo "::error::Cannot determine base commit for comparison"
+              exit 1
+            else
+              echo "::notice::No base commit - skipping guard check"
+              exit 0
+            fi
+          fi
+
+          echo "::notice::Checking diff from ${base:0:8}...HEAD"
+
+          # Check for deletions in protected directories
+          blocked=()
+          
+          git diff --name-status "${base}...HEAD" | grep -E '^[DR]' | while read -r status path rest; do
+            # Skip if not protected
+            [[ $path =~ ^(contracts|schemas)/ ]] || continue
+            
+            # Skip if removals allowed
+            [[ "$ALLOW_REMOVALS" == "1" ]] && continue
+            
+            # Track blocked
+            case "$status" in
+              D) echo "DELETE: $path" ;;
+              R) echo "RENAME: $path -> $rest" ;;
+            esac
+          done > /tmp/guard_blocked.txt 2>&1
+          
+          if [[ -s /tmp/guard_blocked.txt ]]; then
+            echo "::group::❌ Blocked: Protected file deletions detected"
+            sed 's/^/  /' /tmp/guard_blocked.txt
+            echo "::endgroup::"
+            echo "::error::Guard policy: deletions in contracts/ or schemas/ not allowed"
+            exit 1
+          fi
+
+          echo "::notice::✅ Guard check passed"
+
+  validate:
+    name: "Validate fixtures via reusable workflow"
+    needs: [version-sync-check, guard]
+    uses: heimgewebe/contracts/.github/workflows/contracts-ajv-reusable.yml@contracts-v1
+    secrets: inherit
+    with:
+      fixtures_glob: ${{ env.FIXTURES_GLOB }}
