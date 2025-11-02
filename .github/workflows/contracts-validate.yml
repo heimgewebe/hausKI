@@ -59,7 +59,7 @@ jobs:
             line="${line##+([[:space:]])}"
             line="${line%%+([[:space:]])}"
 
-            # Escape single quotes in regex
+            # Match YAML with single-quoted values
             if [[ "$line" =~ ^(-[[:space:]]*)?uses:[[:space:]]*\'([^']+)\' ]]; then
               echo "${BASH_REMATCH[2]}"; return 0
             fi
