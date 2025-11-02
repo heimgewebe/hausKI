@@ -159,14 +159,13 @@ jobs:
             status="${fields[0]}"
             p1="${fields[1]}"
             p2="${fields[2]}"
-            [[ "$status" =~ ^[DR] ]] || continue
             [[ "$p1" =~ ^(contracts|schemas)/ ]] || continue
             if is_truthy "$ALLOW_REMOVALS"; then continue; fi
             case "$status" in
               D)  echo "DELETE: $p1" ;;
               R*) echo "RENAME: $p1 → ${p2:-?}" ;;
             esac
-          done < <(git diff --name-status "${base}...HEAD") > "$blocked_file"
+          done < <(git diff --name-status --diff-filter=DR "${base}...HEAD") > "$blocked_file"
 
           if [[ -s "$blocked_file" ]]; then
             echo "::group::❌ Protected file deletions blocked"
