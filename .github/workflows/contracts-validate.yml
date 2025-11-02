@@ -155,7 +155,10 @@ jobs:
           blocked_file="$(mktemp)"; trap 'rm -f "$blocked_file"' EXIT
 
           # Direct while loop instead of redundant awk
-          while IFS=$'\t' read -r status p1 p2; do
+          while IFS=$'\t' read -r -a fields; do
+            status="${fields[0]}"
+            p1="${fields[1]}"
+            p2="${fields[2]}"
             [[ "$status" =~ ^[DR] ]] || continue
             [[ "$p1" =~ ^(contracts|schemas)/ ]] || continue
             if is_truthy "$ALLOW_REMOVALS"; then continue; fi
