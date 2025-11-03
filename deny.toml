@@ -6,6 +6,10 @@ targets = [
 
 [advisories]
 version = 2
+# Explicitly deny vulnerable, unmaintained, and unsound dependencies for strong security posture.
+vulnerability = "deny"
+unmaintained = "deny"
+unsound = "deny"
 yanked = "warn"
 ignore = []
 
