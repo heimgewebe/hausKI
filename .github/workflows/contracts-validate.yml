@@ -151,7 +151,7 @@ jobs:
           fi
 
           if [[ -z "$base" ]]; then
-            if [[ "${FAIL_ON_NO_BASE:-1}" == "1" ]]; then
+            if is_truthy "${FAIL_ON_NO_BASE:-1}"; then
               echo "::error::Cannot determine merge-base"; exit 1
             else
               echo "::notice::No merge-base found - skipping guard"; exit 0
