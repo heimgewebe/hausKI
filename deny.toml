@@ -6,9 +6,6 @@ targets = [
 
 [advisories]
 version = 2
-vulnerability = "deny"
-unmaintained = "warn"
-unsound = "deny"
 yanked = "warn"
 ignore = []
 
@@ -29,12 +26,10 @@ allow = [
     "ISC",
     "OpenSSL",
     "CC0-1.0",
+    "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.9
 # Wie mit problematischen Klassen umgehen:
-unlicensed = "deny"
-unknown = "deny"
-copyleft = "deny" # auf "warn" setzen, wenn du temporäre Toleranz brauchst
 # Optional: lokale Eigenlizenz (für hausKI-Repos)
 # Optional: Private Crates im Monorepo vom Lizenz-Gate ausnehmen
 #   (nur Sichtbarkeitsflag; öffentl. Crates bleiben streng)
@@ -55,10 +50,3 @@ allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = []
 
 # Lizenz-Mapping/Exceptions für verbreitete Kombis (nur falls nötig):
-[[licenses.exceptions]]
-name = "ring"
-allow = ["MIT", "ISC", "OpenSSL"]
-
-[[licenses.exceptions]]
-name = "openssl"
-allow = ["Apache-2.0", "OpenSSL"]
