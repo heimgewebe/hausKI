@@ -35,6 +35,7 @@ allow = [
 confidence-threshold = 0.9
 # Wie mit problematischen Klassen umgehen:
 unlicensed = "deny"
+unknown = "deny"
 copyleft = "allow" # auf "warn" setzen, wenn du temporäre Toleranz brauchst
 # Optional: lokale Eigenlizenz (für hausKI-Repos)
 # Optional: Private Crates im Monorepo vom Lizenz-Gate ausnehmen
