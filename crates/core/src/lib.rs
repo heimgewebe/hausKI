@@ -1213,6 +1213,7 @@ mod tests {
         assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let stub: ChatStubResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(stub.status, "unavailable");
         assert_eq!(
             stub.message,
             "chat pipeline not wired yet, please configure HAUSKI_CHAT_UPSTREAM_URL"
