@@ -329,12 +329,17 @@ pub async fn chat_handler(
     }
 
     warn!("chat request received but no chat upstream is configured");
-    let status = StatusCode::NOT_IMPLEMENTED;
+    let status = StatusCode::SERVICE_UNAVAILABLE;
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        axum::http::header::RETRY_AFTER,
+        HeaderValue::from_static("30"),
+    );
     state.record_http_observation(Method::POST, "/v1/chat", status, started);
     let payload = ChatStubResponse {
-        status: "not_implemented".to_string(),
+        status: "unavailable".to_string(),
         message: "chat pipeline not wired yet, please configure HAUSKI_CHAT_UPSTREAM_URL"
             .to_string(),
     };
-    (status, Json(payload)).into_response()
+    (status, headers, Json(payload)).into_response()
 }
