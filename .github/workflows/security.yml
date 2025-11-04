@@ -48,7 +48,13 @@ jobs:
       - name: Install cargo-deny (supports config v2)
         run: |
           cargo install cargo-deny --locked --force --version '^0.15'
-          cargo-deny --version
+          cargo deny --version
+
+      - name: Debug deny config (schema v2)
+        run: |
+          echo "=== deny.toml (first 200 lines) ==="
+          sed -n '1,200p' deny.toml || true
+          echo "=== end deny.toml ==="
 
       - name: cargo-deny (conditional)
         run: |
