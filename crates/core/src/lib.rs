@@ -64,7 +64,7 @@ struct ApiDoc;
 
 /// Creates a latency histogram with predefined buckets.
 fn create_latency_histogram() -> Histogram {
-    Histogram::new(LATENCY_BUCKETS.into_iter())
+    Histogram::new(LATENCY_BUCKETS)
 }
 
 #[derive(Clone)]
@@ -1167,7 +1167,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn chat_stub_returns_not_implemented() {
+    async fn chat_stub_returns_service_unavailable_when_unconfigured() {
         let app = demo_app(false);
         let payload = json!({
             "messages": [
@@ -1185,14 +1185,14 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let stub: ChatStubResponse = serde_json::from_slice(&body).unwrap();
-        assert_eq!(stub.status, "not_implemented");
+        assert_eq!(stub.status, "unavailable");
     }
 
     #[tokio::test]
-    async fn chat_stub_not_implemented_payload_matches_message() {
+    async fn chat_stub_unavailable_payload_matches_message() {
         let app = demo_app(false);
         let payload = json!({
             "messages": [
@@ -1210,7 +1210,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let stub: ChatStubResponse = serde_json::from_slice(&body).unwrap();
         assert_eq!(

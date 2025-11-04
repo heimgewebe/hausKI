@@ -11,25 +11,25 @@ agents-doc:
     echo "Open: docs/vision/multi-agent-rag.md"
 
 # Template (metarepo/templates/agent-kit) flach einblenden:
-agents.sync:
+agents-sync:
     @bash scripts/agents-sync-from-metarepo.sh
 
 # Dry-Run (falls Template eingeblendet ist):
-agents.run:
+agents-run:
     @set -euo pipefail; \
     if [ -f agent-kit/pyproject.toml ]; then \
         (cd agent-kit && uv sync --frozen && uv run -m agents.graph); \
     else \
-        echo "agent-kit fehlt. Zuerst: just agents.sync"; exit 2; \
+        echo "agent-kit fehlt. Zuerst: just agents-sync"; exit 2; \
     fi
 
 # Placebo-Test (Optional):
-agents.test:
+agents-test:
     @set -euo pipefail; \
     if [ -f agent-kit/pyproject.toml ]; then \
         (cd agent-kit && uv run -m pytest); \
     else \
-        echo "agent-kit fehlt. Zuerst: just agents.sync"; exit 2; \
+        echo "agent-kit fehlt. Zuerst: just agents-sync"; exit 2; \
     fi
 
 default: build
