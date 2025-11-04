@@ -64,7 +64,7 @@ struct ApiDoc;
 
 /// Creates a latency histogram with predefined buckets.
 fn create_latency_histogram() -> Histogram {
-    Histogram::new(LATENCY_BUCKETS.into_iter())
+    Histogram::new(LATENCY_BUCKETS)
 }
 
 #[derive(Clone)]
@@ -1167,7 +1167,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn chat_stub_returns_service_unavailable() {
+    async fn chat_stub_returns_service_unavailable_when_unconfigured() {
         let app = demo_app(false);
         let payload = json!({
             "messages": [
