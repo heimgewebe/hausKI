@@ -92,11 +92,6 @@ jobs:
           echo "=== deny.toml ==="
           sed -n '1,200p' deny.toml || true
           echo "================="
-      - name: Debug deny config (schema v2)
-        run: |
-          echo "=== deny.toml (first 200 lines) ==="
-          sed -n '1,200p' deny.toml || true
-          echo "=== end deny.toml ==="
       - name: Install cargo-audit (fresh)
         run: cargo install cargo-audit --locked --force
       - name: Run cargo audit
