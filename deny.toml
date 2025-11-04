@@ -33,6 +33,10 @@ allow = [
     "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.9
+# Wie mit problematischen Klassen umgehen:
+unlicensed = "deny"
+unknown = "deny"
+copyleft = "warn" # auf "warn" setzen, wenn du temporäre Toleranz brauchst
 # Optional: lokale Eigenlizenz (für hausKI-Repos)
 # Optional: Private Crates im Monorepo vom Lizenz-Gate ausnehmen
 #   (nur Sichtbarkeitsflag; öffentl. Crates bleiben streng)
