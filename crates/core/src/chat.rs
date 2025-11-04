@@ -333,7 +333,7 @@ pub async fn chat_handler(
     let mut headers = HeaderMap::new();
     headers.insert(
         axum::http::header::RETRY_AFTER,
-        HeaderValue::from_static("30"),
+        HeaderValue::from_static(RETRY_AFTER_SECS),
     );
     state.record_http_observation(Method::POST, "/v1/chat", status, started);
     let payload = ChatStubResponse {
