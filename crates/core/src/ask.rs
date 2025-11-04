@@ -8,6 +8,7 @@ use axum::{
 use hauski_indexd::SearchRequest;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
+use serde_json::json;
 
 use crate::AppState;
 
