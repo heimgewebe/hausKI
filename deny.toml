@@ -6,8 +6,9 @@ targets = [
 
 [advisories]
 version = 2
+# Explicitly deny vulnerable, unmaintained, and unsound dependencies for strong security posture.
 vulnerability = "deny"
-unmaintained = "warn"
+unmaintained = "deny"
 unsound = "deny"
 yanked = "warn"
 ignore = []
@@ -55,10 +56,3 @@ allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = []
 
 # Lizenz-Mapping/Exceptions für verbreitete Kombis (nur falls nötig):
-[[licenses.exceptions]]
-name = "ring"
-allow = ["MIT", "ISC", "OpenSSL"]
-
-[[licenses.exceptions]]
-name = "openssl"
-allow = ["Apache-2.0", "OpenSSL"]
