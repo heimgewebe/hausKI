@@ -19,10 +19,22 @@ if [[ -z "${BIND}" || "${BIND}" == "${HOST}" ]]; then
 fi
 
 # Tool-Prüfung
-command -v python3 >/dev/null 2>&1 || { echo "python3 missing" >&2; exit 127; }
-command -v cargo   >/dev/null 2>&1 || { echo "cargo missing"   >&2; exit 127; }
-command -v curl    >/dev/null 2>&1 || { echo "curl missing"    >&2; exit 127; }
-command -v jq      >/dev/null 2>&1 || { echo "jq missing"      >&2; exit 127; }
+command -v python3 >/dev/null 2>&1 || {
+  echo "python3 missing" >&2
+  exit 127
+}
+command -v cargo >/dev/null 2>&1 || {
+  echo "cargo missing" >&2
+  exit 127
+}
+command -v curl >/dev/null 2>&1 || {
+  echo "curl missing" >&2
+  exit 127
+}
+command -v jq >/dev/null 2>&1 || {
+  echo "jq missing" >&2
+  exit 127
+}
 
 cleanup() {
   set +e
@@ -41,7 +53,11 @@ echo "[smoke] wait mock /api/tags…"
 for i in {1..50}; do
   if curl -fsS "http://127.0.0.1:11434/api/tags" >/dev/null; then break; fi
   sleep 0.1
-  [[ $i -eq 50 ]] && { echo "mock did not start"; tail -n 200 "${LOG_MOCK}" || true; exit 1; }
+  [[ $i -eq 50 ]] && {
+    echo "mock did not start"
+    tail -n 200 "${LOG_MOCK}" || true
+    exit 1
+  }
 done
 
 export HAUSKI_CHAT_UPSTREAM_URL="http://127.0.0.1:11434"
@@ -56,7 +72,11 @@ echo "[smoke] wait /health…"
 for i in {1..100}; do
   if curl -fsS "${HOST}/health" >/dev/null; then break; fi
   sleep 0.1
-  [[ $i -eq 100 ]] && { echo "core did not start"; tail -n 200 "${LOG_CORE}" || true; exit 1; }
+  [[ $i -eq 100 ]] && {
+    echo "core did not start"
+    tail -n 200 "${LOG_CORE}" || true
+    exit 1
+  }
 done
 
 echo "[smoke] check /health"
@@ -67,7 +87,10 @@ RESP=$(curl -sSf --max-time 10 -X POST "${HOST}/v1/chat" \
   -H 'Content-Type: application/json' \
   -d '{"messages":[{"role":"user","content":"Ping?"}]}')
 
-echo "${RESP}" | jq . >/dev/null 2>&1 || { echo "Non-JSON response: ${RESP}"; exit 1; }
+echo "${RESP}" | jq . >/dev/null 2>&1 || {
+  echo "Non-JSON response: ${RESP}"
+  exit 1
+}
 
 python3 - "$RESP" "$MODEL" <<'PY'
 import json, sys

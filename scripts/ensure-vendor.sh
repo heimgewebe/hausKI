@@ -23,7 +23,7 @@ mkdir -p vendor
 GEN_LOCK_LOG="$(mktemp /tmp/cargo-generate-lockfile.XXXXXX.log)"
 trap 'rm -f "${GEN_LOCK_LOG}" "${LOGFILE:-}"' EXIT
 
-if ! cargo generate-lockfile > "${GEN_LOCK_LOG}" 2>&1; then
+if ! cargo generate-lockfile >"${GEN_LOCK_LOG}" 2>&1; then
   cat "${GEN_LOCK_LOG}" >&2
   echo "Failed to refresh Cargo.lock via cargo generate-lockfile." >&2
   echo "Bitte aktualisiere die Lock-Datei manuell und versuche es erneut." >&2
@@ -32,7 +32,7 @@ fi
 
 LOGFILE="$(mktemp /tmp/cargo-vendor.XXXXXX.log)"
 
-if ! cargo vendor --locked > "${LOGFILE}" 2>&1; then
+if ! cargo vendor --locked >"${LOGFILE}" 2>&1; then
   cat "${LOGFILE}" >&2
   echo "Failed to regenerate vendor snapshot." >&2
   exit 1

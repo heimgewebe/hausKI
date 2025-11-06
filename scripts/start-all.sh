@@ -92,12 +92,12 @@ NO_UPSTREAM="${NO_UPSTREAM:-0}"
 normalize_bool() {
   local raw="${1:-0}"
   case "${raw}" in
-    1|true|TRUE|True|yes|YES|Yes|on|ON|On)
-      echo "1"
-      ;;
-    *)
-      echo "0"
-      ;;
+  1 | true | TRUE | True | yes | YES | Yes | on | ON | On)
+    echo "1"
+    ;;
+  *)
+    echo "0"
+    ;;
   esac
 }
 
@@ -106,19 +106,34 @@ NO_UPSTREAM="$(normalize_bool "${NO_UPSTREAM}")"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --model) MODEL="${2:-}"; shift 2 ;;
-    --port) PORT="${2:-}"; shift 2 ;;
-    --upstream-url) UPSTREAM_URL="${2:-}"; shift 2 ;;
-    --tmux) USE_TMUX="1"; shift ;;
-    --no-upstream) NO_UPSTREAM="1"; shift ;;
-    -h|--help)
-      sed -n '3,/^$/p' "$0" | sed 's/^#\s\{0,1\}//'
-      exit 0
-      ;;
-    *)
-      echo "Unbekannte Option: $1" >&2
-      exit 2
-      ;;
+  --model)
+    MODEL="${2:-}"
+    shift 2
+    ;;
+  --port)
+    PORT="${2:-}"
+    shift 2
+    ;;
+  --upstream-url)
+    UPSTREAM_URL="${2:-}"
+    shift 2
+    ;;
+  --tmux)
+    USE_TMUX="1"
+    shift
+    ;;
+  --no-upstream)
+    NO_UPSTREAM="1"
+    shift
+    ;;
+  -h | --help)
+    sed -n '3,/^$/p' "$0" | sed 's/^#\s\{0,1\}//'
+    exit 0
+    ;;
+  *)
+    echo "Unbekannte Option: $1" >&2
+    exit 2
+    ;;
   esac
 done
 
@@ -137,9 +152,9 @@ mkdir -p "${CONFIG_DIR}"
 DEFAULT_UPSTREAM_URL="http://127.0.0.1:${PORT}"
 UPSTREAM_URL_RAW="${UPSTREAM_URL}"
 
-if [[ -n "${UPSTREAM_URL:-}" ]] && \
-   [[ "${UPSTREAM_URL}" != "${DEFAULT_UPSTREAM_URL:-}" ]] && \
-   [[ "${NO_UPSTREAM:-0}" -eq 0 ]]; then
+if [[ -n "${UPSTREAM_URL:-}" ]] &&
+  [[ "${UPSTREAM_URL}" != "${DEFAULT_UPSTREAM_URL:-}" ]] &&
+  [[ "${NO_UPSTREAM:-0}" -eq 0 ]]; then
   echo "[info] Using upstream: ${UPSTREAM_URL}"
 fi
 

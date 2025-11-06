@@ -516,7 +516,10 @@ fn docs_routes() -> Router<AppState> {
     Router::new()
         .route("/docs", get(api_docs))
         .route("/api-docs/openapi.json", get(openapi_json))
-        .route("/docs/openapi.json", get(|| async { Redirect::permanent("/api-docs/openapi.json") }))
+        .route(
+            "/docs/openapi.json",
+            get(|| async { Redirect::permanent("/api-docs/openapi.json") }),
+        )
 }
 
 const SWAGGER_UI_HTML: &str = r#"<!DOCTYPE html>
