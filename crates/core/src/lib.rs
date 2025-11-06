@@ -132,7 +132,7 @@ impl AppState {
 
         let http_requests: Family<HttpLabels, Counter<u64>> = Family::default();
         registry.register(
-            "http_requests_total",
+            "http_requests",
             "Total number of HTTP requests received",
             http_requests.clone(),
         );
@@ -725,7 +725,6 @@ mod tests {
 
         let expected_health = [
             r#"http_requests_total{method="GET",path="/health",status="200"} 1"#,
-            r#"http_requests_total_total{method="GET",path="/health",status="200"} 1"#,
         ];
         assert!(
             expected_health
@@ -743,7 +742,6 @@ mod tests {
 
         let expected_metrics = [
             r#"http_requests_total{method="GET",path="/metrics",status="200"} 1"#,
-            r#"http_requests_total_total{method="GET",path="/metrics",status="200"} 1"#,
         ];
         assert!(
             expected_metrics
@@ -988,8 +986,7 @@ mod tests {
         let text = String::from_utf8(body.to_vec()).unwrap();
 
         let expected_search = [
-            r#"http_requests_total{method="POST",path="/index/search",status="200"} 1"#,
-            r#"http_requests_total_total{method="POST",path="/index/search",status="200"} 1"#,
+            r#"http_requests{method="POST",path="/index/search",status="200"} 1"#,
         ];
         assert!(
             expected_search.iter().any(|needle| text.contains(needle)),
