@@ -986,7 +986,7 @@ mod tests {
         let text = String::from_utf8(body.to_vec()).unwrap();
 
         let expected_search = [
-            r#"http_requests_total{method="POST",path="/index/search",status="200"} 1"#,
+            r#"http_requests{method="POST",path="/index/search",status="200"} 1"#,
         ];
         assert!(
             expected_search.iter().any(|needle| text.contains(needle)),
