@@ -12,5 +12,5 @@ mkdir -p "$outdir"
 outfile="$outdir/$(date +%Y-%m).jsonl"
 jq -n --arg id "$ID" --arg node "$NODE_ID" --arg kind "$KIND" --argjson ts "$TS" --argjson pl "$PAYLOAD" '
   {id:$id,node_id:$node,ts:$ts,kind:$kind,payload: ($pl|type=="string" ? ($pl|fromjson) : $pl)}
-' >> "$outfile"
+' >>"$outfile"
 echo "wrote $outfile"

@@ -26,7 +26,10 @@ else
   src_dir="$tmp/metarepo/templates/agent-kit"
 fi
 
-test -d "$src_dir" || { echo "Quelle nicht gefunden: $src_dir"; exit 1; }
+test -d "$src_dir" || {
+  echo "Quelle nicht gefunden: $src_dir"
+  exit 1
+}
 
 echo "→ Sync $src_dir  →  $dest"
 rm -rf "$dest"

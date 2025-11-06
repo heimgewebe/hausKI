@@ -14,7 +14,7 @@ test -r "$PROMPT_FILE" && test -r "$POLICY"
 [ -r "$LOCAL_POLICY" ] && POLICY_COMBINED="$(mktemp)" || POLICY_COMBINED="$POLICY"
 
 if [ "$POLICY_COMBINED" != "$POLICY" ]; then
-  cat "$POLICY" "$LOCAL_POLICY" > "$POLICY_COMBINED"
+  cat "$POLICY" "$LOCAL_POLICY" >"$POLICY_COMBINED"
 fi
 
 TS="$(date +%Y-%m-%d_%H-%M-%S)"
@@ -23,7 +23,10 @@ LOGDIR="$HOME/.hauski/review/$REPO/$TS"
 mkdir -p "$LOGDIR" .hauski-tmp
 
 git update-index -q --refresh
-test -z "$(git status --porcelain)" || { echo "❌ Working tree nicht clean"; exit 1; }
+test -z "$(git status --porcelain)" || {
+  echo "❌ Working tree nicht clean"
+  exit 1
+}
 
 cp "$PROMPT_FILE" "$LOGDIR/prompt.md"
 cp "$POLICY_COMBINED" "$LOGDIR/policy.yml"
@@ -39,13 +42,19 @@ run_codex() {
 }
 
 {
-  echo "### PROMPT"; cat "$PROMPT_FILE"; echo
-  echo "### POLICY"; cat "$POLICY_COMBINED"
+  echo "### PROMPT"
+  cat "$PROMPT_FILE"
+  echo
+  echo "### POLICY"
+  cat "$POLICY_COMBINED"
 } | run_codex | tee "$LOGDIR/session.raw.md"
 
-awk '/^diff --git /{flag=1} flag{print}' "$LOGDIR/session.raw.md" > .hauski-tmp/patch.diff || true
-LINES=$(wc -l < .hauski-tmp/patch.diff || echo 0)
-[ "$LINES" -ge 5 ] || { echo "❌ Kein Patch."; exit 2; }
+awk '/^diff --git /{flag=1} flag{print}' "$LOGDIR/session.raw.md" >.hauski-tmp/patch.diff || true
+LINES=$(wc -l <.hauski-tmp/patch.diff || echo 0)
+[ "$LINES" -ge 5 ] || {
+  echo "❌ Kein Patch."
+  exit 2
+}
 
 FILES=$(grep -c '^diff --git ' .hauski-tmp/patch.diff || true)
 if [ "$FILES" -gt 20 ]; then
@@ -59,17 +68,24 @@ if [ "$CHANGES" -gt 500 ]; then
   exit 2
 fi
 
-awk '/^diff --git /{exit} {print}' "$LOGDIR/session.raw.md" > "$LOGDIR/plan.md" || true
+awk '/^diff --git /{exit} {print}' "$LOGDIR/session.raw.md" >"$LOGDIR/plan.md" || true
 
-git apply --3way --check .hauski-tmp/patch.diff || { echo "❌ Patch check failed"; exit 2; }
+git apply --3way --check .hauski-tmp/patch.diff || {
+  echo "❌ Patch check failed"
+  exit 2
+}
 git apply --3way .hauski-tmp/patch.diff
 
-just test-quick || { echo "❌ Tests rot – rollback"; git restore -SW .; exit 1; }
+just test-quick || {
+  echo "❌ Tests rot – rollback"
+  git restore -SW .
+  exit 1
+}
 
 BR="codex/$TS"
 git checkout -b "$BR" 2>/dev/null || git checkout "$BR"
 git add -A
-cat > .hauski-tmp/commitmsg.txt <<'EOF2'
+cat >.hauski-tmp/commitmsg.txt <<'EOF2'
 fix: minimaler Patch via Codex
 
 Warum:
@@ -84,7 +100,7 @@ git commit -F .hauski-tmp/commitmsg.txt
 
 CANVAS="docs/canvas/codex/${TS}.canvas"
 mkdir -p "$(dirname "$CANVAS")"
-cat > "$CANVAS" <<'JSON'
+cat >"$CANVAS" <<'JSON'
 {
   "nodes":[
     {"id":"meta","type":"text","text":"Codex-Run: Minimaler Patch","x":0,"y":0,"color":"blue"},

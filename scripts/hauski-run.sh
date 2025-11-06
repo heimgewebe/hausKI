@@ -11,8 +11,11 @@ REPO_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG="${HOME}/hauski-api.log"
 FLAGS_FILE="${REPO_DIR}/configs/flags.yaml"
 
-err(){ printf "\033[1;31m[err]\033[0m %s\n" "$*" >&2; exit 1; }
-inf(){ printf "\033[1;34m[info]\033[0m %s\n" "$*"; }
+err() {
+  printf "\033[1;31m[err]\033[0m %s\n" "$*" >&2
+  exit 1
+}
+inf() { printf "\033[1;34m[info]\033[0m %s\n" "$*"; }
 
 command -v curl >/dev/null 2>&1 || err "curl wird benötigt, aber nicht gefunden"
 
@@ -74,4 +77,3 @@ export HAUSKI_CHAT_MODEL="${MODEL}"
 inf "Starte HausKI… (Logs: ${LOG})"
 RUST_LOG="${RUST_LOG:-info,hauski_core=debug}" \
   cargo run -p hauski-cli -- serve 2>&1 | tee -a "${LOG}"
-

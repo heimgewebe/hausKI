@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p configs
-[[ -f configs/hauski.yml ]] || cat > configs/hauski.yml <<'YAML'
+[[ -f configs/hauski.yml ]] || cat >configs/hauski.yml <<'YAML'
 data_dir: "~/.local/state/hauski"
 models_dir: "./models"
 server:
