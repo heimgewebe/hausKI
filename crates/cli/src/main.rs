@@ -131,6 +131,11 @@ fn main() -> Result<()> {
 // ---- Modelle (nutzt hauski_core::ModelsFile) ----
 
 fn print_models_table(file: &ModelsFile) {
+    if file.models.is_empty() {
+        println!("Keine Modelle in der Konfiguration gefunden.");
+        return;
+    }
+
     const HEADERS: [&str; 4] = ["ID", "Path", "VRAM Min", "Canary"];
 
     let mut rows: Vec<[String; 4]> = Vec::new();
@@ -418,4 +423,37 @@ async fn shutdown_signal() {
     }
 
     info!("Stoppsignal empfangen, fahre herunter");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hauski_core::ModelEntry;
+
+    #[test]
+    fn print_models_table_handles_empty_list() {
+        let models = ModelsFile { models: vec![] };
+        print_models_table(&models);
+    }
+
+    #[test]
+    fn print_models_table_handles_mixed_list() {
+        let models = ModelsFile {
+            models: vec![
+                ModelEntry {
+                    id: "test-model-1".into(),
+                    path: "/path/to/model-1".into(),
+                    vram_min_gb: Some(4),
+                    canary: Some(true),
+                },
+                ModelEntry {
+                    id: "test-model-2".into(),
+                    path: "/path/to/model-2".into(),
+                    vram_min_gb: None,
+                    canary: None,
+                },
+            ],
+        };
+        print_models_table(&models);
+    }
 }
