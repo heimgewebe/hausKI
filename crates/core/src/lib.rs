@@ -132,7 +132,7 @@ impl AppState {
 
         let http_requests: Family<HttpLabels, Counter<u64>> = Family::default();
         registry.register(
-            "http_requests_total",
+            "http_requests",
             "Total number of HTTP requests received",
             http_requests.clone(),
         );
@@ -723,7 +723,7 @@ mod tests {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let text_one = String::from_utf8(body.to_vec()).unwrap();
 
-        let expected_health = r#"http_requests_total_total{method="GET",path="/health",status="200"} 1"#;
+        let expected_health = r#"http_requests_total{method="GET",path="/health",status="200"} 1"#;
         assert!(
             text_one.contains(expected_health),
             "metrics missing labeled health counter:\n{text_one}"
@@ -737,7 +737,7 @@ mod tests {
         let text_two = String::from_utf8(body.to_vec()).unwrap();
 
         let expected_metrics =
-            r#"http_requests_total_total{method="GET",path="/metrics",status="200"} 1"#;
+            r#"http_requests_total{method="GET",path="/metrics",status="200"} 1"#;
         assert!(
             text_two.contains(expected_metrics),
             "metrics missing labeled metrics counter:\n{text_two}"
