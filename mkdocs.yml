@@ -25,6 +25,8 @@ nav:
       - Indexd: modules/indexd.md
       - Observability: modules/observability.md
       - Policy: modules/policy.md
+  - Contracts:
+      - Events: contracts/events.md
   - Prozesse:
       - Übersicht: process/README.md
       - Sprache: process/sprache.md

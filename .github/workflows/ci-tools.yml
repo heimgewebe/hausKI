@@ -193,6 +193,26 @@ PY
         if: ${{ hashFiles('pyproject.toml') != '' }}
         run: uv run python scripts/validate-jsonschemas.py
 
+      - name: Validate event sample against schema
+        if: ${{ hashFiles('pyproject.toml') != '' }}
+        run: |
+          set -euo pipefail
+          uv run python - <<'PY'
+import json
+from pathlib import Path
+
+from jsonschema import Draft202012Validator, validate
+
+
+root = Path('.')
+schema = json.loads((root / 'contracts' / 'events.schema.json').read_text(encoding='utf-8'))
+sample = json.loads((root / 'contracts' / 'examples' / 'event.sample.json').read_text(encoding='utf-8'))
+
+Draft202012Validator.check_schema(schema)
+validate(sample, schema)
+print('contracts/examples/event.sample.json \u2713')
+PY
+
       - name: Pytests
         if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |

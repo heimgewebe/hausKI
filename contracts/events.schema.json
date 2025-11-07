@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://heimgewebe.github.io/hausKI/contracts/events.schema.json",
+  "title": "HausKI Event",
+  "description": "Einheitliches Ereignisformat für Logs, Bus und Audits.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "ts", "kind", "level", "source", "node", "data"],
+  "properties": {
+    "id": {
+      "description": "ULID für Ereignis (monoton sortierbar).",
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "ts": {
+      "description": "Zeitstempel in RFC 3339 / ISO 8601 (UTC bevorzugt).",
+      "type": "string",
+      "format": "date-time"
+    },
+    "version": {
+      "description": "Schema-Version, SemVer.",
+      "type": "string",
+      "default": "1.0.0",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:[-+].*)?$"
+    },
+    "kind": {
+      "description": "Ereignisklasse (frei, jedoch stabil halten).",
+      "type": "string",
+      "examples": ["core.health", "core.chat.request", "core.chat.response", "index.upsert", "index.search", "audit.policy.violation"]
+    },
+    "level": {
+      "description": "Schweregrad.",
+      "type": "string",
+      "enum": ["debug", "info", "warn", "error", "audit"]
+    },
+    "source": {
+      "description": "Ursprung/Komponente (crate oder binary).",
+      "type": "string",
+      "examples": ["hauski-core", "hauski-indexd", "hauski-cli", "reviewd"]
+    },
+    "node": {
+      "description": "Knoten/Hostname oder Node-ID.",
+      "type": "string"
+    },
+    "trace_id": {
+      "description": "Tracing-Trace-ID (falls vorhanden, z. B. W3C).",
+      "type": "string"
+    },
+    "span_id": {
+      "description": "Tracing-Span-ID (falls vorhanden).",
+      "type": "string"
+    },
+    "subject": {
+      "description": "Fokusentität (z. B. Dokument-ID, Conversation-ID).",
+      "type": "string"
+    },
+    "labels": {
+      "description": "Flache Schlüssel/Wert-Tags für Filter/Facetten.",
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      }
+    },
+    "data": {
+      "description": "Ereignisdaten (strukturierte Nutzlast).",
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "level": { "const": "audit" } } },
+      "then": {
+        "required": ["labels"],
+        "properties": {
+          "labels": {
+            "minProperties": 1
+          }
+        }
+      }
+    }
+  ]
+}
