@@ -59,7 +59,7 @@ Für lokale Checks kann z. B. `jsonschema` (Python) oder jede Draft-2020-12-fäh
 uv run python - <<'PY'
 import json, sys, pathlib
 from jsonschema import validate, Draft202012Validator
-root = pathlib.Path(__file__).resolve().parents[1]
+root = pathlib.Path('.')
 schema = json.loads((root/"contracts/events.schema.json").read_text())
 sample = json.loads((root/"contracts/examples/event.sample.json").read_text())
 Draft202012Validator.check_schema(schema)
