@@ -1,0 +1,23 @@
+{
+  "id": "01JBDH3Q2H3Y7F3R0Q6G7V6K8Z",
+  "ts": "2025-10-30T17:05:12Z",
+  "version": "1.0.0",
+  "kind": "core.chat.response",
+  "level": "info",
+  "source": "hauski-core",
+  "node": "buildkite-agent-01",
+  "trace_id": "3f75c7f6c4a74ccd8d0a7a54a6bcb3f2",
+  "span_id": "6f9b2a8d3c4e5f6a",
+  "subject": "conv_7f2a1c",
+  "labels": {
+    "model": "llama3.1-8b-q4",
+    "latency_ms": 132,
+    "http_status": 200
+  },
+  "data": {
+    "prompt_tokens": 31,
+    "completion_tokens": 27,
+    "content_preview": "Hallo! Wie kann ich helfen?",
+    "budget_ok": true
+  }
+}
