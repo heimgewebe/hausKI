@@ -6,7 +6,7 @@ steps:
 - id: kg-validate
   run: |
     wgx knowledge extract --repo . --out knowledge.graph.json
-    ./wgx knowledge validate --file knowledge.graph.json
+    wgx knowledge validate --file knowledge.graph.json
 - id: ai-assist
   needs: [lint, kg-validate]
   run: "hauski assist --playbook code_review --metrics tmp/metrics.json --kg knowledge.graph.json"
