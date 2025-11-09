@@ -8,5 +8,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: just deps || true
-      - run: hauski run-playbook playbooks/code_assist.yml
+      - run: just build
+      - run: ./target/debug/hauski run-playbook playbooks/code_assist.yml
