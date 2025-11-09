@@ -1,0 +1,12 @@
+name: playbook-gate
+on:
+  pull_request:
+  workflow_dispatch: {}
+permissions: { contents: read }
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: just deps || true
+      - run: hauski run-playbook playbooks/code_assist.yml
