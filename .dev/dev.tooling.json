@@ -1,0 +1,11 @@
+{
+ "$schema": "https://schemas.heimgewebe.org/dev.tooling.schema.json",
+ "language": "rust",
+ "lsp_config": { "rust_analyzer": { "cargo": { "buildScripts": true } } },
+ "code_generation": {
+ "templates": ["service", "cli"],
+ "generators": ["wgx.template"],
+ "validation_rules": ["fmt", "lint"]
+ },
+ "test_framework": { "kind": "cargo", "watch": true }
+}

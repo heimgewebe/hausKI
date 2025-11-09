@@ -1,0 +1,22 @@
+# ai_assist – Minimal-Playbook mit Gates
+version: 1
+name: ai_assist
+steps:
+ - id: gate_lint
+ run: |
+ if [[ -x ./scripts/wgx ]]; then
+ ./scripts/wgx code lint --fix || exit 1
+ else
+ echo "wgx fehlt – überspringe lint"; fi
+ - id: gate_knowledge_validate
+ run: |
+ npm i -g ajv-cli@5 >/dev/null 2>&1 || true
+ curl -fsSL https://raw.githubusercontent.com/heimgewebe/metarepo/contracts-v1/contracts/knowledge.graph.schema.json -o /tmp/schema.json
+ if [[ -f knowledge.graph.json ]]; then
+ ajv validate --spec=draft2020 -s /tmp/schema.json -d knowledge.graph.json
+ else
+ echo "no knowledge.graph.json – continue"
+ fi
+ - id: ai_assist
+ run: |
+ echo "→ AI Assist (placeholder) – hier z. B. Analyse/Refactor/Commit"
