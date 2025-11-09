@@ -1,0 +1,9 @@
+[package]
+name = "hauski-memory"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+prometheus-client = { workspace = true }
+prometheus-client-derive-encode = { workspace = true }

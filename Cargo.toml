@@ -4,6 +4,7 @@ members = [
   "crates/cli",
   "crates/embeddings",
   "crates/indexd",
+  "crates/memory",
   "crates/policy",
   "crates/policy_api",
   # weitere später: indexd, llm, asr, tts, audio, memory, commentary, bridge, observability, security, adapters/*
@@ -27,6 +28,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "tim
 axum = "0.8"
 clap = { version = "4", features = ["derive"] }
 prometheus-client = "0.24"
+prometheus-client-derive-encode = "0.5.0"
 walkdir = "2"
 dirs = "6.0.0"
 # Abhängigkeiten, die bereits von mehreren Crates genutzt werden, zentralisieren

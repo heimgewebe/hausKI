@@ -623,6 +623,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hauski-memory"
+version = "0.1.0"
+dependencies = [
+ "prometheus-client",
+ "prometheus-client-derive-encode",
+]
+
+[[package]]
 name = "hauski-policy-api"
 version = "0.1.0"
 dependencies = [
