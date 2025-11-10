@@ -20,6 +20,7 @@ nav:
   - Module:
       - Übersicht: modules/index.md
       - Core: modules/core.md
+      - Assist: modules/assist.md
       - Memory: modules/memory.md
       - Audio: modules/audio.md
       - Indexd: modules/indexd.md
