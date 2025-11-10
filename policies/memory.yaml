@@ -1,0 +1,13 @@
+# Default-Policy für das Memory-Subsystem.
+# Diese Datei ist optional. Wenn vorhanden, wird sie beim Core-Start (bzw.
+# beim ersten Memory-API-Aufruf) eingelesen.
+#
+# Semantik:
+# - default_ttl_sec: Wird verwendet, wenn /memory/set keinen ttl_sec liefert.
+# - pin_allowlist: Keys, die automatisch als pinned=true gesetzt werden,
+#   wenn der Request kein pinned-Feld enthält.
+
+default_ttl_sec: 300
+pin_allowlist:
+  - "session:*"
+  - "profile:current_user"
