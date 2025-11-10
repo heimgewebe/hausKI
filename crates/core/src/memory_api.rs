@@ -4,7 +4,10 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
 use utoipa::ToSchema;
 
 use crate::AppState;
@@ -50,6 +53,63 @@ pub struct MemoryEvictRequest {
 pub struct MemoryEvictResponse {
     pub ok: bool,
 }
+
+// ---------------------- Policy ----------------------
+#[derive(Debug, Clone, Default, Deserialize)]
+struct MemoryPolicy {
+    #[serde(default)]
+    default_ttl_sec: Option<i64>,
+    #[serde(default)]
+    pin_allowlist: Vec<String>,
+}
+
+static POLICY: OnceCell<MemoryPolicy> = OnceCell::new();
+
+fn policy_load_once() -> &'static MemoryPolicy {
+    POLICY.get_or_init(|| {
+        // Reihenfolge:
+        // 1) HAUSKI_MEMORY_POLICY_PATH
+        // 2) ./policies/memory.yaml (repo-local)
+        // 3) kein File -> Default
+        let path = std::env::var("HAUSKI_MEMORY_POLICY_PATH")
+            .ok()
+            .unwrap_or_else(|| "policies/memory.yaml".to_string());
+        let p = Path::new(&path);
+        if p.exists() {
+            match fs::read_to_string(p) {
+                Ok(text) => match serde_yaml::from_str::<MemoryPolicy>(&text) {
+                    Ok(cfg) => cfg,
+                    Err(err) => {
+                        tracing::warn!("memory policy parse failed: {err} – using defaults");
+                        MemoryPolicy::default()
+                    }
+                },
+                Err(err) => {
+                    tracing::warn!("memory policy read failed: {err} – using defaults");
+                    MemoryPolicy::default()
+                }
+            }
+        } else {
+            MemoryPolicy::default()
+        }
+    })
+}
+
+fn is_pin_allowed(key: &str, allowlist: &[String]) -> bool {
+    // sehr einfache Pattern-Logik: unterstützt "prefix:*"
+    for pat in allowlist {
+        if let Some(prefix) = pat.strip_suffix('*') {
+            if key.starts_with(prefix) {
+                return true;
+            }
+        } else if pat == key {
+            return true;
+        }
+    }
+    false
+}
+
+// ---------------------- Handlers ----------------------
 
 #[utoipa::path(
     post,
@@ -103,7 +163,21 @@ pub async fn memory_set_handler(
     Json(req): Json<MemorySetRequest>,
 ) -> Response {
     let store = mem::global();
-    match store.set(&req.key, req.value.as_bytes(), req.ttl_sec, req.pinned) {
+    let pol = policy_load_once();
+
+    // TTL: falls im Request nicht gesetzt, Policy-Default verwenden
+    let ttl = req.ttl_sec.or(pol.default_ttl_sec);
+
+    // pinned: falls im Request nicht gesetzt, Allowlist aus Policy prüfen
+    let pinned = req.pinned.or_else(|| {
+        if is_pin_allowed(&req.key, &pol.pin_allowlist) {
+            Some(true)
+        } else {
+            None
+        }
+    });
+
+    match store.set(&req.key, req.value.as_bytes(), ttl, pinned) {
         Ok(_) => (StatusCode::OK, Json(MemorySetResponse { ok: true })).into_response(),
         Err(e) => {
             tracing::error!(error = ?e, "failed to set memory item");
