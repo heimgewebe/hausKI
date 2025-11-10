@@ -50,3 +50,4 @@ observability/k6/summary.json
 .lycheecache
 .hauski-reports
 artifacts/
+metrics.json
