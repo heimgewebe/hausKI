@@ -115,6 +115,8 @@ struct AppStateInner {
     index: IndexState,
     build_info: Family<BuildInfoLabels, Gauge>,
     registry: Mutex<Registry>,
+    /// HTTP-Client für ausgehende Anfragen (z. B. /assist, Plugins).
+    http_client: reqwest::Client,
     /// Controls whether configuration endpoints are exposed.
     ///
     /// WARNING: Enabling this may expose sensitive configuration information.
@@ -193,6 +195,14 @@ impl AppState {
 
         let index = IndexState::new(limits.latency.index_topk20_ms, metrics_recorder.clone());
 
+        let http_client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(15))
+            .build()
+            .unwrap_or_else(|e| {
+                tracing::warn!("failed to build http client, falling back to default: {}", e);
+                reqwest::Client::new()
+            });
+
         Self(Arc::new(AppStateInner {
             limits,
             models,
@@ -205,6 +215,7 @@ impl AppState {
             index,
             build_info,
             registry: Mutex::new(registry),
+            http_client,
             expose_config,
             ready: AtomicBool::new(false),
         }))
@@ -267,6 +278,9 @@ impl AppState {
         self.0.ready.load(Ordering::Acquire)
     }
 
+    pub fn http_client(&self) -> reqwest::Client {
+        self.0.http_client.clone()
+    }
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -324,6 +338,12 @@ impl EncodeLabelSet for HttpLabels {
 impl FromRef<AppState> for IndexState {
     fn from_ref(state: &AppState) -> Self {
         state.index()
+    }
+}
+
+impl FromRef<AppState> for reqwest::Client {
+    fn from_ref(state: &AppState) -> Self {
+        state.http_client()
     }
 }
 
