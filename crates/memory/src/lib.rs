@@ -1,4 +1,11 @@
-use std::{borrow::Cow, fmt, hash::Hash, path::PathBuf, time::Duration};
+use std::{
+    borrow::Cow,
+    fmt,
+    hash::Hash,
+    path::PathBuf,
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -51,6 +58,13 @@ pub struct Item {
     pub updated_ts: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Stats {
+    pub pinned: u64,
+    pub unpinned: u64,
+    pub expired_evictions_total: u64,
+}
+
 #[derive(Clone, Debug)]
 pub struct MemoryConfig {
     /// Optionaler Pfad zur DB-Datei. Default: $XDG_STATE_HOME/hauski/memory.db
@@ -76,6 +90,11 @@ pub struct MemoryStore {
 }
 
 static GLOBAL: OnceCell<MemoryStore> = OnceCell::new();
+static EXPIRED_EVICTIONS_TOTAL: AtomicU64 = AtomicU64::new(0);
+
+pub fn expired_evictions_total() -> u64 {
+    EXPIRED_EVICTIONS_TOTAL.load(Ordering::Relaxed)
+}
 
 pub fn init_default() -> Result<&'static MemoryStore> {
     init_with(MemoryConfig::default())
@@ -202,6 +221,23 @@ impl MemoryStore {
         }
         Ok(n > 0)
     }
+
+    pub fn stats(&self) -> Result<Stats> {
+        let conn = Connection::open(&self.db_path)?;
+        let (pinned, unpinned) = conn.query_row(
+            "SELECT
+                COUNT(CASE WHEN pinned = 1 THEN 1 END),
+                COUNT(CASE WHEN pinned = 0 THEN 1 END)
+            FROM memory_items",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        Ok(Stats {
+            pinned,
+            unpinned,
+            expired_evictions_total: expired_evictions_total(),
+        })
+    }
 }
 
 async fn janitor_task(db_path: PathBuf, every_secs: u64) {
@@ -210,13 +246,18 @@ async fn janitor_task(db_path: PathBuf, every_secs: u64) {
         tokio::time::sleep(d).await;
         if let Ok(conn) = Connection::open(&db_path) {
             // Lösche abgelaufene TTLs, wenn nicht gepinnt
-            let _ = conn.execute(
+            let n = conn.execute(
                 r#"DELETE FROM memory_items
                     WHERE pinned=0
                         AND ttl_sec IS NOT NULL
                         AND (strftime('%s','now') - strftime('%s', updated_ts)) > ttl_sec"#,
                 [],
             );
+            if let Ok(count) = n {
+                if count > 0 {
+                    EXPIRED_EVICTIONS_TOTAL.fetch_add(count as u64, Ordering::Relaxed);
+                }
+            }
         }
     }
 }

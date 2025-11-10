@@ -19,13 +19,17 @@ use std::{
     env, fmt,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, Mutex,
     },
     time::{Duration, Instant},
 };
 use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, BoxError, ServiceBuilder};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+use once_cell::sync::OnceCell;
+use prometheus_client::metrics::counter::Counter as PromCounter;
+use prometheus_client::metrics::gauge::Gauge as PromGauge;
+use hauski_memory as memory;
 
 mod ask;
 mod chat;
@@ -73,6 +77,19 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
 )]
 pub struct ApiDoc;
 
+// ---- Memory metrics handles (set at startup) -------------------------------
+static MEMORY_ITEMS_PINNED_GAUGE: OnceCell<PromGauge> = OnceCell::new();
+static MEMORY_ITEMS_UNPINNED_GAUGE: OnceCell<PromGauge> = OnceCell::new();
+static MEMORY_EVICTIONS_EXPIRED: OnceCell<PromCounter> = OnceCell::new();
+static MEMORY_EVICTIONS_MANUAL: OnceCell<PromCounter> = OnceCell::new();
+
+/// Inkrement aus dem /memory/evict-Handler (ohne AppState zu ändern).
+pub(crate) fn record_memory_manual_eviction() {
+    if let Some(c) = MEMORY_EVICTIONS_MANUAL.get() {
+        c.inc();
+    }
+}
+
 /// Creates a latency histogram with predefined buckets.
 fn create_latency_histogram() -> Histogram {
     Histogram::new(LATENCY_BUCKETS)
@@ -93,7 +110,7 @@ struct AppStateInner {
     metrics_recorder: Arc<MetricsCallback>,
     index: IndexState,
     build_info: Family<BuildInfoLabels, Gauge>,
-    registry: Registry,
+    registry: Mutex<Registry>,
     /// Controls whether configuration endpoints are exposed.
     ///
     /// WARNING: Enabling this may expose sensitive configuration information.
@@ -183,7 +200,7 @@ impl AppState {
             metrics_recorder,
             index,
             build_info,
-            registry,
+            registry: Mutex::new(registry),
             expose_config,
             ready: AtomicBool::new(false),
         }))
@@ -223,7 +240,8 @@ impl AppState {
 
     fn encode_metrics(&self) -> Result<String, std::fmt::Error> {
         let mut body = String::new();
-        encode(&mut body, &self.0.registry)?;
+        let registry = self.0.registry.lock().unwrap();
+        encode(&mut body, &registry)?;
         Ok(body)
     }
 
@@ -244,6 +262,7 @@ impl AppState {
     fn is_ready(&self) -> bool {
         self.0.ready.load(Ordering::Acquire)
     }
+
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -460,16 +479,20 @@ pub fn build_app_with_state(
         .merge(core_routes())
         .nest("/index", index_router::<AppState>());
 
+    // Initialize memory subsystem. This is fallible, so we capture the result.
+    let memory_initialized = hauski_memory::init_default().map_err(|e| {
+        tracing::error!(error = ?e, "failed to initialize memory subsystem");
+        e
+    }).is_ok();
+
     if state.expose_config() {
         // OpenAPI UI under /docs, spec under /api-docs/openapi.json
         let swagger = SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi());
 
         app = app.merge(config_routes()).merge(swagger);
 
-        // make sure the memory subsystem is initialized before exposing routes
-        if let Err(e) = hauski_memory::init_default() {
-            tracing::error!(error = ?e, "failed to initialize memory, memory routes disabled");
-        } else {
+        // Conditionally add memory routes if the subsystem is up.
+        if memory_initialized {
             app = app.merge(memory_routes());
         }
     }
@@ -520,6 +543,74 @@ pub fn build_app_with_state(
         .with_state(state.clone())
         .layer(from_fn_with_state(allowed_origin.clone(), cors_middleware))
         .layer(request_guards);
+
+    // ---- Memory metrics registration & poller -------------------------------
+    if memory_initialized {
+        use prometheus_client::registry::Unit;
+        // Register metrics into the existing registry
+        let pinned_g = PromGauge::default();
+        let unpinned_g = PromGauge::default();
+        let expired_c = PromCounter::default();
+        let manual_c = PromCounter::default();
+
+        let mut registry = state.0.registry.lock().unwrap();
+        registry.register_with_unit(
+            "memory_items_pinned",
+            "Number of pinned items in hauski-memory",
+            Unit::Other("Count".into()),
+            pinned_g.clone(),
+        );
+        registry.register_with_unit(
+            "memory_items_unpinned",
+            "Number of unpinned items in hauski-memory",
+            Unit::Other("Count".into()),
+            unpinned_g.clone(),
+        );
+        registry.register_with_unit(
+            "memory_evictions_expired_total",
+            "Total number of TTL-based (expired) evictions performed by janitor",
+            Unit::Other("Count".into()),
+            expired_c.clone(),
+        );
+        registry.register_with_unit(
+            "memory_evictions_manual_total",
+            "Total number of manual evictions via API",
+            Unit::Other("Count".into()),
+            manual_c.clone(),
+        );
+
+        // Make handles available to other modules (e.g., memory_api)
+        let _ = MEMORY_ITEMS_PINNED_GAUGE.set(pinned_g);
+        let _ = MEMORY_ITEMS_UNPINNED_GAUGE.set(unpinned_g);
+        let _ = MEMORY_EVICTIONS_EXPIRED.set(expired_c.clone());
+        let _ = MEMORY_EVICTIONS_MANUAL.set(manual_c.clone());
+
+        // Spawn polling task to refresh gauges and push deltas of expired evictions.
+        tokio::spawn(async move {
+            use std::time::Duration;
+            let mut last_expired = memory::expired_evictions_total();
+            loop {
+                tokio::time::sleep(Duration::from_secs(30)).await;
+                // Snapshot
+                if let Ok(stats) = memory::global().stats() {
+                    if let Some(g) = MEMORY_ITEMS_PINNED_GAUGE.get() {
+                        g.set(stats.pinned as i64);
+                    }
+                    if let Some(g) = MEMORY_ITEMS_UNPINNED_GAUGE.get() {
+                        g.set(stats.unpinned as i64);
+                    }
+                    if let Some(c) = MEMORY_EVICTIONS_EXPIRED.get() {
+                        let now = stats.expired_evictions_total;
+                        if now > last_expired {
+                            c.inc_by((now - last_expired) as u64);
+                            last_expired = now;
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     (app, state)
 }
 
