@@ -461,16 +461,17 @@ pub fn build_app_with_state(
         .nest("/index", index_router::<AppState>());
 
     if state.expose_config() {
-        // make sure the memory subsystem is initialized before exposing routes
-        let _ = hauski_memory::init_default();
-
         // OpenAPI UI under /docs, spec under /api-docs/openapi.json
         let swagger = SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi());
 
-        app = app
-            .merge(config_routes())
-            .merge(memory_routes())
-            .merge(swagger);
+        app = app.merge(config_routes()).merge(swagger);
+
+        // make sure the memory subsystem is initialized before exposing routes
+        if let Err(e) = hauski_memory::init_default() {
+            tracing::error!(error = ?e, "failed to initialize memory, memory routes disabled");
+        } else {
+            app = app.merge(memory_routes());
+        }
     }
 
     if state.safe_mode() {
