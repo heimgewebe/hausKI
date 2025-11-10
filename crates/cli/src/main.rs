@@ -51,6 +51,12 @@ enum Commands {
         #[command(subcommand)]
         cmd: ConfigCmd,
     },
+    /// Führt AI-Assistenten-Playbooks aus
+    Assist {
+        /// Pfad zur Playbook-Datei
+        #[arg(long)]
+        playbook: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -123,6 +129,40 @@ fn main() -> Result<()> {
                 validate_config(file)?;
             }
         },
+        Commands::Assist { playbook } => {
+            run_playbook(&playbook)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn run_playbook(playbook_path: &str) -> Result<()> {
+    let content = std::fs::read_to_string(playbook_path)
+        .with_context(|| format!("Could not read playbook file: {}", playbook_path))?;
+    let playbook: serde_yaml::Value = serde_yaml::from_str(&content)
+        .with_context(|| format!("Could not parse playbook file: {}", playbook_path))?;
+
+    if let Some(steps) = playbook.get("steps").and_then(|s| s.as_sequence()) {
+        for (i, step) in steps.iter().enumerate() {
+            if let Some(run_cmd) = step.get("run").and_then(|r| r.as_str()) {
+                info!("Executing step {}: {}", i + 1, run_cmd);
+                let output = std::process::Command::new("sh")
+                    .arg("-c")
+                    .arg(run_cmd)
+                    .output()
+                    .with_context(|| format!("Failed to execute command: {}", run_cmd))?;
+
+                if !output.status.success() {
+                    bail!(
+                        "Step {} failed with status {}:\n{}",
+                        i + 1,
+                        output.status,
+                        String::from_utf8_lossy(&output.stderr)
+                    );
+                }
+            }
+        }
     }
 
     Ok(())
