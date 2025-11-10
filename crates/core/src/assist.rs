@@ -89,7 +89,8 @@ fn write_event(kind: &str, level: &str, labels: BTreeMap<&str, serde_json::Value
         let p = Path::new(&path);
         if let Some(dir) = p.parent() { fs::create_dir_all(dir)?; }
         let mut f = fs::OpenOptions::new().create(true).append(true).open(p)?;
-        serde_json::to_writer(&mut f, &event)?;
+        serde_json::to_writer(&mut f, &event)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         f.write_all(b"\n")?;
         Ok(())
     })() {
