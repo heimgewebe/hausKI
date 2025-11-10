@@ -26,6 +26,9 @@ tower = { workspace = true, features = ["limit", "timeout"] }
 utoipa = { workspace = true, features = ["macros"] }
 utoipa-swagger-ui = { workspace = true, features = ["axum"] }
 hauski-memory = { path = "../memory", version = "0.1.0" }
+hostname.workspace = true
+ulid.workspace = true
+chrono = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }

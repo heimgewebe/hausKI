@@ -32,6 +32,7 @@ use prometheus_client::metrics::gauge::Gauge as PromGauge;
 use hauski_memory as memory;
 
 mod ask;
+mod assist;
 mod chat;
 mod chat_upstream;
 mod config;
@@ -56,7 +57,8 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
     paths(
         health, healthz, ready,
         ask::ask_handler, chat::chat_handler,
-        memory_api::memory_get_handler, memory_api::memory_set_handler, memory_api::memory_evict_handler
+        memory_api::memory_get_handler, memory_api::memory_set_handler, memory_api::memory_evict_handler,
+        assist::assist_handler
     ),
     components(
         schemas(
@@ -68,7 +70,9 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
             chat::ChatResponse,
             memory_api::MemoryGetRequest, memory_api::MemoryGetResponse,
             memory_api::MemorySetRequest, memory_api::MemorySetResponse,
-            memory_api::MemoryEvictRequest, memory_api::MemoryEvictResponse
+            memory_api::MemoryEvictRequest, memory_api::MemoryEvictResponse,
+            assist::AssistRequest,
+            assist::AssistResponse
         )
     ),
     tags(
@@ -621,6 +625,7 @@ fn core_routes() -> Router<AppState> {
         .route("/ready", get(ready))
         .route("/metrics", get(metrics))
         .route("/ask", get(ask::ask_handler))
+        .route("/assist", post(assist::assist_handler))
         .route("/v1/chat", post(chat::chat_handler))
 }
 
