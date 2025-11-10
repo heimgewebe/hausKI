@@ -25,12 +25,14 @@ use std::{
 };
 use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, BoxError, ServiceBuilder};
 use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 mod ask;
 mod chat;
 mod chat_upstream;
 mod config;
 mod egress;
+mod memory_api;
 pub use config::{
     load_flags, load_limits, load_models, load_routing, FeatureFlags, Limits, ModelEntry,
     ModelsFile, RoutingDecision, RoutingPolicy, RoutingRule,
@@ -47,7 +49,11 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(health, healthz, ready, ask::ask_handler, chat::chat_handler),
+    paths(
+        health, healthz, ready,
+        ask::ask_handler, chat::chat_handler,
+        memory_api::memory_get_handler, memory_api::memory_set_handler, memory_api::memory_evict_handler
+    ),
     components(
         schemas(
             ask::AskResponse,
@@ -55,12 +61,17 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
             chat::ChatRequest,
             chat::ChatMessage,
             chat::ChatStubResponse,
-            chat::ChatResponse
+            chat::ChatResponse,
+            memory_api::MemoryGetRequest, memory_api::MemoryGetResponse,
+            memory_api::MemorySetRequest, memory_api::MemorySetResponse,
+            memory_api::MemoryEvictRequest, memory_api::MemoryEvictResponse
         )
     ),
-    tags((name = "core", description = "Core health & readiness"))
+    tags(
+        (name = "core", description = "Core service endpoints")
+    )
 )]
-struct ApiDoc;
+pub struct ApiDoc;
 
 /// Creates a latency histogram with predefined buckets.
 fn create_latency_histogram() -> Histogram {
@@ -450,7 +461,16 @@ pub fn build_app_with_state(
         .nest("/index", index_router::<AppState>());
 
     if state.expose_config() {
-        app = app.merge(config_routes()).merge(docs_routes());
+        // make sure the memory subsystem is initialized before exposing routes
+        let _ = hauski_memory::init_default();
+
+        // OpenAPI UI under /docs, spec under /api-docs/openapi.json
+        let swagger = SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi());
+
+        app = app
+            .merge(config_routes())
+            .merge(memory_routes())
+            .merge(swagger);
     }
 
     if state.safe_mode() {
@@ -512,14 +532,11 @@ fn core_routes() -> Router<AppState> {
         .route("/v1/chat", post(chat::chat_handler))
 }
 
-fn docs_routes() -> Router<AppState> {
+fn memory_routes() -> Router<AppState> {
     Router::new()
-        .route("/docs", get(api_docs))
-        .route("/api-docs/openapi.json", get(openapi_json))
-        .route(
-            "/docs/openapi.json",
-            get(|| async { Redirect::permanent("/api-docs/openapi.json") }),
-        )
+        .route("/memory/get", post(memory_api::memory_get_handler))
+        .route("/memory/set", post(memory_api::memory_set_handler))
+        .route("/memory/evict", post(memory_api::memory_evict_handler))
 }
 
 const SWAGGER_UI_HTML: &str = r#"<!DOCTYPE html>

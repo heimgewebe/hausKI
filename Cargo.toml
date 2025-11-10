@@ -33,15 +33,16 @@ walkdir = "2"
 dirs = "6.0.0"
 # Abhängigkeiten, die bereits von mehreren Crates genutzt werden, zentralisieren
 tower = "0.5"
-utoipa = { version = "5", features = ["axum_extras"] }
+utoipa = { version = "5.4", features = ["macros", "axum_extras", "yaml"] }
+utoipa-swagger-ui = { version = "9.0" }
 http-body-util = "0.1"
 serial_test = "3"
 tempfile = "3"
 # sqlx bewusst nicht vorgezogen, bis erste DB-Crate existiert
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots", "gzip"] }
 url = "2"
-rusqlite = { version = "0.37.0", features = ["bundled"] }
-chrono = { version = "0.4", features = ["clock"] }
+rusqlite = { version = "0.37.0", features = ["bundled", "chrono"] }
+chrono = { version = "0.4", features = ["clock", "serde"] }
 hostname = "0.4"
 ulid = "1"
 

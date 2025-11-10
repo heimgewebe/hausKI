@@ -23,7 +23,9 @@ reqwest.workspace = true
 url.workspace = true
 hauski-indexd = { path = "../indexd", version = "0.1.0" }
 tower = { workspace = true, features = ["limit", "timeout"] }
-utoipa.workspace = true
+utoipa = { workspace = true, features = ["macros"] }
+utoipa-swagger-ui = { workspace = true, features = ["axum"] }
+hauski-memory = { path = "../memory", version = "0.1.0" }
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }
