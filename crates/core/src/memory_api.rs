@@ -10,7 +10,7 @@ use std::fs;
 use std::path::Path;
 use utoipa::ToSchema;
 
-use crate::AppState;
+use crate::{record_memory_manual_eviction, AppState};
 use hauski_memory as mem;
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -199,7 +199,13 @@ pub async fn memory_evict_handler(
 ) -> Response {
     let store = mem::global();
     match store.evict(&req.key) {
-        Ok(ok) => (StatusCode::OK, Json(MemoryEvictResponse { ok })).into_response(),
+        Ok(ok) => {
+            if ok {
+                // Nur inkrementieren, wenn wirklich ein Key gelöscht wurde.
+                record_memory_manual_eviction();
+            }
+            (StatusCode::OK, Json(MemoryEvictResponse { ok })).into_response()
+        }
         Err(e) => {
             tracing::error!(error = ?e, "failed to evict memory item");
             (StatusCode::INTERNAL_SERVER_ERROR).into_response()
