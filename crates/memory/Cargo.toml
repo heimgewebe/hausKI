@@ -6,4 +6,16 @@ license = "MIT"
 
 [dependencies]
 prometheus-client = { workspace = true }
-prometheus-client-derive-encode = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+rusqlite = { workspace = true }
+dirs = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+once_cell = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+serial_test = { workspace = true }
