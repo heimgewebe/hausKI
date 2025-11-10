@@ -1,10 +1,13 @@
-use axum::{http::StatusCode, Json};
+use axum::{http::{StatusCode}, Json};
 use axum::{extract::State, http::Method};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, env, fs, io::Write, path::Path, time::Instant};
 use utoipa::ToSchema;
 use ulid::Ulid;
+use once_cell::sync::Lazy;
+use std::sync::Mutex;
+use std::time::Duration;
 
 use crate::AppState;
 
@@ -65,6 +68,50 @@ fn route_mode(q: &str, hint: &Option<String>) -> &'static str {
         || lower.contains("error:")
         || lower.contains("traceback");
     if looks_like_code { "code" } else { "knowledge" }
+}
+
+/// --------- Einfache, prozessweite Rate-Limit-Grenze (Requests / Minute) ----------
+/// ENV: HAUSKI_ASSIST_MAX_PER_MIN (default 60), HAUSKI_ASSIST_ENABLED (default true)
+struct MinuteWindow {
+    start: Instant,
+    count: u64,
+}
+
+static WINDOW: Lazy<Mutex<MinuteWindow>> = Lazy::new(|| {
+    Mutex::new(MinuteWindow { start: Instant::now(), count: 0 })
+});
+
+fn assist_enabled() -> bool {
+    env::var("HAUSKI_ASSIST_ENABLED")
+        .ok()
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true") || v == "yes")
+        .unwrap_or(true)
+}
+
+fn assist_max_per_min() -> u64 {
+    env::var("HAUSKI_ASSIST_MAX_PER_MIN").ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(60)
+}
+
+/// Gibt `None` zurück, wenn innerhalb des Fensters noch Budget übrig ist;
+/// andernfalls die Sekunden, nach denen wieder versucht werden darf.
+fn check_minute_budget(now: Instant) -> Option<u64> {
+    let mut win = WINDOW.lock().expect("window mutex poisoned");
+    let elapsed = now.duration_since(win.start);
+    let limit = assist_max_per_min();
+    if elapsed >= Duration::from_secs(60) {
+        // neues Fenster
+        win.start = now;
+        win.count = 0;
+    }
+    if win.count < limit {
+        win.count += 1;
+        None
+    } else {
+        let secs = (60u64).saturating_sub(elapsed.as_secs());
+        Some(secs.max(1))
+    }
 }
 
 /// Optionaler JSONL-Event-Sink (HAUSKI_EVENT_SINK=/pfad/events.jsonl)
@@ -169,7 +216,9 @@ async fn fetch_topk_citations(state: &AppState, question: &str) -> Vec<AssistCit
     request_body = AssistRequest,
     responses(
         (status = 200, description = "Assist response (knowledge path; may include citations)", body = AssistResponse),
-        (status = 501, description = "Code agent not implemented", body = AssistResponse)
+        (status = 429, description = "Rate limit exceeded", body = AssistResponse),
+        (status = 501, description = "Code agent not implemented", body = AssistResponse),
+        (status = 503, description = "Assist feature disabled", body = AssistResponse)
     )
 )]
 pub async fn assist_handler(
@@ -177,6 +226,32 @@ pub async fn assist_handler(
     Json(req): Json<AssistRequest>,
 ) -> (StatusCode, Json<AssistResponse>) {
     let started = Instant::now();
+    // --- Feature-Gate ---------------------------------------------------------
+    if !assist_enabled() {
+        let ms = started.elapsed().as_millis() as u64;
+        state.record_http_observation(Method::POST, "/assist", StatusCode::SERVICE_UNAVAILABLE, started);
+        return (StatusCode::SERVICE_UNAVAILABLE, Json(AssistResponse{
+            answer: "assist is disabled (set HAUSKI_ASSIST_ENABLED=true to enable)".into(),
+            citations: Vec::new(),
+            trace: vec![serde_json::json!({"step":"guard","decision":"disabled", "retry_after_sec": 30})],
+            latency_ms: ms,
+        }));
+    }
+
+    // --- Globales Budget pro Minute ------------------------------------------
+    if let Some(retry_secs) = check_minute_budget(Instant::now()) {
+        let ms = started.elapsed().as_millis() as u64;
+        state.record_http_observation(Method::POST, "/assist", StatusCode::TOO_MANY_REQUESTS, started);
+        // Antwortkörper mit Hinweis + (implizit) Retry-After Header wäre nice; Header setzen wir
+        // am einfachsten, indem wir ihn in der App-Schicht ergänzen – hier minimal im Body.
+        return (StatusCode::TOO_MANY_REQUESTS, Json(AssistResponse{
+            answer: "assist is rate-limited".into(),
+            citations: Vec::new(),
+            trace: vec![serde_json::json!({"step":"guard","decision":"rate_limited","retry_after_sec":retry_secs})],
+            latency_ms: ms,
+        }));
+    }
+
     let mode = route_mode(&req.question, &req.mode);
 
     // --- CODE PATH: liefert 501 + strukturierte Diagnose im Trace -------------------------
