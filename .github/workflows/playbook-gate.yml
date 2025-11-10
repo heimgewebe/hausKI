@@ -28,6 +28,7 @@ jobs:
           if ! command -v wgx >/dev/null 2>&1; then
             git clone https://github.com/heimgewebe/wgx.git /tmp/wgx
             echo "/tmp/wgx/bin" >> "$GITHUB_PATH"
+            export PATH="/tmp/wgx/bin:$PATH"
           fi
           wgx --version
 
