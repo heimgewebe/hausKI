@@ -98,6 +98,70 @@ fn write_event(kind: &str, level: &str, labels: BTreeMap<&str, serde_json::Value
     }
 }
 
+/// Anfrageformat für `/index/search` (lokale Hilfsstruktur).
+#[derive(Debug, Serialize)]
+struct IndexSearchRequest<'a> {
+    q: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    namespace: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    k: Option<u32>,
+}
+
+/// Robust gegen Schema-Varianz: wir versuchen, Titel/Score aus typischen Feldern zu ziehen.
+fn extract_citations_from_value(v: &serde_json::Value) -> Vec<AssistCitation> {
+    // akzeptiere: {items:[{title,score}]}, {results:[...]}, oder direkt Array
+    let arr = v.get("items")
+        .and_then(|x| x.as_array())
+        .or_else(|| v.get("results").and_then(|x| x.as_array()))
+        .or_else(|| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    arr.into_iter().filter_map(|it| {
+        // Versuche verschiedene Felder
+        let title = it.get("title")
+            .or_else(|| it.get("path"))
+            .or_else(|| it.get("id"))
+            .and_then(|x| x.as_str())
+            .map(|s| s.to_string())?;
+        let score = it.get("score").and_then(|s| s.as_f64()).map(|f| f as f32);
+        Some(AssistCitation { title, score })
+    }).collect()
+}
+
+/// Holt Top-K Treffer aus `/index/search` (wenn erreichbar). Fallback: leer.
+async fn fetch_topk_citations(question: &str) -> Vec<AssistCitation> {
+    // Basis-URL für Core (am gleichen Prozess): über Env konfigurierbar,
+    // default auf loopback, damit lokale Dev-Starts out-of-the-box funktionieren.
+    let base = env::var("HAUSKI_INTERNAL_BASE").ok()
+        .unwrap_or_else(|| "http://127.0.0.1:8080".to_string());
+    let url = format!("{}/index/search", base.trim_end_matches('/'));
+
+    let client = reqwest::Client::new();
+    let body = IndexSearchRequest { q: question, namespace: Some("default"), k: Some(3) };
+
+    match client.post(url).json(&body).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            match resp.json::<serde_json::Value>().await {
+                Ok(val) => extract_citations_from_value(&val),
+                Err(err) => {
+                    tracing::warn!("index search: failed to decode json: {}", err);
+                    Vec::new()
+                }
+            }
+        }
+        Ok(resp) => {
+            tracing::warn!("index search: non-success status {}", resp.status());
+            Vec::new()
+        }
+        Err(err) => {
+            tracing::debug!("index search request failed: {}", err);
+            Vec::new()
+        }
+    }
+}
+
 /// Minimaler Assist-Router (MVP): wählt "code" oder "knowledge" und liefert eine Stub-Antwort.
 #[utoipa::path(
     post,
@@ -115,10 +179,11 @@ pub async fn assist_handler(
     let started = Instant::now();
     let mode = route_mode(&req.question, &req.mode);
 
-    // TODO(Phase 2): Für "knowledge" semantAH-TopK /index/search integrieren; für "code" Tooling-Hooks.
+    // TODO(Phase 2): Für "code" Tooling-Hooks ergänzen.
     let answer = format!("Router wählte {}. (MVP-Stub)", mode);
+    // Knowledge-Modus: Top-K aus Index versuchen, sonst leer.
     let citations = if mode == "knowledge" {
-        vec![AssistCitation { title: "docs/api.md".to_string(), score: Some(0.83) }]
+        fetch_topk_citations(&req.question).await
     } else {
         Vec::new()
     };

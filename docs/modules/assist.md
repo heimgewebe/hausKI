@@ -29,6 +29,7 @@ In Phase-2 dient dies als Gerüst, um später semantAH-Suche, Tools und Policies
 | Variable | Default | Zweck |
 | --- | --- | --- |
 | `HAUSKI_EVENT_SINK` | _(leer)_ | Wenn gesetzt, werden Events (JSONL) hierhin angehängt. |
++| `HAUSKI_INTERNAL_BASE` | `http://127.0.0.1:8080` | Basis-URL für interne HTTP-Aufrufe (hier: `/index/search`). |
 
 ## Nächste Schritte
 - Knowledge-Agent mit **semantAH Top-K** und Zitaten anbinden (füllt `citations[]` mit Titeln/IDs & Scores).
