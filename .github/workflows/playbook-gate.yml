@@ -13,4 +13,4 @@ jobs:
       - name: Build hauski binary
         run: cargo build --package hauski-cli --release
       - name: Run playbook
-        run: ./target/release/hauski-cli run-playbook playbooks/code_assist.yml
+        run: ./target/release/hauski-cli assist --playbook playbooks/code_assist.yml
