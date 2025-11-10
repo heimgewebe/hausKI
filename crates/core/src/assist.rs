@@ -168,7 +168,8 @@ async fn fetch_topk_citations(state: &AppState, question: &str) -> Vec<AssistCit
     tag = "core",
     request_body = AssistRequest,
     responses(
-        (status = 200, description = "Assist response (MVP)", body = AssistResponse)
+        (status = 200, description = "Assist response (knowledge path; may include citations)", body = AssistResponse),
+        (status = 501, description = "Code agent not implemented", body = AssistResponse)
     )
 )]
 pub async fn assist_handler(
@@ -178,23 +179,52 @@ pub async fn assist_handler(
     let started = Instant::now();
     let mode = route_mode(&req.question, &req.mode);
 
-    // TODO(Phase 2): Für "code" Tooling-Hooks ergänzen.
-    let answer = format!("Router wählte {}. (MVP-Stub)", mode);
-    // Knowledge-Modus: Top-K aus Index versuchen, sonst leer.
-    let citations = if mode == "knowledge" {
-        fetch_topk_citations(&state, &req.question).await
-    } else {
-        Vec::new()
-    };
+    // --- CODE PATH: liefert 501 + strukturierte Diagnose im Trace -------------------------
+    if mode == "code" {
+        // Kleine Heuristik für eine knappe Diagnose
+        let ql = req.question.to_ascii_lowercase();
+        let looks_like_python = ql.contains("traceback") || ql.contains("python") || ql.contains("pip ");
+        let looks_like_rust   = ql.contains("error:") && (ql.contains("cargo ") || ql.contains("rustc"));
+        let looks_like_node   = ql.contains("npm ") || ql.contains("node ");
+        let guess = if looks_like_python { "python" } else if looks_like_rust { "rust" } else if looks_like_node { "node" } else { "unknown" };
+
+        let diag = serde_json::json!({
+            "step": "code_stub",
+            "decision": "code",
+            "language_guess": guess,
+            "next": "not_implemented",
+            "advice": match guess {
+                "python" => "Prüfe Traceback-Root-Cause; venv/uv nutzen, Abhängigkeiten synchronisieren.",
+                "rust"   => "Baue lokal mit `cargo build -v`; prüfe Fehlermeldung und fehlende Features.",
+                "node"   => "Installiere Abhängigkeiten neu (`npm ci`); prüfe lockfile & Node-Version.",
+                _        => "Bitte Code/Fehlerauszug präzisieren; Tooling-Hooks folgen in Phase 2.",
+            }
+        });
+        let answer = "CodeAgent ist noch nicht verdrahtet (501).".to_string();
+        let ms = started.elapsed().as_millis() as u64;
+        state.record_http_observation(Method::POST, "/assist", StatusCode::NOT_IMPLEMENTED, started);
+        return (
+            StatusCode::NOT_IMPLEMENTED,
+            Json(AssistResponse {
+                answer,
+                citations: Vec::new(),
+                trace: vec![diag],
+                latency_ms: ms,
+            })
+        );
+    }
+
+    // --- KNOWLEDGE PATH: Top-K aus Index (falls erreichbar) ------------------------------
+    let answer = "Router wählte knowledge. (MVP-Stub)".to_string();
+    let citations = fetch_topk_citations(&state, &req.question).await;
+
     let trace = vec![serde_json::json!({
-        "step":"router",
-        "decision":mode,
-        "reason": req.mode.as_deref().unwrap_or("heuristic")
+        "step":"router","decision":mode,"reason": req.mode.as_deref().unwrap_or("heuristic")
     })];
 
     let ms = started.elapsed().as_millis() as u64;
 
-    // Optionale Events (JSONL) gemäß contracts/events.schema.json
+    // Events emittieren (JSONL), kompatibel mit contracts/events.schema.json
     {
         let mut labels = BTreeMap::new();
         labels.insert("mode", serde_json::json!(mode));

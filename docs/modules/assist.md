@@ -24,6 +24,24 @@ In Phase-2 dient dies als Gerüst, um später semantAH-Suche, Tools und Policies
 
 > Der `mode`-Parameter ist optional. Wenn gesetzt (`code|knowledge`), überschreibt er die Heuristik.
 
+### Code-Pfad (Stub)
+Bis der Code-Agent angebunden ist, liefert der Router für `mode=code` (oder heuristisch erkannten Code)
+einen `501 Not Implemented` mit kurzer Diagnose im `trace`:
+```json
+{
+  "answer": "CodeAgent ist noch nicht verdrahtet (501).",
+  "citations": [],
+  "trace": [{
+    "step":"code_stub",
+    "decision":"code",
+    "language_guess":"python",
+    "next":"not_implemented",
+    "advice":"Prüfe Traceback-Root-Cause; venv/uv nutzen, Abhängigkeiten synchronisieren."
+  }],
+  "latency_ms": 7
+}
+```
+
 ## Konfiguration
 
 | Variable | Default | Zweck |
