@@ -131,17 +131,16 @@ fn extract_citations_from_value(v: &serde_json::Value) -> Vec<AssistCitation> {
 }
 
 /// Holt Top-K Treffer aus `/index/search` (wenn erreichbar). Fallback: leer.
-async fn fetch_topk_citations(question: &str) -> Vec<AssistCitation> {
+async fn fetch_topk_citations(state: &AppState, question: &str) -> Vec<AssistCitation> {
     // Basis-URL für Core (am gleichen Prozess): über Env konfigurierbar,
     // default auf loopback, damit lokale Dev-Starts out-of-the-box funktionieren.
     let base = env::var("HAUSKI_INTERNAL_BASE").ok()
         .unwrap_or_else(|| "http://127.0.0.1:8080".to_string());
     let url = format!("{}/index/search", base.trim_end_matches('/'));
 
-    let client = reqwest::Client::new();
     let body = IndexSearchRequest { q: question, namespace: Some("default"), k: Some(3) };
 
-    match client.post(url).json(&body).send().await {
+    match state.http_client().post(url).json(&body).send().await {
         Ok(resp) if resp.status().is_success() => {
             match resp.json::<serde_json::Value>().await {
                 Ok(val) => extract_citations_from_value(&val),
@@ -183,7 +182,7 @@ pub async fn assist_handler(
     let answer = format!("Router wählte {}. (MVP-Stub)", mode);
     // Knowledge-Modus: Top-K aus Index versuchen, sonst leer.
     let citations = if mode == "knowledge" {
-        fetch_topk_citations(&req.question).await
+        fetch_topk_citations(&state, &req.question).await
     } else {
         Vec::new()
     };
