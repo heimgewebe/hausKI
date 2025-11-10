@@ -8,6 +8,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ runner.os }}-wgx-${{ hashFiles('**/Cargo.lock') }}
+          cache-on-failure: true
+
+      - name: Add Cargo bin to PATH
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Install wgx (via cargo)
+        run: |
+          if ! command -v wgx >/dev/null 2>&1; then
+            cargo install --locked --git https://github.com/heimgewebe/wgx wgx
+          fi
+          wgx --version
+
       - name: Install just
         run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
       - name: Build hauski binary
