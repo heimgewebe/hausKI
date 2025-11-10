@@ -106,3 +106,28 @@ if not content or "(mock)" not in content:
 PY
 
 echo "[smoke] success."
+
+# --- Optional: /metrics Smoke (nicht-blockierend) -----------------------------
+echo "[smoke] check /metrics (optional: memory gauges/counters)"
+METRICS="$(curl -fsS --max-time 5 "${HOST}/metrics" || true)"
+if [[ -z "${METRICS}" ]]; then
+  echo "[warn] /metrics unavailable or empty (non-blocking)" >&2
+else
+  missing=0
+  for m in \
+    "memory_items_pinned" \
+    "memory_items_unpinned" \
+    "memory_evictions_expired_total" \
+    "memory_evictions_manual_total"
+  do
+    if grep -q "${m}" <<<"${METRICS}"; then
+      echo "[smoke] metric ok: ${m}"
+    else
+      echo "[warn] metric missing: ${m} (non-blocking)" >&2
+      missing=$((missing+1))
+    fi
+  done
+  if [[ "${missing}" -gt 0 ]]; then
+    echo "[warn] some memory metrics are missing; continuing (non-blocking)" >&2
+  fi
+fi
