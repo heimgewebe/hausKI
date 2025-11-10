@@ -53,3 +53,10 @@ einen `501 Not Implemented` mit kurzer Diagnose im `trace`:
 - Knowledge-Agent mit **semantAH Top-K** und Zitaten anbinden (füllt `citations[]` mit Titeln/IDs & Scores).
 - Code-Agent: Lint/Build/Run-Tools und Kurzdiagnosen.
 - Events (`core.assist.request|response`) nach `contracts/events.schema.json`.
+
+## Guards & Limits
+
+| Variable | Default | Zweck |
+| --- | --- | --- |
+| `HAUSKI_ASSIST_ENABLED` | `true` | Globales Feature-Gate. Wenn `false`, liefert `/assist` `503`. |
+| `HAUSKI_ASSIST_MAX_PER_MIN` | `60` | Globales Prozess-Limit (Requests/Minute). Bei Überschreitung `429` mit `trace.retry_after_sec`. |
