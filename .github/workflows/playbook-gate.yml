@@ -23,10 +23,12 @@ jobs:
       - name: Add Cargo bin to PATH
         run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-      - name: Install wgx (via cargo)
+      - name: Install wgx (from git)
         run: |
           if ! command -v wgx >/dev/null 2>&1; then
-            cargo install --locked --git https://github.com/heimgewebe/wgx wgx
+            git clone https://github.com/heimgewebe/wgx.git /tmp/wgx
+            echo "/tmp/wgx/bin" >> "$GITHUB_PATH"
+            export PATH="/tmp/wgx/bin:$PATH"
           fi
           wgx --version
 

@@ -10,7 +10,7 @@ Logs, Audits und eventuelle Message-Bus-Publikationen.
 - **Nutzlast** in `data` ohne feste Struktur, aber validierbar.
 
 ## JSON-Schema
-Das Schema liegt unter: [`contracts/events.schema.json`](../../contracts/events.schema.json) (Draft 2020-12) und ein Beispiel unter [`contracts/examples/event.sample.json`](../../contracts/examples/event.sample.json).
+Das Schema liegt unter: [`contracts/events.schema.json`](events.schema.json) (Draft 2020-12) und ein Beispiel unter [`contracts/examples/event.sample.json`](examples/event.sample.json).
 
 Wichtige Regeln:
 - `id` ist ein **ULID** (26 Zeichen, sortierbar).

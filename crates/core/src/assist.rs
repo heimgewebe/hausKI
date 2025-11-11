@@ -1,15 +1,16 @@
 use axum::{http::StatusCode, Json};
-use axum::{extract::State, http::Method};
+use axum::extract::State;
+use axum::http::Method;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, env, fs, io::Write, path::Path, time::Instant};
-use utoipa::ToSchema;
 use ulid::Ulid;
+use utoipa::ToSchema;
 
 use crate::AppState;
 
 #[derive(Debug, Deserialize, ToSchema)]
-#[schema(title = "AssistRequest", example = json!({"question":"Wie richte ich /docs ein?","mode":"knowledge"}))]
+#[schema(title = "AssistRequest", example = json!({"question":"Wie richte ich /docs ein?"}))]
 pub struct AssistRequest {
     /// Freitext-Frage / Aufgabe.
     pub question: String,
@@ -55,7 +56,7 @@ fn route_mode(q: &str, hint: &Option<String>) -> &'static str {
             _ => {}
         }
     }
-    // Sehr einfache Heuristik (MVP)
+    // sehr einfache Heuristik (MVP)
     let lower = q.to_ascii_lowercase();
     let looks_like_code = lower.contains("```")
         || lower.contains("fn ")
@@ -67,13 +68,15 @@ fn route_mode(q: &str, hint: &Option<String>) -> &'static str {
     if looks_like_code { "code" } else { "knowledge" }
 }
 
-/// Optionaler JSONL-Event-Sink (HAUSKI_EVENT_SINK=/pfad/events.jsonl)
+/// Konfiguration: Wohin sollen Events (JSONL) geschrieben werden?
 fn event_sink_path() -> Option<String> {
     env::var("HAUSKI_EVENT_SINK").ok().filter(|s| !s.is_empty())
 }
 
 fn write_event(kind: &str, level: &str, labels: BTreeMap<&str, serde_json::Value>, data: serde_json::Value) {
     let Some(path) = event_sink_path() else { return };
+
+    // contracts/events.schema.json Felder
     let event = serde_json::json!({
         "id": Ulid::new().to_string(),
         "ts": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
@@ -85,15 +88,79 @@ fn write_event(kind: &str, level: &str, labels: BTreeMap<&str, serde_json::Value
         "labels": labels,
         "data": data
     });
+
     if let Err(err) = (|| -> std::io::Result<()> {
         let p = Path::new(&path);
         if let Some(dir) = p.parent() { fs::create_dir_all(dir)?; }
         let mut f = fs::OpenOptions::new().create(true).append(true).open(p)?;
-        serde_json::to_writer(&mut f, &event)?;
+        serde_json::to_writer(&mut f, &event).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         f.write_all(b"\n")?;
         Ok(())
     })() {
         tracing::warn!("failed to write event to sink {}: {}", path, err);
+    }
+}
+
+/// Anfrageformat für `/index/search` (lokale Hilfsstruktur).
+#[derive(Debug, Serialize)]
+struct IndexSearchRequest<'a> {
+    q: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    namespace: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    k: Option<u32>,
+}
+
+/// Robust gegen Schema-Varianz: wir versuchen, Titel/Score aus typischen Feldern zu ziehen.
+fn extract_citations_from_value(v: &serde_json::Value) -> Vec<AssistCitation> {
+    // akzeptiere: {items:[{title,score}]}, {results:[...]}, oder direkt Array
+    let arr = v.get("items")
+        .and_then(|x| x.as_array())
+        .or_else(|| v.get("results").and_then(|x| x.as_array()))
+        .or_else(|| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    arr.into_iter().filter_map(|it| {
+        let title = it.get("title")
+            .or_else(|| it.get("path"))
+            .or_else(|| it.get("id"))
+            .and_then(|x| x.as_str())
+            .map(|s| s.to_string())?;
+        let score = it.get("score").and_then(|s| s.as_f64()).map(|f| f as f32);
+        Some(AssistCitation { title, score })
+    }).collect()
+}
+
+/// Holt Top-K Treffer aus `/index/search` (wenn erreichbar). Fallback: leer.
+async fn fetch_topk_citations(question: &str) -> Vec<AssistCitation> {
+    // Basis-URL für Core (am gleichen Prozess): über Env konfigurierbar,
+    // default auf loopback, damit lokale Dev-Starts out-of-the-box funktionieren.
+    let base = env::var("HAUSKI_INTERNAL_BASE").ok()
+        .unwrap_or_else(|| "http://127.0.0.1:8080".to_string());
+    let url = format!("{}/index/search", base.trim_end_matches('/'));
+
+    let client = reqwest::Client::new();
+    let body = IndexSearchRequest { q: question, namespace: Some("default"), k: Some(3) };
+
+    match client.post(url).json(&body).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            match resp.json::<serde_json::Value>().await {
+                Ok(val) => extract_citations_from_value(&val),
+                Err(err) => {
+                    tracing::warn!("index search: failed to decode json: {}", err);
+                    Vec::new()
+                }
+            }
+        }
+        Ok(resp) => {
+            tracing::warn!("index search: non-success status {}", resp.status());
+            Vec::new()
+        }
+        Err(err) => {
+            tracing::debug!("index search request failed: {}", err);
+            Vec::new()
+        }
     }
 }
 
@@ -114,22 +181,23 @@ pub async fn assist_handler(
     let started = Instant::now();
     let mode = route_mode(&req.question, &req.mode);
 
-    // TODO(Phase 2): Für "knowledge" semantAH-TopK /index/search integrieren; für "code" Tooling-Hooks.
+    // TODO(Phase 2): Für "code" Tooling-Hooks ergänzen.
     let answer = format!("Router wählte {}. (MVP-Stub)", mode);
+
+    // Knowledge-Modus: versuche Top-K aus /index/search; bei Fehler → leere Liste (MVP-Fallback)
     let citations = if mode == "knowledge" {
-        vec![AssistCitation { title: "docs/api.md".to_string(), score: Some(0.83) }]
+        fetch_topk_citations(&req.question).await
     } else {
         Vec::new()
     };
+
     let trace = vec![serde_json::json!({
-        "step":"router",
-        "decision":mode,
-        "reason": req.mode.as_deref().unwrap_or("heuristic")
+        "step":"router","decision":mode,"reason": req.mode.as_deref().unwrap_or("heuristic")
     })];
 
     let ms = started.elapsed().as_millis() as u64;
 
-    // Optionale Events (JSONL) gemäß contracts/events.schema.json
+    // Events emittieren (JSONL), kompatibel mit contracts/events.schema.json
     {
         let mut labels = BTreeMap::new();
         labels.insert("mode", serde_json::json!(mode));
@@ -138,7 +206,7 @@ pub async fn assist_handler(
             "core.assist.request",
             "info",
             labels.clone(),
-            serde_json::json!({ "question_preview": &req.question.chars().take(120).collect::<String>() })
+            serde_json::json!({"question_preview": &req.question.chars().take(120).collect::<String>()})
         );
         write_event(
             "core.assist.response",
