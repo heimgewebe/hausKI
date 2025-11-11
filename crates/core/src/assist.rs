@@ -1,18 +1,48 @@
-use axum::{http::{StatusCode}, Json};
-use axum::{extract::State, http::Method};
-use chrono::Utc;
+use axum::{http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, env, fs, io::Write, path::Path, time::Instant};
+use std::time::Instant;
 use utoipa::ToSchema;
-use ulid::Ulid;
-use once_cell::sync::Lazy;
-use std::sync::Mutex;
-use std::time::Duration;
 
 use crate::AppState;
+use axum::extract::State;
+use axum::http::Method;
+
+use std::{collections::BTreeMap, env, fs, io::Write, path::Path};
+use chrono::Utc;
+use ulid::Ulid;
+
+/// Optional: Pfad für JSONL-Events. Wenn nicht gesetzt, werden keine Events geschrieben.
+fn event_sink_path() -> Option<String> {
+    env::var("HAUSKI_EVENT_SINK").ok().filter(|s| !s.is_empty())
+}
+
+fn write_event(kind: &str, level: &str, labels: BTreeMap<&str, serde_json::Value>, data: serde_json::Value) {
+    let Some(path) = event_sink_path() else { return };
+    let event = serde_json::json!({
+        "id": Ulid::new().to_string(),
+        "ts": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        "version": "1.0.0",
+        "kind": kind,
+        "level": level,
+        "source": "hauski-core",
+        "node": hostname::get().ok().and_then(|h| h.into_string().ok()).unwrap_or_else(|| "unknown".into()),
+        "labels": labels,
+        "data": data
+    });
+    if let Err(err) = (|| -> std::io::Result<()> {
+        let p = Path::new(&path);
+        if let Some(dir) = p.parent() { fs::create_dir_all(dir)?; }
+        let mut f = fs::OpenOptions::new().create(true).append(true).open(p)?;
+        serde_json::to_writer(&mut f, &event)?;
+        f.write_all(b"\n")?;
+        Ok(())
+    })() {
+        tracing::warn!("failed to write event to sink {}: {}", path, err);
+    }
+}
 
 #[derive(Debug, Deserialize, ToSchema)]
-#[schema(title = "AssistRequest", example = json!({"question":"Wie richte ich /docs ein?","mode":"knowledge"}))]
+#[schema(title = "AssistRequest", example = json!({"question":"Wie richte ich /docs ein?"}))]
 pub struct AssistRequest {
     /// Freitext-Frage / Aufgabe.
     pub question: String,
@@ -58,7 +88,7 @@ fn route_mode(q: &str, hint: &Option<String>) -> &'static str {
             _ => {}
         }
     }
-    // Sehr einfache Heuristik (MVP)
+    // sehr einfache Heuristik (MVP)
     let lower = q.to_ascii_lowercase();
     let looks_like_code = lower.contains("```")
         || lower.contains("fn ")
@@ -68,81 +98,6 @@ fn route_mode(q: &str, hint: &Option<String>) -> &'static str {
         || lower.contains("error:")
         || lower.contains("traceback");
     if looks_like_code { "code" } else { "knowledge" }
-}
-
-/// --------- Einfache, prozessweite Rate-Limit-Grenze (Requests / Minute) ----------
-/// ENV: HAUSKI_ASSIST_MAX_PER_MIN (default 60), HAUSKI_ASSIST_ENABLED (default true)
-struct MinuteWindow {
-    start: Instant,
-    count: u64,
-}
-
-static WINDOW: Lazy<Mutex<MinuteWindow>> = Lazy::new(|| {
-    Mutex::new(MinuteWindow { start: Instant::now(), count: 0 })
-});
-
-fn assist_enabled() -> bool {
-    env::var("HAUSKI_ASSIST_ENABLED")
-        .ok()
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true") || v == "yes")
-        .unwrap_or(true)
-}
-
-fn assist_max_per_min() -> u64 {
-    env::var("HAUSKI_ASSIST_MAX_PER_MIN").ok()
-        .and_then(|s| s.parse::<u64>().ok())
-        .unwrap_or(60)
-}
-
-/// Gibt `None` zurück, wenn innerhalb des Fensters noch Budget übrig ist;
-/// andernfalls die Sekunden, nach denen wieder versucht werden darf.
-fn check_minute_budget(now: Instant) -> Option<u64> {
-    let mut win = WINDOW.lock().expect("window mutex poisoned");
-    let elapsed = now.duration_since(win.start);
-    let limit = assist_max_per_min();
-    if elapsed >= Duration::from_secs(60) {
-        // neues Fenster
-        win.start = now;
-        win.count = 0;
-    }
-    if win.count < limit {
-        win.count += 1;
-        None
-    } else {
-        let secs = (60u64).saturating_sub(elapsed.as_secs());
-        Some(secs.max(1))
-    }
-}
-
-/// Optionaler JSONL-Event-Sink (HAUSKI_EVENT_SINK=/pfad/events.jsonl)
-fn event_sink_path() -> Option<String> {
-    env::var("HAUSKI_EVENT_SINK").ok().filter(|s| !s.is_empty())
-}
-
-fn write_event(kind: &str, level: &str, labels: BTreeMap<&str, serde_json::Value>, data: serde_json::Value) {
-    let Some(path) = event_sink_path() else { return };
-    let event = serde_json::json!({
-        "id": Ulid::new().to_string(),
-        "ts": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-        "version": "1.0.0",
-        "kind": kind,
-        "level": level,
-        "source": "hauski-core",
-        "node": hostname::get().ok().and_then(|h| h.into_string().ok()).unwrap_or_else(|| "unknown".into()),
-        "labels": labels,
-        "data": data
-    });
-    if let Err(err) = (|| -> std::io::Result<()> {
-        let p = Path::new(&path);
-        if let Some(dir) = p.parent() { fs::create_dir_all(dir)?; }
-        let mut f = fs::OpenOptions::new().create(true).append(true).open(p)?;
-        serde_json::to_writer(&mut f, &event)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        f.write_all(b"\n")?;
-        Ok(())
-    })() {
-        tracing::warn!("failed to write event to sink {}: {}", path, err);
-    }
 }
 
 /// Anfrageformat für `/index/search` (lokale Hilfsstruktur).
@@ -166,7 +121,6 @@ fn extract_citations_from_value(v: &serde_json::Value) -> Vec<AssistCitation> {
         .unwrap_or_default();
 
     arr.into_iter().filter_map(|it| {
-        // Versuche verschiedene Felder
         let title = it.get("title")
             .or_else(|| it.get("path"))
             .or_else(|| it.get("id"))
@@ -178,16 +132,15 @@ fn extract_citations_from_value(v: &serde_json::Value) -> Vec<AssistCitation> {
 }
 
 /// Holt Top-K Treffer aus `/index/search` (wenn erreichbar). Fallback: leer.
-async fn fetch_topk_citations(state: &AppState, question: &str) -> Vec<AssistCitation> {
-    // Basis-URL für Core (am gleichen Prozess): über Env konfigurierbar,
-    // default auf loopback, damit lokale Dev-Starts out-of-the-box funktionieren.
+async fn fetch_topk_citations(question: &str) -> Vec<AssistCitation> {
     let base = env::var("HAUSKI_INTERNAL_BASE").ok()
         .unwrap_or_else(|| "http://127.0.0.1:8080".to_string());
     let url = format!("{}/index/search", base.trim_end_matches('/'));
 
+    let client = reqwest::Client::new();
     let body = IndexSearchRequest { q: question, namespace: Some("default"), k: Some(3) };
 
-    match state.http_client().post(url).json(&body).send().await {
+    match client.post(url).json(&body).send().await {
         Ok(resp) if resp.status().is_success() => {
             match resp.json::<serde_json::Value>().await {
                 Ok(val) => extract_citations_from_value(&val),
@@ -215,10 +168,7 @@ async fn fetch_topk_citations(state: &AppState, question: &str) -> Vec<AssistCit
     tag = "core",
     request_body = AssistRequest,
     responses(
-        (status = 200, description = "Assist response (knowledge path; may include citations)", body = AssistResponse),
-        (status = 429, description = "Rate limit exceeded", body = AssistResponse),
-        (status = 501, description = "Code agent not implemented", body = AssistResponse),
-        (status = 503, description = "Assist feature disabled", body = AssistResponse)
+        (status = 200, description = "Assist response (MVP)", body = AssistResponse)
     )
 )]
 pub async fn assist_handler(
@@ -226,72 +176,17 @@ pub async fn assist_handler(
     Json(req): Json<AssistRequest>,
 ) -> (StatusCode, Json<AssistResponse>) {
     let started = Instant::now();
-    // --- Feature-Gate ---------------------------------------------------------
-    if !assist_enabled() {
-        let ms = started.elapsed().as_millis() as u64;
-        state.record_http_observation(Method::POST, "/assist", StatusCode::SERVICE_UNAVAILABLE, started);
-        return (StatusCode::SERVICE_UNAVAILABLE, Json(AssistResponse{
-            answer: "assist is disabled (set HAUSKI_ASSIST_ENABLED=true to enable)".into(),
-            citations: Vec::new(),
-            trace: vec![serde_json::json!({"step":"guard","decision":"disabled", "retry_after_sec": 30})],
-            latency_ms: ms,
-        }));
-    }
-
-    // --- Globales Budget pro Minute ------------------------------------------
-    if let Some(retry_secs) = check_minute_budget(Instant::now()) {
-        let ms = started.elapsed().as_millis() as u64;
-        state.record_http_observation(Method::POST, "/assist", StatusCode::TOO_MANY_REQUESTS, started);
-        // Antwortkörper mit Hinweis + (implizit) Retry-After Header wäre nice; Header setzen wir
-        // am einfachsten, indem wir ihn in der App-Schicht ergänzen – hier minimal im Body.
-        return (StatusCode::TOO_MANY_REQUESTS, Json(AssistResponse{
-            answer: "assist is rate-limited".into(),
-            citations: Vec::new(),
-            trace: vec![serde_json::json!({"step":"guard","decision":"rate_limited","retry_after_sec":retry_secs})],
-            latency_ms: ms,
-        }));
-    }
-
     let mode = route_mode(&req.question, &req.mode);
 
-    // --- CODE PATH: liefert 501 + strukturierte Diagnose im Trace -------------------------
-    if mode == "code" {
-        // Kleine Heuristik für eine knappe Diagnose
-        let ql = req.question.to_ascii_lowercase();
-        let looks_like_python = ql.contains("traceback") || ql.contains("python") || ql.contains("pip ");
-        let looks_like_rust   = ql.contains("error:") && (ql.contains("cargo ") || ql.contains("rustc"));
-        let looks_like_node   = ql.contains("npm ") || ql.contains("node ");
-        let guess = if looks_like_python { "python" } else if looks_like_rust { "rust" } else if looks_like_node { "node" } else { "unknown" };
+    // TODO(Phase 2): Für "code" Tooling-Hooks ergänzen.
+    let answer = format!("Router wählte {}. (MVP-Stub)", mode);
 
-        let diag = serde_json::json!({
-            "step": "code_stub",
-            "decision": "code",
-            "language_guess": guess,
-            "next": "not_implemented",
-            "advice": match guess {
-                "python" => "Prüfe Traceback-Root-Cause; venv/uv nutzen, Abhängigkeiten synchronisieren.",
-                "rust"   => "Baue lokal mit `cargo build -v`; prüfe Fehlermeldung und fehlende Features.",
-                "node"   => "Installiere Abhängigkeiten neu (`npm ci`); prüfe lockfile & Node-Version.",
-                _        => "Bitte Code/Fehlerauszug präzisieren; Tooling-Hooks folgen in Phase 2.",
-            }
-        });
-        let answer = "CodeAgent ist noch nicht verdrahtet (501).".to_string();
-        let ms = started.elapsed().as_millis() as u64;
-        state.record_http_observation(Method::POST, "/assist", StatusCode::NOT_IMPLEMENTED, started);
-        return (
-            StatusCode::NOT_IMPLEMENTED,
-            Json(AssistResponse {
-                answer,
-                citations: Vec::new(),
-                trace: vec![diag],
-                latency_ms: ms,
-            })
-        );
-    }
-
-    // --- KNOWLEDGE PATH: Top-K aus Index (falls erreichbar) ------------------------------
-    let answer = "Router wählte knowledge. (MVP-Stub)".to_string();
-    let citations = fetch_topk_citations(&state, &req.question).await;
+    // Knowledge-Modus: versuche Top-K aus /index/search; bei Fehler → leere Liste (MVP-Fallback)
+    let citations = if mode == "knowledge" {
+        fetch_topk_citations(&req.question).await
+    } else {
+        Vec::new()
+    };
 
     let trace = vec![serde_json::json!({
         "step":"router","decision":mode,"reason": req.mode.as_deref().unwrap_or("heuristic")
@@ -308,7 +203,7 @@ pub async fn assist_handler(
             "core.assist.request",
             "info",
             labels.clone(),
-            serde_json::json!({ "question_preview": &req.question.chars().take(120).collect::<String>() })
+            serde_json::json!({"question_preview": &req.question.chars().take(120).collect::<String>()})
         );
         write_event(
             "core.assist.response",
