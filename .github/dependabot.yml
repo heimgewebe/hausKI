@@ -1,15 +1,25 @@
 version: 2
 updates:
-  # Halte CI-Actions aktuell (Sicherheitsfixes)
+  # Security & CI: GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
-    schedule: { interval: "weekly" }
+    schedule:
+      interval: "weekly"
+
+  # Rust/Cargo-Dependencies
   - package-ecosystem: "cargo"
     directory: "/"
-    schedule: { interval: "weekly" }
+    schedule:
+      interval: "weekly"
+
+  # Node/NPM-Dependencies (falls vorhanden)
   - package-ecosystem: "npm"
     directory: "/"
-    schedule: { interval: "weekly" }
+    schedule:
+      interval: "weekly"
+
+  # Python/pip-Dependencies (falls vorhanden)
   - package-ecosystem: "pip"
     directory: "/"
-    schedule: { interval: "weekly" }
+    schedule:
+      interval: "weekly"
