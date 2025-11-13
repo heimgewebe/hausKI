@@ -96,7 +96,7 @@ jobs:
             echo "::notice::index search histogram sample: $first_bucket"
           fi
           ask_histogram_pattern='/http_request_duration_seconds_bucket/ && /path="\/ask"/ {print}'
-          awk "$ask_histogram_pattern" metrics.txt | head -n 5 
+          awk "$ask_histogram_pattern" metrics.txt | head -n 5
           ask_first_bucket=$(awk "$ask_histogram_pattern {exit}" metrics.txt)
           if [ -n "$ask_first_bucket" ]; then
             echo "::notice::ask histogram sample: $ask_first_bucket"

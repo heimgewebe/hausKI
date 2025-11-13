@@ -21,4 +21,3 @@ RUN set -e; \
 # Install uv (astral)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && install -m 0755 /root/.cargo/bin/uv /usr/local/bin/uv
-

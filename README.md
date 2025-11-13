@@ -19,7 +19,7 @@ HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-
 - `lsof` (für das Stop-Skript)
 - Optional: `just` (verkürzt Startaufrufe)
 
-Für einen lokalen, OpenAI-kompatiblen Chat-Pfad nutze das Runbook unter  
+Für einen lokalen, OpenAI-kompatiblen Chat-Pfad nutze das Runbook unter
 `docs/runbooks/local-chat.md` **oder** starte alles per:
 
 ```bash
@@ -529,7 +529,7 @@ Für eine dauerhafte Installation kann `hauski` als `systemd`-Dienst konfigurier
 ### Python-Dev Abhängigkeiten & Lockfile (uv)
 - CI erwartet **reproduzierbare** Installs: `uv sync --extra dev --locked --frozen`.
 - Wenn du `pyproject.toml` änderst (z. B. neue Dev-Lib wie `jsonschema==4.23.0`):
-  1. `uv lock --extra dev`  
+  1. `uv lock --extra dev`
      _oder gezielt:_ `uv lock --upgrade-package jsonschema==4.23.0`
   2. `git add uv.lock`
   3. commit & push

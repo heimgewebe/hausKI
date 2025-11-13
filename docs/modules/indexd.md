@@ -1,6 +1,6 @@
 # Modul: indexd
 
-**Rolle:** Speicherung und semantische Suche  
+**Rolle:** Speicherung und semantische Suche
 **Komponente:** `hauski-indexd` (Crate)
 
 ---
@@ -42,16 +42,16 @@ index:
 ## Metriken & Budgets
 
 - `index_queries_total`
-- `index_query_duration_seconds`  
-  *Budget:* p95 ≤ 60 ms  
+- `index_query_duration_seconds`
+  *Budget:* p95 ≤ 60 ms
 
 ---
 
 ## Offene Aufgaben
 
-- [ ] HNSW-Backend dokumentieren  
-- [ ] Beispiel-Querys ergänzen  
-- [ ] API-Spec per `utoipa` exportieren  
+- [ ] HNSW-Backend dokumentieren
+- [ ] Beispiel-Querys ergänzen
+- [ ] API-Spec per `utoipa` exportieren
 
 ---
 

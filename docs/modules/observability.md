@@ -1,6 +1,6 @@
 # Modul: Observability
 
-**Rolle:** Überwachung, Logging, Metriken, Tracing  
+**Rolle:** Überwachung, Logging, Metriken, Tracing
 **Verortung:** Querschnittsmodul (Core-Integration)
 
 ---

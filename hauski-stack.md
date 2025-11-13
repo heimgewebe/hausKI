@@ -1,7 +1,7 @@
- 
+
 # HausKI – Stack vNext (Rust-first, Offline-Default)
 
-## 0) 
+## 0)
 
 * **Core/API/Daemon:** Rust (axum + tokio + tower + tracing)
 * **LLM/ASR/TTS:** llama.cpp (FFI), whisper-rs, piper-rs

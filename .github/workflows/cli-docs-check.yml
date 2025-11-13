@@ -78,4 +78,3 @@ jobs:
             git --no-pager diff -- docs/cli.md || true
             exit 1
           fi
-

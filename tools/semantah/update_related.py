@@ -20,9 +20,7 @@ from pathlib import Path
 DEFAULT_NAMESPACE = "default"
 MARKER_START = "<!-- related:auto:start -->"
 MARKER_END = "<!-- related:auto:end -->"
-BLOCK_PATTERN = re.compile(
-    r"<!-- related:auto:start -->.*?<!-- related:auto:end -->", re.DOTALL
-)
+BLOCK_PATTERN = re.compile(r"<!-- related:auto:start -->.*?<!-- related:auto:end -->", re.DOTALL)
 
 
 @dataclass
@@ -60,9 +58,7 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("HAUSKI_OBSIDIAN_VAULT", "seeds/obsidian.sample"),
         help="Pfad zum Obsidian-Vault",
     )
-    parser.add_argument(
-        "--note", help="Nur eine spezifische Note aktualisieren (relativer Pfad)"
-    )
+    parser.add_argument("--note", help="Nur eine spezifische Note aktualisieren (relativer Pfad)")
     parser.add_argument(
         "--check",
         action="store_true",
@@ -112,9 +108,7 @@ def load_edges(path: Path) -> list[Edge]:
     return edges
 
 
-def build_related_map(
-    nodes: dict[str, Node], edges: Iterable[Edge]
-) -> dict[str, RelatedBlock]:
+def build_related_map(nodes: dict[str, Node], edges: Iterable[Edge]) -> dict[str, RelatedBlock]:
     related: dict[str, RelatedBlock] = {}
 
     for edge in edges:
