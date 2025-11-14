@@ -30,7 +30,7 @@ Dieses Dokument ergänzt die bestehende Analyse durch gezielte Empfehlungen zur 
         - run: bash scripts/check-vendor.sh
   ```
 
-  So können alle Repos (`heimlern`, `leitstand`, `aussensensor`) denselben Check einbinden.
+  So können alle Repos (`heimlern`, `chronik`, `aussensensor`) denselben Check einbinden. Der Name "Leitstand" ist zukünftig für das zentrale UI/Dashboard vorgesehen.
 
 ## 3. Review-Zyklus in CI einbinden
 - Die hausKI-spezifische Review-Pipeline (`.hauski-reports`, `flock`, `hauski-reviewd`) sollte einen optionalen CI-Workflow auslösen:

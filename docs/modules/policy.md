@@ -17,7 +17,7 @@ Es stellt eine gemeinsame Policy-Engine für hausKI-Komponenten bereit.
 
 - Validieren von Konfigurationen gegen Policies
 - Laufzeitprüfung (Budget-Überwachung)
-- Bereitstellen strukturierter Policy-Events für `leitstand`
+- Bereitstellen strukturierter Policy-Events für `chronik` (den Event-Store)
 
 ---
 
