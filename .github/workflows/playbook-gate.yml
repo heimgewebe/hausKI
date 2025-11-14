@@ -10,22 +10,27 @@ permissions:
 jobs:
   gate:
     runs-on: ubuntu-latest
+
+    env:
+      CARGO_TERM_COLOR: always
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Rust toolchain (stable)
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
 
-      - name: Cache cargo + target
+      - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: ${{ runner.os }}-hauski-cli-${{ hashFiles('**/Cargo.lock') }}
           cache-on-failure: true
 
-      - name: Build hauski binary
-        run: cargo build --package hauski-cli --release
+      - name: Build hauski CLI (release, locked)
+        run: cargo build --package hauski-cli --release --locked
 
-      - name: Run playbook
+      - name: Run assist playbook
         run: ./target/release/hauski-cli assist --playbook playbooks/code_assist.yml

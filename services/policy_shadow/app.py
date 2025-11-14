@@ -1,4 +1,5 @@
 """Minimal FastAPI service for HausKI policy experimentation."""
+
 from __future__ import annotations
 
 import json
