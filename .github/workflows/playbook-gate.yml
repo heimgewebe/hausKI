@@ -1,8 +1,12 @@
 name: playbook-gate
+
 on:
   pull_request:
   workflow_dispatch: {}
-permissions: { contents: read }
+
+permissions:
+  contents: read
+
 jobs:
   gate:
     runs-on: ubuntu-latest
@@ -17,25 +21,11 @@ jobs:
       - name: Cache cargo + target
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}-wgx-${{ hashFiles('**/Cargo.lock') }}
+          shared-key: ${{ runner.os }}-hauski-cli-${{ hashFiles('**/Cargo.lock') }}
           cache-on-failure: true
 
-      - name: Add Cargo bin to PATH
-        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-
-      - name: Install wgx
-        run: |
-          set -euo pipefail
-          if cargo search wgx | grep -E '^wgx\\s' >/dev/null 2>&1; then
-            cargo install wgx --locked
-          else
-            cargo install --git https://github.com/heimgewebe/wgx --locked wgx
-          fi
-          command -v wgx
-
-      - name: Install just
-        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
       - name: Build hauski binary
         run: cargo build --package hauski-cli --release
+
       - name: Run playbook
         run: ./target/release/hauski-cli assist --playbook playbooks/code_assist.yml
