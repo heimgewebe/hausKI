@@ -353,11 +353,11 @@ Die API exportiert Prometheus-kompatible Kennzahlen unter `/metrics`:
 
 Beispielabfragen für Dashboards oder die Prometheus-Konsole:
 
-- Erfolgs- vs. Fehlerraten:
+- Erfolgs- vs. Fehlerraten (Beispiel in PromQL):
   ```promql
   sum by (status) (rate(http_requests_total[5m]))
   ```
-- 95%-Perzentil der Request-Latenz je Route:
+- 95%-Perzentil der Request-Latenz je Route (Beispiel in PromQL):
   ```promql
   histogram_quantile(0.95, sum by (le, method, path) (rate(http_request_duration_seconds_bucket[5m])))
   ```
