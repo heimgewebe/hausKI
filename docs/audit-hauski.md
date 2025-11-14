@@ -59,13 +59,13 @@ Die vorliegende Audit-Erweiterung ist mit folgenden Architekturentscheidungen ve
 |-----|--------|---------|--------|
 | [ADR-0001](adrs/ADR-0001-toolchain-strategy.md) | Einheitliche Toolchain-Strategie | `Accepted` | Definiert zentrale Toolchain-Versionen für CI und lokale Entwicklung |
 
-Diese Entscheidung dient als Basis für alle weiteren CI- und Container-Anpassungen.  
+Diese Entscheidung dient als Basis für alle weiteren CI- und Container-Anpassungen.
 Künftige ADRs (z. B. für Speicher- und Kommunikationsschichten) sollten diesem Schema folgen.
 
 ## 6. Begleitender Smoke-Test
 
 Als technische Verprobung des CI-Health-Flows wurde ein minimaler Integrationstest
-unter `crates/core/tests/metrics_smoke.rs` hinzugefügt.  
+unter `crates/core/tests/metrics_smoke.rs` hinzugefügt.
 Dieser prüft die Verfügbarkeit von `/metrics` und dient als Ankerpunkt für
 spätere API-Tests (z. B. `/ask`, `/chat`, `/health`).
 
@@ -90,4 +90,3 @@ Die Querverweise schließen den Audit-Kreislauf und verbinden Architektur, CI-Go
 innerhalb des hausKI-Dokumentationssystems.
 
 **Letzte Erweiterung:** 2025-10-23 – Backlinks zu Runbooks ergänzt.
-

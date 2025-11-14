@@ -1,7 +1,7 @@
 # ADR-0001: Einheitliche Toolchain-Strategie (Rust, Python, UV)
 
-**Status:** Accepted  
-**Datum:** 2025-10-23  
+**Status:** Accepted
+**Datum:** 2025-10-23
 **Autor:** hausKI Team
 
 ## Kontext
@@ -42,4 +42,3 @@ uv: "0.7.0"
 1. `toolchain.versions.yml` im Repo anlegen (Werte s. oben).
 2. CI-Workflows so anpassen, dass sie daraus lesen (ohne harte Defaults).
 3. DevContainer/`.wgx` an zentrale Datei koppeln.
-

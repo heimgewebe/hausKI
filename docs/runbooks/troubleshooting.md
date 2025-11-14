@@ -39,4 +39,3 @@ vendored crates. If you encounter alerts for these paths, confirm the files are
 vendored test assets and close the alerts as "ignored by configuration". Never
 remove files from `vendor/`; adjust the ignore list if additional fixture paths
 are needed.
-

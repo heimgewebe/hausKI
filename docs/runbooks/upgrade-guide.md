@@ -9,9 +9,9 @@
 
 ## 1. Vorbereitung
 
-- Alle laufenden Dienste beenden (`systemctl --user stop hauski*`)  
-- Arbeitsverzeichnis sauber halten (`git status` → clean)  
-- Optional: Review-Snapshot sichern (`~/.hauski/review/<repo>/`)  
+- Alle laufenden Dienste beenden (`systemctl --user stop hauski*`)
+- Arbeitsverzeichnis sauber halten (`git status` → clean)
+- Optional: Review-Snapshot sichern (`~/.hauski/review/<repo>/`)
 
 ---
 
@@ -47,8 +47,8 @@ Damit bleiben Offline-Builds reproduzierbar.
 
 ## 4. Models & Seeds aktualisieren
 
-- **Ollama-Modelle:** `ollama pull all-MiniLM-L6-v2`  
-- **Whisper/Piper:** Download über `just ai-sync`  
+- **Ollama-Modelle:** `ollama pull all-MiniLM-L6-v2`
+- **Whisper/Piper:** Download über `just ai-sync`
 - **semantAH Seeds:** `uv run scripts/build_index.py`
 
 ---
@@ -70,8 +70,8 @@ Damit bleiben Offline-Builds reproduzierbar.
 
 ## Verknüpfte Dokumente
 
-- [ADR-0001 Toolchain-Strategie](../adrs/ADR-0001-toolchain-strategy.md) — legt fest, wie Versionen zentral gepflegt werden  
-- [Audit-Bericht](../audit-hauski.md) — referenziert die Toolchain-Synchronisierung und CI-Empfehlungen  
-- [Runbook: Incident-Response](incident-response.md) — beschreibt, wie bei fehlerhaften Upgrades oder Policy-Verletzungen vorzugehen ist  
+- [ADR-0001 Toolchain-Strategie](../adrs/ADR-0001-toolchain-strategy.md) — legt fest, wie Versionen zentral gepflegt werden
+- [Audit-Bericht](../audit-hauski.md) — referenziert die Toolchain-Synchronisierung und CI-Empfehlungen
+- [Runbook: Incident-Response](incident-response.md) — beschreibt, wie bei fehlerhaften Upgrades oder Policy-Verletzungen vorzugehen ist
 
 Diese Seite ergänzt den strategischen Upgrade-Pfad und verbindet ADRs mit operativer Praxis.

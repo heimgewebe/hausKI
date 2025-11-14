@@ -40,4 +40,3 @@ curl -s -X POST http://localhost:8080/v1/chat -H 'Content-Type: application/json
 ```
 
 A successful health probe returns `ok`. The chat stub currently responds with `501 Not Implemented`, confirming the route is wired. Stop the server with `Ctrl+C` when you're done.
-

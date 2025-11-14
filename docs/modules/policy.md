@@ -1,6 +1,6 @@
 # Modul: Policy & Limits
 
-**Rolle:** Durchsetzung von Laufzeit- und Ressourcenrichtlinien  
+**Rolle:** Durchsetzung von Laufzeit- und Ressourcenrichtlinien
 **Crate:** `hauski-policy`
 
 ---
@@ -8,16 +8,16 @@
 ## Überblick
 
 Das Policy-Modul definiert und überwacht **System-Budgets** für Performance,
-Thermik, LLM-Latenz und weitere Ressourcenparameter.  
+Thermik, LLM-Latenz und weitere Ressourcenparameter.
 Es stellt eine gemeinsame Policy-Engine für hausKI-Komponenten bereit.
 
 ---
 
 ## Hauptaufgaben
 
-- Validieren von Konfigurationen gegen Policies  
-- Laufzeitprüfung (Budget-Überwachung)  
-- Bereitstellen strukturierter Policy-Events für `leitstand`  
+- Validieren von Konfigurationen gegen Policies
+- Laufzeitprüfung (Budget-Überwachung)
+- Bereitstellen strukturierter Policy-Events für `leitstand`
 
 ---
 
@@ -38,14 +38,14 @@ asr:
 
 ## Schnittstellen
 
-- `PolicySnapshot` – serialisierbarer Zustand  
-- `BudgetGuard` – automatisierte Prüfmechanik  
-- Export via `/policies` API  
+- `PolicySnapshot` – serialisierbarer Zustand
+- `BudgetGuard` – automatisierte Prüfmechanik
+- Export via `/policies` API
 
 ---
 
 ## ToDo
-- [ ] Event-Schema in `contracts/` dokumentieren  
-- [ ] CLI-Integration `hauski-cli policy check` ergänzen  
+- [ ] Event-Schema in `contracts/` dokumentieren
+- [ ] CLI-Integration `hauski-cli policy check` ergänzen
 
 **Letzte Aktualisierung:** 2025-10-23
