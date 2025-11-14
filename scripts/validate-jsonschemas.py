@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Validate JSON Schema contracts against Draft 2020-12."""
-
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
+import sys
 
 try:
     from jsonschema import Draft202012Validator
 except ImportError as exc:  # pragma: no cover - missing optional dependency
-    raise SystemExit("jsonschema is required. Install via `uv sync --extra dev`.") from exc
+    raise SystemExit(
+        "jsonschema is required. Install via `uv sync --extra dev`."
+    ) from exc
 
 
 def main() -> int:
@@ -28,7 +29,7 @@ def main() -> int:
             with schema_path.open("r", encoding="utf-8") as handle:
                 schema = json.load(handle)
             Draft202012Validator.check_schema(schema)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - show the original exception
             print(f"✗ {rel}: {exc}")
             exit_code = 1
         else:

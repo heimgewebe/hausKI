@@ -82,7 +82,9 @@ def write_graph(gewebe: Path, namespace: str) -> None:
 
     report = gewebe / "reports"
     report.mkdir(exist_ok=True)
-    (report / "graph_report.md").write_text("# semantAH Graph Report (Stub)\n", encoding="utf-8")
+    (report / "graph_report.md").write_text(
+        "# semantAH Graph Report (Stub)\n", encoding="utf-8"
+    )
 
 
 def main() -> None:
