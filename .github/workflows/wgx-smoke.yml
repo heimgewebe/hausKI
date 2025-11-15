@@ -1,13 +1,27 @@
-name: wgx-smoke (disabled)
-permissions: {}
+---
+name: wgx-smoke
+
 on:
-  # Only manually startable to keep the file valid,
-  # but no longer appears "red" in normal CI.
-  workflow_dispatch: {}
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  noop:
+  smoke-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Report disabled status
-        run: echo "wgx-smoke workflow is intentionally disabled (noop)."
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run WGX smoke
+        run: |
+          if [[ ! -x ./wgx/wgx ]]; then
+            echo "::error::wgx/wgx not found or not executable - WGX is required in this repo."
+            exit 1
+          fi
+          ./wgx/wgx smoke
