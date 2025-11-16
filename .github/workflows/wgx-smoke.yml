@@ -20,8 +20,8 @@ jobs:
 
       - name: Run WGX smoke
         run: |
-          if [[ ! -x ./wgx/wgx ]]; then
-            echo "::error::wgx/wgx not found or not executable - WGX is required in this repo."
+          if [[ ! -x ./wgx ]]; then
+            echo "::error::./wgx not found or not executable - WGX is required in this repo."
             exit 1
           fi
-          ./wgx/wgx smoke
+          ./wgx smoke
