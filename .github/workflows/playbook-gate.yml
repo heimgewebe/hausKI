@@ -18,6 +18,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install shfmt
+        run: sudo apt-get update && sudo apt-get install -y shfmt
+
       - name: Set up Rust toolchain (stable)
         uses: dtolnay/rust-toolchain@stable
         with:
