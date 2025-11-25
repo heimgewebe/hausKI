@@ -1,111 +1,286 @@
 # Copilot Instructions for HausKI
 
-Diese Dokumentation richtet sich an GitHub Copilot (Coding Agent) und erklärt die Konventionen, Struktur und Arbeitsweise des HausKI-Repositorys.
+Diese Datei richtet sich an GitHub Copilot / Copilot Agents und beschreibt, wie in diesem Repository gearbeitet werden soll.
 
-## Projektübersicht
+Ziel: Copilot soll HausKI als Rust-zentrierten, lokalen KI-Orchestrator verstehen und Änderungen vorschlagen, die
 
-HausKI ist ein Rust-zentrierter, lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-GPU. Das Projekt verfolgt einen Offline-First-Ansatz und ist als Monorepo mit klaren Schnittstellen (CLI, Core, Policies, Modelle) organisiert.
+- zum bestehenden Architekturmodell passen,
+- die Toolchain nicht brechen,
+- die Definition-of-Done respektieren,
+- und in kleinen, gut überprüfbaren Schritten erfolgen.
 
-## Sprache & Dokumentation
+---
 
-- **Deutsch** für Dokumentation, Commit-Nachrichten und Hilfetexte
-- **Englisch** für Code-Kommentare und Log-Meldungen
-- Keine Gender-Sonderzeichen (`*`, `:`, `·`, `_`, Binnen-I); nutze neutrale Formulierungen
-- Conventional-Commit-Präfixe verwenden: `feat:`, `fix:`, `docs:`, `refactor:`, `chore(core):`
+## 1. Projektüberblick
 
-## Entwicklungsumgebung
+- **Projekt:** HausKI – lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-GPU
+- **Ansatz:** Offline-first, datensparsam, keine versteckten Netzwerkabhängigkeiten
+- **Architektur:** Monorepo mit klar getrennten Bereichen:
+  - CLI (User-Einstieg)
+  - Core (axum-Server, Services)
+  - Policies (Routing, Limits)
+  - Models/Configs (Modell- und Feature-Flags)
+  - Python-Services (Adapter, Shadow-Logik)
 
-- Devcontainer (`.devcontainer/`) mit Rust, CUDA-Basis, `cargo-deny`, `just` und Vale
-- Lokale Entwicklung erfordert Rust, CUDA-Treiber, Vale und `cargo-deny`
-- Profile in `.wgx/profile.yml` und `.wgx/profile.local.yml`
+**Wichtige Annahme:**
+Pop!_OS mit NVIDIA-RTX ist der Referenz-Stack. Anpassungen dürfen andere Plattformen (Termux, WSL, Codespaces) nicht „brechen“, sondern müssen optional bleiben.
 
-## Build, Lint & Test
+---
 
-Verwende diese Befehle zum Prüfen der Codequalität:
+## 2. Sprache, Stil und Commits
+
+### Sprache
+
+- **Deutsch** für:
+  - Dokumentation (`README`, `docs/`, Runbooks)
+  - Commit-Nachrichten
+  - CLI-Hilfetexte
+- **Englisch** für:
+  - Code-Kommentare
+  - Log-Meldungen
+  - Fehlermeldungen im Code
+
+Keine Gender-Sonderzeichen (`*`, `:`, `·`, `_`, Binnen-I). Neutrale Formulierungen verwenden.
+
+### Commit-Konventionen
+
+Conventional Commits mit kurzen, präzisen Messages:
+
+Beispiele:
+
+- `feat(cli): add conversation history export`
+- `fix(core): handle missing policy in request path`
+- `docs: document GPU memory limits`
+- `refactor(indexd): simplify query builder`
+- `chore(core): update dependencies`
+
+Commits sollen kleine, logische Einheiten bilden:
+
+- ein neues CLI-Feature,
+- eine isolierte Bugfix,
+- ein kleiner Refactor,
+- eine gezielte Dokumentationsänderung.
+
+---
+
+## 3. Projektstruktur (für Copilot wichtig)
+
+Das Repository ist ein Cargo-Workspace. Wichtige Pfade:
+
+- `crates/cli`
+  - Kommandozeilen-Einstiegspunkt (clap)
+  - Verantwortlich für Argument-Parsing, Konfiguration, Starten des Core-Servers
+
+- `crates/core`
+  - axum-Server, zentrale Services, Auth, HTTP-API
+  - Policies werden hier konsumiert, nicht definiert
+
+- `crates/embeddings`
+  - Logik zur Erzeugung von Text-Embeddings
+
+- `crates/indexd`
+  - Indizierung und Suche (SQLite + tantivy)
+
+- `crates/memory`
+  - Persistenter Key-Value-Store (SQLite)
+
+- `crates/policy`
+  - Policy-Datenstrukturen und Evaluierungslogik
+
+- `crates/policy_api`
+  - API-Schicht zur Policy-Engine (Requests/Responses, Contracts)
+
+- `configs/`
+  - Konfigurationsdateien (z. B. `models.yml`, `flags.yaml`)
+
+- `policies/`
+  - Routing, Ratenbegrenzungen, Sicherheits- und Ressourcenregeln
+
+- `services/`
+  - Python-Dienste (z. B. `policy_shadow`, Hilfsmodule)
+
+- `docs/`
+  - Runbooks, Architekturübersichten, Troubleshooting
+
+---
+
+## 4. Entwicklungs- und Tooling-Kontext
+
+HausKI wird in einem Devcontainer und lokal entwickelt.
+
+### Devcontainer
+
+- `.devcontainer/` enthält die Referenzumgebung:
+  - Rust-Toolchain
+  - CUDA-Basis
+  - `cargo-deny`
+  - `just`
+  - Vale (Prose-Linting)
+
+Copilot soll davon ausgehen, dass diese Tools verfügbar sind, wenn im Container gearbeitet wird.
+
+### Profile
+
+- `.wgx/profile.yml` – kanonisches Profil
+- `.wgx/profile.local.yml` – lokale Anpassungen
+
+Änderungen im Tooling sollten dieses Profil-System respektieren und nicht stillschweigend ignorieren.
+
+---
+
+## 5. Build, Lint & Test
+
+Vorbereitete Standardbefehle:
 
 ```bash
-# Formatierung
+# Rust
 cargo fmt --all
-
-# Lints
 cargo clippy --all-targets --all-features -- -D warnings
 cargo deny check
-
-# Tests
 cargo test --workspace -- --nocapture
 
-# Prose-Linting
+# Prose
 vale .
-```
 
-Alternativ über die `justfile`:
+Alternativ über just:
 
-```bash
 just fmt
 just lint
 just build
 just test
-```
 
-Für Python-Tooling:
+Python-Tooling
 
-```bash
+Einige Dienste liegen in services/ und nutzen Python:
+
 just py-init    # uv sync --extra dev --locked --frozen
 just py-lint    # Ruff
-just py-fmt     # Ruff Format
+just py-fmt     # Ruff format
 just py-test    # pytest
-```
 
-## Projektstruktur
+Wichtig:
+Rust- und Python-Teile müssen jeweils ihre Tests bestehen. Copilot soll neue Funktionen so vorschlagen, dass bestehende just-Tasks nicht brechen.
 
-Das Repository ist als Cargo-Workspace organisiert:
+---
 
-- `crates/cli` – Kommandozeilen-Einstieg (clap)
-- `crates/core` – axum-Server, Policies, Auth, zentrale Services
-- `crates/embeddings` – Vektor-Embeddings aus Textdaten
-- `crates/indexd` – SQLite + tantivy für Indizierung/Suche
-- `crates/memory` – Persistenter Key-Value-Store (SQLite)
-- `crates/policy` – Policy-Datenstrukturen und Logik
-- `crates/policy_api` – API für Policy-Engine
-- `configs/` – Konfigurationsdateien (models.yml, flags.yaml)
-- `policies/` – Routing- und Limit-Definitionen
-- `services/` – Python-Dienste (z. B. policy_shadow)
-- `docs/` – Dokumentation und Runbooks
+## 6. Coding Conventions (Rust und Shell)
 
-## Coding Conventions
+### Rust
+	•	Formatierung immer mit cargo fmt.
+	•	Benennung:
+	•	snake_case für Variablen und Funktionen
+	•	PascalCase für Typen, Structs, Enums
+	•	Fehlerbehandlung:
+	•	thiserror für eigene Fehler-Typen
+	•	anyhow für flexible Fehlerweitergabe
+	•	Öffentliche Funktionen und Typen dokumentieren (///-Kommentare).
+	•	In performancekritischen Pfaden lieber explizit optimieren als „magische“ Abstraktionen hinzufügen.
 
-- **Formatierung**: Code mit `cargo fmt` formatieren
-- **Benennung**: `snake_case` für Variablen/Funktionen, `PascalCase` für Typen
-- **Fehlerbehandlung**: `thiserror` und `anyhow` verwenden
-- **Dokumentation**: Alle öffentlichen Funktionen und Typen dokumentieren
-- **Shell-Skripte**: Mit `set -euo pipefail` starten
-- **CLI-Kommandos**: Müssen `-h|--help` anbieten
+### Shell-Skripte
+	•	Immer mit set -euo pipefail beginnen.
+	•	Skripte sollten:
+	•	Eingaben validieren,
+	•	Pfade und Umgebungsvariablen klar dokumentieren,
+	•	keine unkontrollierten Netzwerkzugriffe ausführen.
 
-## Sicherheitsrichtlinien
+### CLI-Kommandos
+	•	Jedes Kommando benötigt -h | --help mit sinnvollen Beschreibungen.
+	•	Beispiele in der Hilfe sind erwünscht (Deutsch).
+	•	Fehlerausgaben bei falscher Benutzung: klar, kurz, informativ.
 
-- Keine stillen Fehler oder unkontrollierte Netzwerkzugriffe
-- Pop!_OS ist Referenz-Stack; Termux/WSL/Codespaces dürfen nicht brechen
-- Keine Linux-Distro-spezifischen Flags ohne Absicherung
-- Performance-kritische Pfade in Rust; riskante Adapter isoliert in Wasm
+---
 
-## Definition of Done
+## 7. Sicherheitsrichtlinien
 
-Änderungen gelten als fertig, wenn:
+Copilot soll diese Regeln bei Vorschlägen berücksichtigen:
+	•	Keine stillen Fehler:
+	•	Fehler nicht „verschlucken“, sondern mit Kontext loggen.
+	•	unwrap() und expect() in nicht-testendem Code vermeiden, außer in sehr eng kontrollierten Pfaden.
+	•	Keine unkontrollierten Netzwerkzugriffe:
+	•	HausKI ist offline-first.
+	•	Neue HTTP-Aufrufe, Cloud-Abhängigkeiten oder Telemetrie sind nicht erwünscht, außer explizit in der Architektur vorgesehen.
+	•	Plattform:
+	•	Pop!_OS mit CUDA/NVIDIA ist Referenz.
+	•	Termux, WSL, Codespaces dürfen nicht durch harte Annahmen über Pfade oder Distributionen unbenutzbar werden.
+	•	Linux-Distro-spezifische Flags oder Pakete nur mit sinnvollem Fallback.
+	•	Performancekritische Pfade:
+	•	In Rust implementieren, nicht in Python.
+	•	Riskante Adapter oder experimentelle Logik wenn möglich in Wasm isolieren.
 
-- CI grün: `cargo fmt`, `cargo clippy`, `cargo test`, `cargo deny`, Vale
-- Für CLI-Kommandos: Hilfetext, Tests und Dokumentation vorhanden
-- Policies/Modelle dokumentiert und in `configs/`/`policies/` gepflegt
-- GPU-relevante Änderungen dokumentiert (Thermik, Speicher, Limits)
+---
 
-## Wichtige Hinweise
+## 8. Definition of Done (DoD)
 
-- Änderungen sollen klein, überprüfbar und reproduzierbar bleiben
-- Commits klein halten und logisch gruppieren
-- PR-Beschreibung: Fokus, Motivation und „Wie getestet" angeben
-- Vendor-Verzeichnis prüfen vor Offline-Builds (`scripts/check-vendor.sh`)
+Eine Änderung gilt als fertig, wenn:
+	1.	CI grün ist:
+	•	cargo fmt
+	•	cargo clippy (ohne Warnungen)
+	•	cargo test (workspaceweit)
+	•	cargo deny
+	•	vale (für relevante Dokumentation)
+	2.	Für CLI-Kommandos zusätzlich:
+	•	Hilfetext aktualisiert
+	•	Minimaltests vorhanden (Unit- oder Integrationstests)
+	•	Dokumentation (README oder docs/) angepasst, falls Verhalten geändert wurde
+	3.	Policies und Modelle:
+	•	Änderungen in configs/ und policies/ sind dokumentiert.
+	•	Auswirkungen auf Limits, Routing oder Ressourcenverbrauch sind nachvollziehbar.
+	4.	GPU-relevante Änderungen:
+	•	Auswirkungen auf GPU-Speicher, Thermik und Limits sind kurz dokumentiert (z. B. in docs/ oder entsprechendem Runbook).
 
-## Weiterführende Dokumentation
+---
 
-- [CONTRIBUTING.md](../CONTRIBUTING.md) – Detaillierte Beitragsrichtlinien
-- [README.md](../README.md) – Projektübersicht und Schnellstart
-- [docs/](../docs/) – Runbooks und technische Dokumentation
+## 9. Spezifische Anweisungen an Copilot
+
+Wenn du (Copilot / Agent) Code vorschlägst:
+	1.	Kleinschrittig arbeiten
+	•	Kleine PRs, wenig Dateien auf einmal.
+	•	Einen klaren Fokus pro Änderung (z. B. nur ein neues CLI-Flag, nur eine Policy-Anpassung).
+	2.	Bestehende Strukturen bevorzugen
+	•	Keine neuen Frameworks oder großen Abhängigkeiten vorschlagen.
+	•	Nur auf bereits verwendete Bibliotheken zurückgreifen (z. B. axum, thiserror, anyhow, tantivy).
+	3.	Kein spontanes API-Design ohne Kontext
+	•	Bei neuen Endpoints: an vorhandene Muster in crates/core und crates/policy_api anlehnen.
+	•	Bestehende DTOs, Enums und Error-Typen wiederverwenden.
+	4.	Policies sehr vorsichtig bearbeiten
+	•	policies/ und configs/models.yml nur ändern, wenn der Zweck klar ist.
+	•	Keine „sicherheitshalber“-Änderungen an Limits oder Berechtigungen.
+	5.	Python-Services
+	•	Dienste in services/ sollen klar abgegrenzt bleiben.
+	•	Kein Vermischen von Rust- und Python-Pflichten (z. B. keine Businesslogik doppelt implementieren).
+	6.	Vendoring / Offline-Builds
+	•	Vor neuen Abhängigkeiten prüfen, ob das Vendor-Konzept (scripts/check-vendor.sh) betroffen wäre.
+	•	Möglichst keine Abhängigkeit hinzufügen, die schwer zu vendoren ist.
+
+---
+
+## 10. Typische Aufgabenbeispiele für Copilot
+
+Copilot darf u. a. helfen bei:
+	•	Neues CLI-Subkommando anlegen
+	•	Ort: crates/cli
+	•	Beispiel: Kommando für Status-Abfrage oder Export von Logs
+	•	Erwartet: --help-Text, Tests, Dokumentation
+	•	Neuen HTTP-Endpoint im Core ergänzen
+	•	Ort: crates/core
+	•	Ablauf:
+	1.	Route registrieren
+	2.	Handler implementieren
+	3.	Fehler- und Auth-Handling gemäß vorhandenen Mustern
+	4.	Tests schreiben
+	•	Kleine Refactors
+	•	Duplizierten Code reduzieren
+	•	Fehlerbehandlung vereinheitlichen
+	•	Logging verbessern (ohne Logspam)
+	•	Dokumentation ergänzen
+	•	Beispiele in README oder docs/ aktualisieren
+	•	Runbooks erweitern, falls neue Betriebsmodi hinzukommen
+
+---
+
+## 11. Weiterführende Dokumentation
+	•	CONTRIBUTING.md – detaillierte Beitragsrichtlinien
+	•	README.md – Projektübersicht und Schnellstart
+	•	docs/ – Runbooks, Architektur, Betriebsanleitungen
+
+Wenn unklar ist, wie eine Änderung eingebettet werden soll, bevorzugt in diesen Dokumenten nach Mustern suchen, statt eigene Strukturen zu erfinden.
