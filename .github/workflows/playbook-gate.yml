@@ -29,6 +29,17 @@ jobs:
           shared-key: ${{ runner.os }}-hauski-cli-${{ hashFiles('**/Cargo.lock') }}
           cache-on-failure: true
 
+      # Fix: wgx is a shell tool, not a rust crate.
+      # Checkout heimgewebe/wgx and add cli/ to PATH.
+      - name: Install wgx (Checkout)
+        uses: actions/checkout@v4
+        with:
+          repository: heimgewebe/wgx
+          path: .wgx
+
+      - name: Add wgx to PATH
+        run: echo "${{ github.workspace }}/.wgx/cli" >> $GITHUB_PATH
+
       - name: Build hauski CLI (release, locked)
         run: cargo build --package hauski-cli --release --locked
 
