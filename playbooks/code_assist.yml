@@ -2,7 +2,7 @@ version: 1
 name: code-assist-gated
 steps:
 - id: lint
-  run: "wgx code lint --export tmp/metrics.json"
+  run: "wgx lint --export tmp/metrics.json"
 - id: kg-validate
   run: |
     wgx knowledge extract --repo . --out knowledge.graph.json
