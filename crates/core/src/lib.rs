@@ -10,6 +10,10 @@ use axum::{
     Json, Router,
 };
 use hauski_indexd::{router as index_router, IndexState};
+use hauski_memory as memory;
+use once_cell::sync::OnceCell;
+use prometheus_client::metrics::counter::Counter as PromCounter;
+use prometheus_client::metrics::gauge::Gauge as PromGauge;
 use prometheus_client::{
     encoding::{text::encode, EncodeLabel, EncodeLabelSet},
     metrics::{counter::Counter, family::Family, gauge::Gauge, histogram::Histogram},
@@ -26,10 +30,6 @@ use std::{
 use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, BoxError, ServiceBuilder};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use once_cell::sync::OnceCell;
-use prometheus_client::metrics::counter::Counter as PromCounter;
-use prometheus_client::metrics::gauge::Gauge as PromGauge;
-use hauski_memory as memory;
 
 mod ask;
 mod assist;
@@ -102,7 +102,6 @@ fn create_latency_histogram() -> Histogram {
 #[derive(Clone)]
 pub struct AppState(Arc<AppStateInner>);
 
-#[allow(dead_code)]
 struct AppStateInner {
     limits: Limits,
     models: ModelsFile,
@@ -199,7 +198,10 @@ impl AppState {
             .timeout(Duration::from_secs(15))
             .build()
             .unwrap_or_else(|e| {
-                tracing::warn!("failed to build http client, falling back to default: {}", e);
+                tracing::warn!(
+                    "failed to build http client, falling back to default: {}",
+                    e
+                );
                 reqwest::Client::new()
             });
 
@@ -504,10 +506,12 @@ pub fn build_app_with_state(
         .nest("/index", index_router::<AppState>());
 
     // Initialize memory subsystem. This is fallible, so we capture the result.
-    let memory_initialized = hauski_memory::init_default().map_err(|e| {
-        tracing::error!(error = ?e, "failed to initialize memory subsystem");
-        e
-    }).is_ok();
+    let memory_initialized = hauski_memory::init_default()
+        .map_err(|e| {
+            tracing::error!(error = ?e, "failed to initialize memory subsystem");
+            e
+        })
+        .is_ok();
 
     if state.expose_config() {
         // OpenAPI UI under /docs, spec under /api-docs/openapi.json
