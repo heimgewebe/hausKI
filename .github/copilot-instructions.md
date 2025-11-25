@@ -141,22 +141,27 @@ cargo test --workspace -- --nocapture
 
 # Prose
 vale .
+```
 
 Alternativ über just:
 
+```bash
 just fmt
 just lint
 just build
 just test
+```
 
-Python-Tooling
+### Python-Tooling
 
 Einige Dienste liegen in services/ und nutzen Python:
 
+```bash
 just py-init    # uv sync --extra dev --locked --frozen
 just py-lint    # Ruff
 just py-fmt     # Ruff format
 just py-test    # pytest
+```
 
 Wichtig:
 Rust- und Python-Teile müssen jeweils ihre Tests bestehen. Copilot soll neue Funktionen so vorschlagen, dass bestehende just-Tasks nicht brechen.
