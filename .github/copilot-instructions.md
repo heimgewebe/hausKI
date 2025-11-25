@@ -64,6 +64,7 @@ Das Repository ist als Cargo-Workspace organisiert:
 - `crates/core` – axum-Server, Policies, Auth, zentrale Services
 - `crates/embeddings` – Vektor-Embeddings aus Textdaten
 - `crates/indexd` – SQLite + tantivy für Indizierung/Suche
+- `crates/memory` – Persistenter Key-Value-Store (SQLite)
 - `crates/policy` – Policy-Datenstrukturen und Logik
 - `crates/policy_api` – API für Policy-Engine
 - `configs/` – Konfigurationsdateien (models.yml, flags.yaml)
