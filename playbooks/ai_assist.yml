@@ -5,7 +5,7 @@ steps:
  - id: gate_lint
    run: |
      if [[ -x ./scripts/wgx ]]; then
-       ./scripts/wgx code lint --fix || exit 1
+       ./scripts/wgx lint --fix || exit 1
      else
        echo "wgx fehlt – überspringe lint";
      fi
