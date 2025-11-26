@@ -141,22 +141,27 @@ cargo test --workspace -- --nocapture
 
 # Prose
 vale .
+```
 
 Alternativ über just:
 
+```bash
 just fmt
 just lint
 just build
 just test
+```
 
-Python-Tooling
+### Python-Tooling
 
 Einige Dienste liegen in services/ und nutzen Python:
 
+```bash
 just py-init    # uv sync --extra dev --locked --frozen
 just py-lint    # Ruff
 just py-fmt     # Ruff format
 just py-test    # pytest
+```
 
 Wichtig:
 Rust- und Python-Teile müssen jeweils ihre Tests bestehen. Copilot soll neue Funktionen so vorschlagen, dass bestehende just-Tasks nicht brechen.
@@ -166,121 +171,129 @@ Rust- und Python-Teile müssen jeweils ihre Tests bestehen. Copilot soll neue Fu
 ## 6. Coding Conventions (Rust und Shell)
 
 ### Rust
-	•	Formatierung immer mit cargo fmt.
-	•	Benennung:
-	•	snake_case für Variablen und Funktionen
-	•	PascalCase für Typen, Structs, Enums
-	•	Fehlerbehandlung:
-	•	thiserror für eigene Fehler-Typen
-	•	anyhow für flexible Fehlerweitergabe
-	•	Öffentliche Funktionen und Typen dokumentieren (///-Kommentare).
-	•	In performancekritischen Pfaden lieber explizit optimieren als „magische“ Abstraktionen hinzufügen.
+
+- Formatierung immer mit cargo fmt.
+- Benennung:
+  - snake_case für Variablen und Funktionen
+  - PascalCase für Typen, Structs, Enums
+- Fehlerbehandlung:
+  - thiserror für eigene Fehler-Typen
+  - anyhow für flexible Fehlerweitergabe
+- Öffentliche Funktionen und Typen dokumentieren (///-Kommentare).
+- In performancekritischen Pfaden lieber explizit optimieren als „magische“ Abstraktionen hinzufügen.
 
 ### Shell-Skripte
-	•	Immer mit set -euo pipefail beginnen.
-	•	Skripte sollten:
-	•	Eingaben validieren,
-	•	Pfade und Umgebungsvariablen klar dokumentieren,
-	•	keine unkontrollierten Netzwerkzugriffe ausführen.
+
+- Immer mit set -euo pipefail beginnen.
+- Skripte sollten:
+  - Eingaben validieren,
+  - Pfade und Umgebungsvariablen klar dokumentieren,
+  - keine unkontrollierten Netzwerkzugriffe ausführen.
 
 ### CLI-Kommandos
-	•	Jedes Kommando benötigt -h | --help mit sinnvollen Beschreibungen.
-	•	Beispiele in der Hilfe sind erwünscht (Deutsch).
-	•	Fehlerausgaben bei falscher Benutzung: klar, kurz, informativ.
+
+- Jedes Kommando benötigt -h | --help mit sinnvollen Beschreibungen.
+- Beispiele in der Hilfe sind erwünscht (Deutsch).
+- Fehlerausgaben bei falscher Benutzung: klar, kurz, informativ.
 
 ---
 
 ## 7. Sicherheitsrichtlinien
 
 Copilot soll diese Regeln bei Vorschlägen berücksichtigen:
-	•	Keine stillen Fehler:
-	•	Fehler nicht „verschlucken“, sondern mit Kontext loggen.
-	•	unwrap() und expect() in nicht-testendem Code vermeiden, außer in sehr eng kontrollierten Pfaden.
-	•	Keine unkontrollierten Netzwerkzugriffe:
-	•	HausKI ist offline-first.
-	•	Neue HTTP-Aufrufe, Cloud-Abhängigkeiten oder Telemetrie sind nicht erwünscht, außer explizit in der Architektur vorgesehen.
-	•	Plattform:
-	•	Pop!_OS mit CUDA/NVIDIA ist Referenz.
-	•	Termux, WSL, Codespaces dürfen nicht durch harte Annahmen über Pfade oder Distributionen unbenutzbar werden.
-	•	Linux-Distro-spezifische Flags oder Pakete nur mit sinnvollem Fallback.
-	•	Performancekritische Pfade:
-	•	In Rust implementieren, nicht in Python.
-	•	Riskante Adapter oder experimentelle Logik wenn möglich in Wasm isolieren.
+
+- Keine stillen Fehler:
+  - Fehler nicht „verschlucken“, sondern mit Kontext loggen.
+  - unwrap() und expect() in nicht-testendem Code vermeiden, außer in sehr eng kontrollierten Pfaden.
+- Keine unkontrollierten Netzwerkzugriffe:
+  - HausKI ist offline-first.
+  - Neue HTTP-Aufrufe, Cloud-Abhängigkeiten oder Telemetrie sind nicht erwünscht, außer explizit in der Architektur vorgesehen.
+- Plattform:
+  - Pop!_OS mit CUDA/NVIDIA ist Referenz.
+  - Termux, WSL, Codespaces dürfen nicht durch harte Annahmen über Pfade oder Distributionen unbenutzbar werden.
+  - Linux-Distro-spezifische Flags oder Pakete nur mit sinnvollem Fallback.
+- Performancekritische Pfade:
+  - In Rust implementieren, nicht in Python.
+  - Riskante Adapter oder experimentelle Logik wenn möglich in Wasm isolieren.
 
 ---
 
 ## 8. Definition of Done (DoD)
 
 Eine Änderung gilt als fertig, wenn:
-	1.	CI grün ist:
-	•	cargo fmt
-	•	cargo clippy (ohne Warnungen)
-	•	cargo test (workspaceweit)
-	•	cargo deny
-	•	vale (für relevante Dokumentation)
-	2.	Für CLI-Kommandos zusätzlich:
-	•	Hilfetext aktualisiert
-	•	Minimaltests vorhanden (Unit- oder Integrationstests)
-	•	Dokumentation (README oder docs/) angepasst, falls Verhalten geändert wurde
-	3.	Policies und Modelle:
-	•	Änderungen in configs/ und policies/ sind dokumentiert.
-	•	Auswirkungen auf Limits, Routing oder Ressourcenverbrauch sind nachvollziehbar.
-	4.	GPU-relevante Änderungen:
-	•	Auswirkungen auf GPU-Speicher, Thermik und Limits sind kurz dokumentiert (z. B. in docs/ oder entsprechendem Runbook).
+
+1. CI grün ist:
+   - cargo fmt
+   - cargo clippy (ohne Warnungen)
+   - cargo test (workspaceweit)
+   - cargo deny
+   - vale (für relevante Dokumentation)
+2. Für CLI-Kommandos zusätzlich:
+   - Hilfetext aktualisiert
+   - Minimaltests vorhanden (Unit- oder Integrationstests)
+   - Dokumentation (README oder docs/) angepasst, falls Verhalten geändert wurde
+3. Policies und Modelle:
+   - Änderungen in configs/ und policies/ sind dokumentiert.
+   - Auswirkungen auf Limits, Routing oder Ressourcenverbrauch sind nachvollziehbar.
+4. GPU-relevante Änderungen:
+   - Auswirkungen auf GPU-Speicher, Thermik und Limits sind kurz dokumentiert (z. B. in docs/ oder entsprechendem Runbook).
 
 ---
 
 ## 9. Spezifische Anweisungen an Copilot
 
 Wenn du (Copilot / Agent) Code vorschlägst:
-	1.	Kleinschrittig arbeiten
-	•	Kleine PRs, wenig Dateien auf einmal.
-	•	Einen klaren Fokus pro Änderung (z. B. nur ein neues CLI-Flag, nur eine Policy-Anpassung).
-	2.	Bestehende Strukturen bevorzugen
-	•	Keine neuen Frameworks oder großen Abhängigkeiten vorschlagen.
-	•	Nur auf bereits verwendete Bibliotheken zurückgreifen (z. B. axum, thiserror, anyhow, tantivy).
-	3.	Kein spontanes API-Design ohne Kontext
-	•	Bei neuen Endpoints: an vorhandene Muster in crates/core und crates/policy_api anlehnen.
-	•	Bestehende DTOs, Enums und Error-Typen wiederverwenden.
-	4.	Policies sehr vorsichtig bearbeiten
-	•	policies/ und configs/models.yml nur ändern, wenn der Zweck klar ist.
-	•	Keine „sicherheitshalber“-Änderungen an Limits oder Berechtigungen.
-	5.	Python-Services
-	•	Dienste in services/ sollen klar abgegrenzt bleiben.
-	•	Kein Vermischen von Rust- und Python-Pflichten (z. B. keine Businesslogik doppelt implementieren).
-	6.	Vendoring / Offline-Builds
-	•	Vor neuen Abhängigkeiten prüfen, ob das Vendor-Konzept (scripts/check-vendor.sh) betroffen wäre.
-	•	Möglichst keine Abhängigkeit hinzufügen, die schwer zu vendoren ist.
+
+1. Kleinschrittig arbeiten
+   - Kleine PRs, wenig Dateien auf einmal.
+   - Einen klaren Fokus pro Änderung (z. B. nur ein neues CLI-Flag, nur eine Policy-Anpassung).
+2. Bestehende Strukturen bevorzugen
+   - Keine neuen Frameworks oder großen Abhängigkeiten vorschlagen.
+   - Nur auf bereits verwendete Bibliotheken zurückgreifen (z. B. axum, thiserror, anyhow, tantivy).
+3. Kein spontanes API-Design ohne Kontext
+   - Bei neuen Endpoints: an vorhandene Muster in crates/core und crates/policy_api anlehnen.
+   - Bestehende DTOs, Enums und Error-Typen wiederverwenden.
+4. Policies sehr vorsichtig bearbeiten
+   - policies/ und configs/models.yml nur ändern, wenn der Zweck klar ist.
+   - Keine „sicherheitshalber“-Änderungen an Limits oder Berechtigungen.
+5. Python-Services
+   - Dienste in services/ sollen klar abgegrenzt bleiben.
+   - Kein Vermischen von Rust- und Python-Pflichten (z. B. keine Businesslogik doppelt implementieren).
+6. Vendoring / Offline-Builds
+   - Vor neuen Abhängigkeiten prüfen, ob das Vendor-Konzept (scripts/check-vendor.sh) betroffen wäre.
+   - Möglichst keine Abhängigkeit hinzufügen, die schwer zu vendoren ist.
 
 ---
 
 ## 10. Typische Aufgabenbeispiele für Copilot
 
 Copilot darf u. a. helfen bei:
-	•	Neues CLI-Subkommando anlegen
-	•	Ort: crates/cli
-	•	Beispiel: Kommando für Status-Abfrage oder Export von Logs
-	•	Erwartet: --help-Text, Tests, Dokumentation
-	•	Neuen HTTP-Endpoint im Core ergänzen
-	•	Ort: crates/core
-	•	Ablauf:
-	1.	Route registrieren
-	2.	Handler implementieren
-	3.	Fehler- und Auth-Handling gemäß vorhandenen Mustern
-	4.	Tests schreiben
-	•	Kleine Refactors
-	•	Duplizierten Code reduzieren
-	•	Fehlerbehandlung vereinheitlichen
-	•	Logging verbessern (ohne Logspam)
-	•	Dokumentation ergänzen
-	•	Beispiele in README oder docs/ aktualisieren
-	•	Runbooks erweitern, falls neue Betriebsmodi hinzukommen
+
+- Neues CLI-Subkommando anlegen
+  - Ort: crates/cli
+  - Beispiel: Kommando für Status-Abfrage oder Export von Logs
+  - Erwartet: --help-Text, Tests, Dokumentation
+- Neuen HTTP-Endpoint im Core ergänzen
+  - Ort: crates/core
+  - Ablauf:
+    1. Route registrieren
+    2. Handler implementieren
+    3. Fehler- und Auth-Handling gemäß vorhandenen Mustern
+    4. Tests schreiben
+- Kleine Refactors
+  - Duplizierten Code reduzieren
+  - Fehlerbehandlung vereinheitlichen
+  - Logging verbessern (ohne Logspam)
+- Dokumentation ergänzen
+  - Beispiele in README oder docs/ aktualisieren
+  - Runbooks erweitern, falls neue Betriebsmodi hinzukommen
 
 ---
 
 ## 11. Weiterführende Dokumentation
-	•	CONTRIBUTING.md – detaillierte Beitragsrichtlinien
-	•	README.md – Projektübersicht und Schnellstart
-	•	docs/ – Runbooks, Architektur, Betriebsanleitungen
+
+- CONTRIBUTING.md – detaillierte Beitragsrichtlinien
+- README.md – Projektübersicht und Schnellstart
+- docs/ – Runbooks, Architektur, Betriebsanleitungen
 
 Wenn unklar ist, wie eine Änderung eingebettet werden soll, bevorzugt in diesen Dokumenten nach Mustern suchen, statt eigene Strukturen zu erfinden.
