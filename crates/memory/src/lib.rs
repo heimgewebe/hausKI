@@ -106,14 +106,16 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
         home.join(".local/state")
     });
-    let db_path = cfg.db_path.unwrap_or_else(|| base.join("hauski").join("memory.db"));
+    let db_path = cfg
+        .db_path
+        .unwrap_or_else(|| base.join("hauski").join("memory.db"));
     std::fs::create_dir_all(db_path.parent().unwrap())
         .with_context(|| format!("create parent dir for {:?}", db_path))?;
 
     // ensure schema exists
     {
-        let conn = Connection::open(&db_path)
-            .with_context(|| format!("open sqlite at {:?}", db_path))?;
+        let conn =
+            Connection::open(&db_path).with_context(|| format!("open sqlite at {:?}", db_path))?;
         conn.execute_batch(
             r#"
             PRAGMA journal_mode=WAL;
@@ -143,11 +145,19 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
 }
 
 pub fn global() -> &'static MemoryStore {
-    GLOBAL.get().expect("hauski-memory not initialized; call init_default() early")
+    GLOBAL
+        .get()
+        .expect("hauski-memory not initialized; call init_default() early")
 }
 
 impl MemoryStore {
-    pub fn set(&self, key: &str, value: &[u8], ttl_sec: Option<i64>, pinned: Option<bool>) -> Result<()> {
+    pub fn set(
+        &self,
+        key: &str,
+        value: &[u8],
+        ttl_sec: Option<i64>,
+        pinned: Option<bool>,
+    ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         let pinned_i = if pinned.unwrap_or(false) { 1 } else { 0 };
         let conn = Connection::open(&self.db_path)?;
@@ -173,7 +183,10 @@ impl MemoryStore {
             params![key, value, ttl_sec, pinned_i, created_ts, now],
         )?;
 
-        let c = self.ops_total.get_or_create(&MemoryLabels{ namespace: Cow::Borrowed("default"), layer: Cow::Borrowed("short_term")});
+        let c = self.ops_total.get_or_create(&MemoryLabels {
+            namespace: Cow::Borrowed("default"),
+            layer: Cow::Borrowed("short_term"),
+        });
         c.inc();
         Ok(())
     }
@@ -207,7 +220,10 @@ impl MemoryStore {
             )
             .optional()?;
 
-        let c = self.ops_total.get_or_create(&MemoryLabels{ namespace: Cow::Borrowed("default"), layer: Cow::Borrowed("short_term")});
+        let c = self.ops_total.get_or_create(&MemoryLabels {
+            namespace: Cow::Borrowed("default"),
+            layer: Cow::Borrowed("short_term"),
+        });
         c.inc();
         Ok(row)
     }
@@ -216,7 +232,9 @@ impl MemoryStore {
         let conn = Connection::open(&self.db_path)?;
         let n = conn.execute("DELETE FROM memory_items WHERE key=?1", params![key])?;
         if n > 0 {
-            let c = self.evictions_total.get_or_create(&EvictLabels{ reason: Cow::Borrowed("manual") });
+            let c = self.evictions_total.get_or_create(&EvictLabels {
+                reason: Cow::Borrowed("manual"),
+            });
             c.inc();
         }
         Ok(n > 0)
@@ -301,7 +319,9 @@ mod tests {
     #[tokio::test]
     async fn set_get_evict_roundtrip() {
         let (store, _tmp) = test_store(60);
-        store.set("k", "v".as_bytes(), Some(5), Some(false)).unwrap();
+        store
+            .set("k", "v".as_bytes(), Some(5), Some(false))
+            .unwrap();
         let it = store.get("k").unwrap().unwrap();
         assert_eq!(it.key, "k");
         assert_eq!(it.value, b"v");
@@ -312,7 +332,9 @@ mod tests {
     #[tokio::test]
     async fn janitor_expires() {
         let (store, _tmp) = test_store(1);
-        store.set("k", "v".as_bytes(), Some(1), Some(false)).unwrap();
+        store
+            .set("k", "v".as_bytes(), Some(1), Some(false))
+            .unwrap();
         tokio::time::sleep(Duration::from_secs(3)).await;
         // allow janitor to run
         tokio::time::sleep(Duration::from_secs(2)).await;

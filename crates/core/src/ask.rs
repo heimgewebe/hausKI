@@ -10,8 +10,10 @@ use serde::{Deserialize, Serialize};
 
 use utoipa::{IntoParams, ToSchema};
 
-use serde_json::json;
 use crate::AppState;
+// Used by utoipa's #[schema(example = json!(...))] attribute macros
+#[allow(unused_imports)]
+use serde_json::json;
 
 /// Maximum number of matches returned by the `/ask` endpoint.
 const MAX_K: usize = 100;
