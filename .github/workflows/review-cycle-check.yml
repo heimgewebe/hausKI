@@ -33,18 +33,18 @@ jobs:
                 jq -r '."last_updated" // "index has no last_updated"' "$BASE/index.json" || true
               else
                 echo "::notice title=hauski review::jq nicht gefunden – nutze Python-Fallback"
-                python3 - "$BASE/index.json" <<'PY' || true
-import json
-import sys
-from pathlib import Path
+                python3 - "$BASE/index.json" <<'PYTHON_SCRIPT' || true
+          import json
+          import sys
+          from pathlib import Path
 
-path = Path(sys.argv[1])
-try:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    print(data.get("last_updated", "index has no last_updated"))
-except Exception as exc:
-    print(f"warn: could not parse index.json ({exc})")
-PY
+          path = Path(sys.argv[1])
+          try:
+              data = json.loads(path.read_text(encoding="utf-8"))
+              print(data.get("last_updated", "index has no last_updated"))
+          except Exception as exc:
+              print(f"warn: could not parse index.json ({exc})")
+          PYTHON_SCRIPT
               fi
             else
               echo "::warning title=hauski review::No global index.json at $BASE/index.json"

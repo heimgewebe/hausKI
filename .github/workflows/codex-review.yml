@@ -48,11 +48,11 @@ jobs:
         run: |
           echo "### REVIEW PROMPT" > prompt.md
           cat <<'EOP' >> prompt.md
-Bewerte diesen PR:
-- Risiken, API-Brüche, fehlende Tests
-- Mache maximal 3 konkrete Patch-Vorschläge (ohne Reformat)
-- Nenne in 3 Sätzen die Begründung und 1–2 Risiken pro Vorschlag
-EOP
+          Bewerte diesen PR:
+          - Risiken, API-Brüche, fehlende Tests
+          - Mache maximal 3 konkrete Patch-Vorschläge (ohne Reformat)
+          - Nenne in 3 Sätzen die Begründung und 1–2 Risiken pro Vorschlag
+          EOP
           echo >> prompt.md
           echo "### DIFF (gekürzt)" >> prompt.md
           head -n 1000 pr.diff >> prompt.md
@@ -70,14 +70,14 @@ EOP
           ISSUE_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          payload=$(python - <<'PY'
-import json
-from pathlib import Path
+          payload=$(python3 - <<'PYTHON_SCRIPT'
+          import json
+          from pathlib import Path
 
-body = Path('review.txt').read_text()[:60000]
-print(json.dumps({"body": body}))
-PY
-)
+          body = Path('review.txt').read_text()[:60000]
+          print(json.dumps({"body": body}))
+          PYTHON_SCRIPT
+          )
           curl -fsSL \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
