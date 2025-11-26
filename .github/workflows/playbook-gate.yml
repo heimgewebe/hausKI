@@ -2,17 +2,24 @@ name: playbook-gate
 
 on:
   pull_request:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      toolchain:
+        description: "Rust toolchain version to use"
+        default: stable
+        required: false
 
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+  toolchain: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
+  RUST_TOOLCHAIN: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
+
 jobs:
   gate:
     runs-on: ubuntu-latest
-
-    env:
-      CARGO_TERM_COLOR: always
 
     steps:
       - name: Checkout repository
@@ -21,10 +28,13 @@ jobs:
       - name: Install shfmt
         run: sudo apt-get update && sudo apt-get install -y shfmt
 
-      - name: Set up Rust toolchain (stable)
+      - name: Show resolved toolchain
+        run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
+
+      - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
 
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
