@@ -6,6 +6,8 @@ use axum::{
 };
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
+// Used by utoipa's #[schema(example = json!(...))] attribute macros
+#[allow(unused_imports)]
 use serde_json::json;
 use std::fs;
 use std::path::Path;

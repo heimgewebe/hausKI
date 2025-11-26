@@ -7,8 +7,8 @@ use crate::AppState;
 use axum::extract::State;
 use axum::http::Method;
 
-use std::{collections::BTreeMap, env, fs, io::Write, path::Path};
 use chrono::Utc;
+use std::{collections::BTreeMap, env, fs, io::Write, path::Path};
 use ulid::Ulid;
 
 /// Optional: Pfad für JSONL-Events. Wenn nicht gesetzt, werden keine Events geschrieben.
@@ -16,8 +16,15 @@ fn event_sink_path() -> Option<String> {
     env::var("HAUSKI_EVENT_SINK").ok().filter(|s| !s.is_empty())
 }
 
-fn write_event(kind: &str, level: &str, labels: BTreeMap<&str, serde_json::Value>, data: serde_json::Value) {
-    let Some(path) = event_sink_path() else { return };
+fn write_event(
+    kind: &str,
+    level: &str,
+    labels: BTreeMap<&str, serde_json::Value>,
+    data: serde_json::Value,
+) {
+    let Some(path) = event_sink_path() else {
+        return;
+    };
     let event = serde_json::json!({
         "id": Ulid::new().to_string(),
         "ts": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
@@ -31,7 +38,9 @@ fn write_event(kind: &str, level: &str, labels: BTreeMap<&str, serde_json::Value
     });
     if let Err(err) = (|| -> std::io::Result<()> {
         let p = Path::new(&path);
-        if let Some(dir) = p.parent() { fs::create_dir_all(dir)?; }
+        if let Some(dir) = p.parent() {
+            fs::create_dir_all(dir)?;
+        }
         let mut f = fs::OpenOptions::new().create(true).append(true).open(p)?;
         serde_json::to_writer(&mut f, &event).map_err(std::io::Error::other)?;
         f.write_all(b"\n")?;
@@ -97,7 +106,11 @@ fn route_mode(q: &str, hint: &Option<String>) -> &'static str {
         || lower.contains("pip ")
         || lower.contains("error:")
         || lower.contains("traceback");
-    if looks_like_code { "code" } else { "knowledge" }
+    if looks_like_code {
+        "code"
+    } else {
+        "knowledge"
+    }
 }
 
 /// Anfrageformat für `/index/search` (lokale Hilfsstruktur).
@@ -113,43 +126,50 @@ struct IndexSearchRequest<'a> {
 /// Robust gegen Schema-Varianz: wir versuchen, Titel/Score aus typischen Feldern zu ziehen.
 fn extract_citations_from_value(v: &serde_json::Value) -> Vec<AssistCitation> {
     // akzeptiere: {items:[{title,score}]}, {results:[...]}, oder direkt Array
-    let arr = v.get("items")
+    let arr = v
+        .get("items")
         .and_then(|x| x.as_array())
         .or_else(|| v.get("results").and_then(|x| x.as_array()))
         .or_else(|| v.as_array())
         .cloned()
         .unwrap_or_default();
 
-    arr.into_iter().filter_map(|it| {
-        let title = it.get("title")
-            .or_else(|| it.get("path"))
-            .or_else(|| it.get("id"))
-            .and_then(|x| x.as_str())
-            .map(|s| s.to_string())?;
-        let score = it.get("score").and_then(|s| s.as_f64()).map(|f| f as f32);
-        Some(AssistCitation { title, score })
-    }).collect()
+    arr.into_iter()
+        .filter_map(|it| {
+            let title = it
+                .get("title")
+                .or_else(|| it.get("path"))
+                .or_else(|| it.get("id"))
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_string())?;
+            let score = it.get("score").and_then(|s| s.as_f64()).map(|f| f as f32);
+            Some(AssistCitation { title, score })
+        })
+        .collect()
 }
 
 /// Holt Top-K Treffer aus `/index/search` (wenn erreichbar). Fallback: leer.
 async fn fetch_topk_citations(question: &str) -> Vec<AssistCitation> {
-    let base = env::var("HAUSKI_INTERNAL_BASE").ok()
+    let base = env::var("HAUSKI_INTERNAL_BASE")
+        .ok()
         .unwrap_or_else(|| "http://127.0.0.1:8080".to_string());
     let url = format!("{}/index/search", base.trim_end_matches('/'));
 
     let client = reqwest::Client::new();
-    let body = IndexSearchRequest { q: question, namespace: Some("default"), k: Some(3) };
+    let body = IndexSearchRequest {
+        q: question,
+        namespace: Some("default"),
+        k: Some(3),
+    };
 
     match client.post(url).json(&body).send().await {
-        Ok(resp) if resp.status().is_success() => {
-            match resp.json::<serde_json::Value>().await {
-                Ok(val) => extract_citations_from_value(&val),
-                Err(err) => {
-                    tracing::warn!("index search: failed to decode json: {}", err);
-                    Vec::new()
-                }
+        Ok(resp) if resp.status().is_success() => match resp.json::<serde_json::Value>().await {
+            Ok(val) => extract_citations_from_value(&val),
+            Err(err) => {
+                tracing::warn!("index search: failed to decode json: {}", err);
+                Vec::new()
             }
-        }
+        },
         Ok(resp) => {
             tracing::warn!("index search: non-success status {}", resp.status());
             Vec::new()
@@ -203,7 +223,7 @@ pub async fn assist_handler(
             "core.assist.request",
             "info",
             labels.clone(),
-            serde_json::json!({"question_preview": &req.question.chars().take(120).collect::<String>()})
+            serde_json::json!({"question_preview": &req.question.chars().take(120).collect::<String>()}),
         );
         write_event(
             "core.assist.response",
@@ -216,17 +236,20 @@ pub async fn assist_handler(
                     "title": c.title,
                     "score": c.score
                 })).collect::<Vec<_>>()
-            })
+            }),
         );
     }
 
     state.record_http_observation(Method::POST, "/assist", StatusCode::OK, started);
-    (StatusCode::OK, Json(AssistResponse {
-        answer,
-        citations,
-        trace,
-        latency_ms: ms,
-    }))
+    (
+        StatusCode::OK,
+        Json(AssistResponse {
+            answer,
+            citations,
+            trace,
+            latency_ms: ms,
+        }),
+    )
 }
 
 #[cfg(test)]

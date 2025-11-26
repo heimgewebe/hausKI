@@ -7,6 +7,8 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+// Used by utoipa's #[schema(example = json!(...))] attribute macros
+#[allow(unused_imports)]
 use serde_json::json;
 use tracing::{debug, warn};
 use utoipa::ToSchema;
