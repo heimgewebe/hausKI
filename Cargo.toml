@@ -47,9 +47,10 @@ hostname = "0.4"
 ulid = "1"
 
 [patch.crates-io]
-# Force all crates in this workspace to use the vendored minimal anyhow
-# implementation under vendor/anyhow instead of pulling from crates.io.
-# This keeps offline builds deterministic.
+# The anyhow patch was previously needed for a minimal stub implementation
+# to work around a coherence conflict with std::error::Error. This has been
+# resolved in anyhow v1.0.100, so we now use the official crate from crates.io
+# and vendor it via `cargo vendor` for offline builds.
 # anyhow = { path = "vendor/anyhow" }
 signal-hook-registry = { path = "vendor/signal-hook-registry" }
 hostname = { path = "vendor/hostname" }
