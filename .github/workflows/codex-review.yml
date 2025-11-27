@@ -76,7 +76,7 @@ jobs:
 
           body = Path('review.txt').read_text()[:60000]
           print(json.dumps({"body": body}))
-          PYTHON_SCRIPT
+PYTHON_SCRIPT
           )
           curl -fsSL \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
