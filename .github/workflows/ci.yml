@@ -179,14 +179,6 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
-      - name: Prepare environment for shellcheck
-        # Create harmless placeholders for files that are commonly sourced but not in repo,
-        # so shellcheck can follow them and not emit SC1091.
-        run: |
-          # If your scripts 'source .env' during linting, provide a CI placeholder
-          if [ ! -f .env ]; then
-            echo '# CI placeholder .env' > .env
-          fi
       - name: shellcheck
         run: |
           files=$(git ls-files '*.sh' '*.bash')
