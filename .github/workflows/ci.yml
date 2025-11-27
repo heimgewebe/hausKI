@@ -148,7 +148,8 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+      # Pin to fixed v2.7.7 release for reproducibility
+      - uses: Swatinem/rust-cache@v2.7.7
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: rustfmt (check)
