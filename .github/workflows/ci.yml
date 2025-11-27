@@ -348,7 +348,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2
+      # Pin to fixed v2.7.7 release to keep builds deterministic
+      - uses: Swatinem/rust-cache@v2.7.7
       - name: Health & chat smoke (mock ollama)
         run: bash scripts/ci-smoke-chat.sh
   security:
