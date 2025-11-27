@@ -31,12 +31,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shfmt
 
       - name: Show resolved toolchain
-        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
+        run: 'echo "Using toolchain: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || ''stable'' }}"'
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          toolchain: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
 
       - name: Cache cargo registry + target
         # Pin to fixed release for reproducibility
