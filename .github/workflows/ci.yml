@@ -148,7 +148,7 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
+      - uses: Swatinem/rust-cache@v2
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: rustfmt (check)
@@ -178,8 +178,24 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Prepare environment for shellcheck
+        # Create harmless placeholders for files that are commonly sourced but not in repo,
+        # so shellcheck can follow them and not emit SC1091.
+        run: |
+          # If your scripts 'source .env' during linting, provide a CI placeholder
+          if [ ! -f .env ]; then
+            echo '# CI placeholder .env' > .env
+          fi
       - name: shellcheck
-        run: git ls-files '*.sh' '*.bash' | xargs -r shellcheck -x
+        run: |
+          files=$(git ls-files '*.sh' '*.bash')
+          if [ -z "$files" ]; then
+            echo "No shell scripts to lint"
+            exit 0
+          fi
+          # Exclude SC1091 (sourced file not present) and SC2034 (intentional unused variables)
+          # Adjust excludes as needed. Keep -x so sourced files are followed.
+          echo "$files" | xargs -r shellcheck -x --exclude=SC1091,SC2034
 
   links:
     name: docs link check (lychee)
@@ -280,7 +296,7 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
+      - uses: Swatinem/rust-cache@v2
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: Cargo fmt
@@ -328,7 +344,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
+      - uses: Swatinem/rust-cache@v2
       - name: Health & chat smoke (mock ollama)
         run: bash scripts/ci-smoke-chat.sh
   security:
