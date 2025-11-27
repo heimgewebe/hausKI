@@ -211,7 +211,7 @@ PYTHON_SCRIPT
           Draft202012Validator.check_schema(schema)
           validate(sample, schema)
           print('contracts/examples/event.sample.json ✓')
-          PYTHON_SCRIPT
+PYTHON_SCRIPT
 
       - name: Pytests
         if: ${{ hashFiles('pyproject.toml') != '' }}
