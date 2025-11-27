@@ -50,7 +50,7 @@ ulid = "1"
 # Force all crates in this workspace to use the vendored minimal anyhow
 # implementation under vendor/anyhow instead of pulling from crates.io.
 # This keeps offline builds deterministic.
-anyhow = { path = "vendor/anyhow" }
+# anyhow = { path = "vendor/anyhow" }
 signal-hook-registry = { path = "vendor/signal-hook-registry" }
 hostname = { path = "vendor/hostname" }
 ulid = { path = "vendor/ulid" }
