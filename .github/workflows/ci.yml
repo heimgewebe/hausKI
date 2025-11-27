@@ -134,7 +134,7 @@ jobs:
         run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
       - name: Check vendor snapshot
