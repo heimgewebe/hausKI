@@ -155,7 +155,7 @@ PYTHON_SCRIPT
               print("  uv lock --upgrade-package jsonschema==4.23.0")
               print("  # oder gesamtes Dev-Set refreshen: uv lock --extra dev")
               sys.exit(1)
-          PYTHON_SCRIPT
+PYTHON_SCRIPT
 
       - name: Cache uv
         if: ${{ hashFiles('pyproject.toml') != '' }}
