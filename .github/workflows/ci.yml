@@ -181,16 +181,23 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: shellcheck
         run: |
-          files=$(git ls-files '*.sh' '*.bash')
-          if [ -z "$files" ]; then
+          set -euo pipefail
+
+          # Count matching files first to keep the "no files" fast-path
+          file_count=$(git ls-files '*.sh' '*.bash' | wc -l)
+          if [ "$file_count" -eq 0 ]; then
             echo "No shell scripts to lint"
             exit 0
           fi
-          # Exclude SC1091 (sourced file not present) and SC2034 (intentional unused variables).
-          # SC2034 is triggered by variables like 'IFS' in scripts/ci-smoke-chat.sh:3,
-          # which are set to affect shell behavior intentionally, even if not referenced later.
-          # Adjust excludes as needed. Keep -x so sourced files are followed.
-          echo "$files" | xargs -r shellcheck -x --exclude=SC1091,SC2034
+
+          # Exclude:
+          # - SC1091: sourced file not present (optional .env files)
+          # - SC2034: intentional unused variables (e.g., IFS in scripts/ci-smoke-chat.sh)
+          # - SC2015: A && B || C pattern (intentionally used with `|| true` for cleanup)
+          # - SC2086: unquoted vars (intentional for $PIDS word splitting in stop-all.sh)
+          #
+          # Use NUL-delimited paths to handle any special characters in filenames.
+          git ls-files -z '*.sh' '*.bash' | xargs -0 -r shellcheck -x --exclude=SC1091,SC2034,SC2015,SC2086
 
   links:
     name: docs link check (lychee)
