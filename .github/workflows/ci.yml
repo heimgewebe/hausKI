@@ -306,7 +306,8 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Cargo clippy
         run: cargo clippy --all-targets -- -D warnings
-      - uses: taiki-e/install-action@7a11182e3a1a996a96f2ef749398a422c9b6f4ff
+      # Pin to v2 for stability while allowing patch updates
+      - uses: taiki-e/install-action@v2
         with:
           tool: nextest
       - name: Tests
@@ -373,7 +374,8 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
-      - uses: taiki-e/install-action@7a11182e3a1a996a96f2ef749398a422c9b6f4ff
+      # Pin to v2 for stability while allowing patch updates
+      - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny
       - name: cargo deny (advisories/bans/licenses)
