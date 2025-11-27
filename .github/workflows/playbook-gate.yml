@@ -15,8 +15,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  toolchain: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
-  RUST_TOOLCHAIN: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
 
 jobs:
   gate:
@@ -31,12 +29,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shfmt
 
       - name: Show resolved toolchain
-        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
+        run: echo "Using toolchain: stable"
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
+          toolchain: stable
 
       - name: Cache cargo registry + target
         # Pin to fixed release for reproducibility

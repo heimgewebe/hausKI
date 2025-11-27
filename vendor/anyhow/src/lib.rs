@@ -6,6 +6,10 @@ use std::result;
 pub type Result<T> = result::Result<T, Error>;
 
 /// Lightweight error wrapper compatible with `anyhow` macros.
+///
+/// Note: Unlike some error types, `Error` intentionally does not implement
+/// `std::error::Error`. This matches the behavior of the real `anyhow` crate
+/// and avoids conflicting with `impl<T> From<T> for T` from core.
 #[derive(Debug)]
 pub struct Error {
     inner: Box<dyn StdError + Send + Sync + 'static>,
@@ -17,6 +21,18 @@ impl Error {
             inner: Box::new(StringError(message.to_string())),
         }
     }
+
+    /// Wrap an existing error.
+    pub fn new<E: StdError + Send + Sync + 'static>(error: E) -> Self {
+        Self {
+            inner: Box::new(error),
+        }
+    }
+
+    /// Returns the root cause of this error, if any.
+    pub fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        self.inner.source()
+    }
 }
 
 impl fmt::Display for Error {
@@ -25,20 +41,12 @@ impl fmt::Display for Error {
     }
 }
 
-impl StdError for Error {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.inner.source()
-    }
-}
-
 impl<E> From<E> for Error
 where
     E: StdError + Send + Sync + 'static,
 {
     fn from(err: E) -> Self {
-        Self {
-            inner: Box::new(err),
-        }
+        Self::new(err)
     }
 }
 
