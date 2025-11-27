@@ -44,7 +44,7 @@ jobs:
               print(data.get("last_updated", "index has no last_updated"))
           except Exception as exc:
               print(f"warn: could not parse index.json ({exc})")
-          PYTHON_SCRIPT
+PYTHON_SCRIPT
               fi
             else
               echo "::warning title=hauski review::No global index.json at $BASE/index.json"
