@@ -35,9 +35,8 @@ models/
 
 # Project specific
 .wgx/profile.local.yml
-# Vendored crates are intentionally tracked to guarantee offline builds.
-# Do not ignore vendor/.
 # NICHT .vscode/settings.json ignorieren – projektweite Settings sind beabsichtigt
+vendor/
 
 # MkDocs build output
 site/
