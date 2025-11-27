@@ -37,6 +37,13 @@ models/
 .wgx/profile.local.yml
 # NICHT .vscode/settings.json ignorieren – projektweite Settings sind beabsichtigt
 vendor/
+# Allow committed stubs required for offline builds
+!vendor/anyhow/**
+!vendor/signal-hook-registry/**
+!vendor/hostname/**
+!vendor/ulid/**
+!vendor/heimlern-core/**
+!vendor/heimlern-bandits/**
 
 # MkDocs build output
 site/

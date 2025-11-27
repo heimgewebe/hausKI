@@ -1,0 +1,14 @@
+[package]
+name = "anyhow"
+version = "1.0.100"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Minimal stub implementation of anyhow for offline builds"
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+backtrace = []
+std = []

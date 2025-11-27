@@ -1,0 +1,12 @@
+[package]
+name = "signal-hook-registry"
+version = "1.4.2"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Stub signal-hook-registry for offline builds"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+libc = "0.2"
