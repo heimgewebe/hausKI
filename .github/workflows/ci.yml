@@ -131,12 +131,10 @@ jobs:
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - name: Show resolved toolchain
-        run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
+        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
       - uses: dtolnay/rust-toolchain@stable
         with:
-          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          # Fall back to "stable" if the workflow-level environment variable is empty.
-          toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
       - name: Check vendor snapshot
@@ -265,12 +263,10 @@ jobs:
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - name: Show resolved toolchain
-        run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
+        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
       - uses: dtolnay/rust-toolchain@stable
         with:
-          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          # Fall back to "stable" if the workflow-level environment variable is empty.
-          toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
       - name: Check vendor snapshot
@@ -316,11 +312,10 @@ jobs:
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Show resolved toolchain
-        run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
+        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
       - uses: dtolnay/rust-toolchain@stable
         with:
-          # Fall back to "stable" if the workflow-level environment variable is empty.
-          toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
+          toolchain: stable
       - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
       - name: Health & chat smoke (mock ollama)
         run: bash scripts/ci-smoke-chat.sh
@@ -340,12 +335,10 @@ jobs:
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Show resolved toolchain
-        run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}"
+        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
       - uses: dtolnay/rust-toolchain@stable
         with:
-          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          # Fall back to "stable" if the workflow-level environment variable is empty.
-          toolchain: ${{ env.RUST_TOOLCHAIN || 'stable' }}
+          toolchain: stable
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - uses: taiki-e/install-action@7a11182e3a1a996a96f2ef749398a422c9b6f4ff

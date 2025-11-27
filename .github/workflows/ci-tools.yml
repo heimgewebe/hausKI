@@ -54,47 +54,47 @@ jobs:
           grep -E '^uv 0\.7\.6$' <<<"$version"
 
       # --- Sanity check: lock must exist and be in sync for dev extra ----------
-      - name: Sanity: require uv.lock when schema sources exist
+      - name: Sanity - require uv.lock when schema sources exist
         if: ${{ hashFiles('pyproject.toml') != '' }}
         shell: bash
         run: |
-          python3 - <<'PY'
-import os
-import sys
+          python3 - <<'PYTHON_SCRIPT'
+          import os
+          import sys
 
 
-def has_jsonschema_from_toml() -> bool:
-    return os.path.exists("pyproject.toml")
+          def has_jsonschema_from_toml():
+              return os.path.exists("pyproject.toml")
 
 
-def has_jsonschema_from_json() -> bool:
-    return os.path.exists("package.json") or os.path.exists("contracts/schema.json")
+          def has_jsonschema_from_json():
+              return os.path.exists("package.json") or os.path.exists("contracts/schema.json")
 
 
-def has_jsonschema_from_text() -> bool:
-    # Platzhalter für spätere Textquellen (README-Anker etc.)
-    return False
+          def has_jsonschema_from_text():
+              # Platzhalter für spätere Textquellen (README-Anker etc.)
+              return False
 
 
-ok = (
-    has_jsonschema_from_toml()
-    or has_jsonschema_from_json()
-    or has_jsonschema_from_text()
-)
-# Wenn keine Schema-Quelle vorhanden ist, überspringen wir die Lock-Prüfung.
-if not ok:
-    print("No schema source detected; skipping uv.lock check")
-    sys.exit(0)
-# Liegt eine Schema-Quelle vor, MUSS uv.lock existieren.
-if not os.path.exists("uv.lock"):
-    print("uv.lock not found. Run uv lock --extra dev", file=sys.stderr)
-    sys.exit(1)
-PY
+          ok = (
+              has_jsonschema_from_toml()
+              or has_jsonschema_from_json()
+              or has_jsonschema_from_text()
+          )
+          # Wenn keine Schema-Quelle vorhanden ist, überspringen wir die Lock-Prüfung.
+          if not ok:
+              print("No schema source detected; skipping uv.lock check")
+              sys.exit(0)
+          # Liegt eine Schema-Quelle vor, MUSS uv.lock existieren.
+          if not os.path.exists("uv.lock"):
+              print("uv.lock not found. Run uv lock --extra dev", file=sys.stderr)
+              sys.exit(1)
+PYTHON_SCRIPT
 
       - name: Assert jsonschema pinned in uv.lock
         if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
-          python3 - <<'PY'
+          python3 - <<'PYTHON_SCRIPT'
           from __future__ import annotations
 
           import json
@@ -103,59 +103,59 @@ PY
 
           lock_path = Path("uv.lock")
           if not lock_path.exists():
-            print("uv.lock not found. Run: uv lock --extra dev", file=sys.stderr)
-            sys.exit(1)
+              print("uv.lock not found. Run: uv lock --extra dev", file=sys.stderr)
+              sys.exit(1)
 
           raw_text = lock_path.read_text(encoding="utf-8")
 
-          def has_jsonschema_from_toml() -> bool:
-            try:
+          def has_jsonschema_from_toml():
               try:
-                import tomllib  # type: ignore[attr-defined]
+                  try:
+                      import tomllib
+                  except ModuleNotFoundError:
+                      import tomli as tomllib
               except ModuleNotFoundError:
-                import tomli as tomllib  # type: ignore[no-redef]
-            except ModuleNotFoundError:
+                  return False
+
+              try:
+                  data = tomllib.loads(raw_text)
+              except Exception:
+                  return False
+
+              packages = data.get("package", [])
+              for package in packages:
+                  name = package.get("name")
+                  if isinstance(name, str) and name.lower() == "jsonschema":
+                      return True
               return False
 
-            try:
-              data = tomllib.loads(raw_text)
-            except Exception:
+          def has_jsonschema_from_json():
+              try:
+                  data = json.loads(raw_text)
+              except json.JSONDecodeError:
+                  return False
+              packages = data.get("package", [])
+              for package in packages:
+                  name = package.get("name")
+                  if isinstance(name, str) and name.lower() == "jsonschema":
+                      return True
               return False
 
-            packages = data.get("package", [])
-            for package in packages:
-              name = package.get("name")
-              if isinstance(name, str) and name.lower() == "jsonschema":
-                return True
-            return False
-
-          def has_jsonschema_from_json() -> bool:
-            try:
-              data = json.loads(raw_text)
-            except json.JSONDecodeError:
-              return False
-            packages = data.get("package", [])
-            for package in packages:
-              name = package.get("name")
-              if isinstance(name, str) and name.lower() == "jsonschema":
-                return True
-            return False
-
-          def has_jsonschema_from_text() -> bool:
-            lowered = raw_text.lower()
-            return 'name = "jsonschema"' in lowered or '"name": "jsonschema"' in lowered
+          def has_jsonschema_from_text():
+              lowered = raw_text.lower()
+              return 'name = "jsonschema"' in lowered or '"name": "jsonschema"' in lowered
 
           if not (
               has_jsonschema_from_toml()
               or has_jsonschema_from_json()
               or has_jsonschema_from_text()
           ):
-            print("jsonschema not found in uv.lock.")
-            print("Fix locally:")
-            print("  uv lock --upgrade-package jsonschema==4.23.0")
-            print("  # oder gesamtes Dev-Set refreshen: uv lock --extra dev")
-            sys.exit(1)
-          PY
+              print("jsonschema not found in uv.lock.")
+              print("Fix locally:")
+              print("  uv lock --upgrade-package jsonschema==4.23.0")
+              print("  # oder gesamtes Dev-Set refreshen: uv lock --extra dev")
+              sys.exit(1)
+PYTHON_SCRIPT
 
       - name: Cache uv
         if: ${{ hashFiles('pyproject.toml') != '' }}
@@ -197,21 +197,21 @@ PY
         if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
           set -euo pipefail
-          uv run python - <<'PY'
-import json
-from pathlib import Path
+          uv run python - <<'PYTHON_SCRIPT'
+          import json
+          from pathlib import Path
 
-from jsonschema import Draft202012Validator, validate
+          from jsonschema import Draft202012Validator, validate
 
 
-root = Path('.')
-schema = json.loads((root / 'contracts' / 'events.schema.json').read_text(encoding='utf-8'))
-sample = json.loads((root / 'contracts' / 'examples' / 'event.sample.json').read_text(encoding='utf-8'))
+          root = Path('.')
+          schema = json.loads((root / 'contracts' / 'events.schema.json').read_text(encoding='utf-8'))
+          sample = json.loads((root / 'contracts' / 'examples' / 'event.sample.json').read_text(encoding='utf-8'))
 
-Draft202012Validator.check_schema(schema)
-validate(sample, schema)
-print('contracts/examples/event.sample.json \u2713')
-PY
+          Draft202012Validator.check_schema(schema)
+          validate(sample, schema)
+          print('contracts/examples/event.sample.json ✓')
+PYTHON_SCRIPT
 
       - name: Pytests
         if: ${{ hashFiles('pyproject.toml') != '' }}

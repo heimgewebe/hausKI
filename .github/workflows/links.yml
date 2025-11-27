@@ -70,19 +70,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Print lychee exit code
-        if: >-
-          ${{ always()
-            && steps.lychee.outputs.exit_code != '' }}
-        run: echo "Lychee exit code: ${{ steps.lychee.outputs.exit_code }}"
+        if: always() && steps.lychee.outputs.exit_code != ''
+        run: 'echo "Lychee exit code: ${{ steps.lychee.outputs.exit_code }}"'
 
       - name: Comment on PR if broken links
-        if: >-
-          ${{ always()
-            && github.event_name == 'pull_request'
-            && github.event.pull_request.head.repo.fork == false
-            && steps.lychee.outcome != 'cancelled'
-            && steps.lychee.outputs.exit_code != ''
-            && steps.lychee.outputs.exit_code != '0' }}
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && steps.lychee.outcome != 'cancelled' && steps.lychee.outputs.exit_code != '' && steps.lychee.outputs.exit_code != '0'
         uses: thollander/actions-comment-pull-request@v3
         with:
           message: |
@@ -91,10 +83,7 @@ jobs:
             Siehe Artefakt: **lychee/out.md**
 
       - name: Upload lychee report
-        if: >-
-          ${{ always()
-            && steps.lychee.outcome != 'cancelled'
-            && hashFiles('lychee/out.md') != '' }}
+        if: always() && steps.lychee.outcome != 'cancelled' && hashFiles('lychee/out.md') != ''
         uses: actions/upload-artifact@v4
         with:
           name: lychee-report

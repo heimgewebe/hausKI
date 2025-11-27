@@ -32,7 +32,7 @@ jobs:
           echo "found .wgx/profile.yml"
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -111,66 +111,66 @@ jobs:
           fi
 
           if [ -f .wgx/profile.yml ] && [ -f pyproject.toml ]; then
-            WGX_PY="$(python - <<'PY'
-try:
-    import yaml  # type: ignore
-except Exception:
-    yaml = None
+            WGX_PY="$(python3 - <<'PYTHON_SCRIPT'
+          try:
+              import yaml
+          except Exception:
+              yaml = None
 
-def manual_parse(text: str) -> str:
-    fallback = "3.12"
-    lines = text.splitlines()
-    tooling = False
-    python = False
-    tooling_indent = None
-    python_indent = None
-    for line in lines:
-        raw = line.rstrip("\n")
-        stripped = raw.lstrip()
-        if not stripped or stripped.startswith('#'):
-            continue
-        indent = len(raw) - len(stripped)
-        if indent == 0:
-            tooling = stripped.startswith('tooling:')
-            python = False
-            tooling_indent = indent if tooling else None
-            continue
-        if tooling and tooling_indent is not None:
-            if indent <= tooling_indent:
-                tooling = False
-                python = False
-            elif stripped.startswith('python:'):
-                python = True
-                python_indent = indent
-                continue
-        if python and python_indent is not None:
-            if indent <= python_indent:
-                python = False
-            elif stripped.startswith('version:'):
-                value = stripped.split(':', 1)[1].strip().strip("'\"")
-                return value or fallback
-    return fallback
+          def manual_parse(text):
+              fallback = "3.12"
+              lines = text.splitlines()
+              tooling = False
+              python = False
+              tooling_indent = None
+              python_indent = None
+              for line in lines:
+                  raw = line.rstrip("\n")
+                  stripped = raw.lstrip()
+                  if not stripped or stripped.startswith('#'):
+                      continue
+                  indent = len(raw) - len(stripped)
+                  if indent == 0:
+                      tooling = stripped.startswith('tooling:')
+                      python = False
+                      tooling_indent = indent if tooling else None
+                      continue
+                  if tooling and tooling_indent is not None:
+                      if indent <= tooling_indent:
+                          tooling = False
+                          python = False
+                      elif stripped.startswith('python:'):
+                          python = True
+                          python_indent = indent
+                          continue
+                  if python and python_indent is not None:
+                      if indent <= python_indent:
+                          python = False
+                      elif stripped.startswith('version:'):
+                          value = stripped.split(':', 1)[1].strip().strip("'\"")
+                          return value or fallback
+              return fallback
 
-try:
-    with open('.wgx/profile.yml', 'r', encoding='utf-8') as f:
-        content = f.read()
-except FileNotFoundError:
-    content = ''
+          try:
+              with open('.wgx/profile.yml', 'r', encoding='utf-8') as f:
+                  content = f.read()
+          except FileNotFoundError:
+              content = ''
 
-version = "3.12"
-if yaml:
-    try:
-        data = yaml.safe_load(content) or {}
-        version = str(data.get('tooling', {}).get('python', {}).get('version', '3.12'))
-    except Exception:
-        version = manual_parse(content)
-else:
-    version = manual_parse(content)
+          version = "3.12"
+          if yaml:
+              try:
+                  data = yaml.safe_load(content) or {}
+                  version = str(data.get('tooling', {}).get('python', {}).get('version', '3.12'))
+              except Exception:
+                  version = manual_parse(content)
+          else:
+              version = manual_parse(content)
 
-version = '.'.join(version.split('.')[:2]) or '3.12'
-print(version)
-PY
-)"
+          version = '.'.join(version.split('.')[:2]) or '3.12'
+          print(version)
+PYTHON_SCRIPT
+          )"
           else
             WGX_PY="3.12"
           fi
