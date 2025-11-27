@@ -193,7 +193,9 @@ jobs:
             echo "No shell scripts to lint"
             exit 0
           fi
-          # Exclude SC1091 (sourced file not present) and SC2034 (intentional unused variables)
+          # Exclude SC1091 (sourced file not present) and SC2034 (intentional unused variables).
+          # SC2034 is triggered by variables like 'IFS' in scripts/ci-smoke-chat.sh:3,
+          # which are set to affect shell behavior intentionally, even if not referenced later.
           # Adjust excludes as needed. Keep -x so sourced files are followed.
           echo "$files" | xargs -r shellcheck -x --exclude=SC1091,SC2034
 
