@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: write   # erforderlich für Swatinem/rust-cache
 
 env:
   CARGO_TERM_COLOR: always
@@ -23,13 +24,14 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        # Pin to fixed v4.2.2 release to keep builds deterministic
+        uses: actions/checkout@v4.2.2
 
       - name: Install shfmt
         run: sudo apt-get update && sudo apt-get install -y shfmt
 
       - name: Show resolved toolchain
-        run: echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"
+        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -37,7 +39,8 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@v2
+        # Pin to fixed release for reproducibility
+        uses: Swatinem/rust-cache@v2.7.7
         with:
           shared-key: ${{ runner.os }}-hauski-cli-${{ hashFiles('**/Cargo.lock') }}
           cache-on-failure: true
@@ -45,13 +48,14 @@ jobs:
       # Fix: wgx is a shell tool, not a rust crate.
       # Checkout heimgewebe/wgx and add cli/ to PATH.
       - name: Install wgx (Checkout)
-        uses: actions/checkout@v4
+        # Pin to fixed v4.2.2 release to keep builds deterministic
+        uses: actions/checkout@v4.2.2
         with:
           repository: heimgewebe/wgx
           path: wgx-tool
 
       - name: Add wgx to PATH
-        run: echo "${{ github.workspace }}/wgx-tool/cli" >> $GITHUB_PATH
+        run: echo "${{ github.workspace }}/wgx-tool/cli" >> "$GITHUB_PATH"
 
       - name: Build hauski CLI (release, locked)
         run: cargo build --package hauski-cli --release --locked

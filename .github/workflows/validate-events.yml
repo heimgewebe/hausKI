@@ -15,8 +15,9 @@ permissions:
 
 jobs:
   validate-jsonl:
-    if: ${{ hashFiles(matrix.file) != '' }}
-    name: "events.jsonl schema check"
+    # NOTE: hashFiles() cannot use matrix variables at job level.
+    # The reusable workflow should handle missing files gracefully.
+    name: "events.jsonl schema check (${{ matrix.file }})"
     uses: heimgewebe/metarepo/.github/workflows/reusable-validate-jsonl.yml@contracts-v1
     strategy:
       fail-fast: false
