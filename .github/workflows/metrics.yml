@@ -18,7 +18,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # Pin to fixed v4.2.2 release to keep builds deterministic
+        uses: actions/checkout@v4.2.2
 
       - name: Ensure Node for ajv-cli
         uses: actions/setup-node@v4

@@ -81,7 +81,10 @@ jobs:
           # always compare the current HEAD against the latest base_ref, even if the merge base
           # cannot be resolved. This avoids missing changes due to merge-base issues, at the cost
           # of potentially including extra commits if the branch is not directly based on base_ref.
-          git diff --name-only "${base_ref}" HEAD | while IFS= read -r file; do
+          #
+          # NOTE: We use a while loop with process substitution instead of a pipe to avoid
+          # variable assignment in a subshell, which would cause the variables to be lost.
+          while IFS= read -r file || [ -n "$file" ]; do
             [ -z "$file" ] && continue
             case "$file" in
               *.rs|Cargo.toml|Cargo.lock)
@@ -101,7 +104,7 @@ jobs:
             if $rust && $docs && $sh; then
               break
             fi
-          done
+          done < <(git diff --name-only "${base_ref}" HEAD)
 
           {
             printf 'rust=%s\n' "$rust"
@@ -200,7 +203,7 @@ jobs:
         uses: actions/checkout@v4.2.2
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
-      - uses: lycheeverse/lychee-action@cc141a2dd1b94f572cca40a6e7d1c2255b21f621
+      - uses: lycheeverse/lychee-action@v1.10.0
         with:
           args: >-
             --no-progress
@@ -246,7 +249,7 @@ jobs:
           github.event_name == 'merge_group' ||
           github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
-        uses: lycheeverse/lychee-action@cc141a2dd1b94f572cca40a6e7d1c2255b21f621
+        uses: lycheeverse/lychee-action@v1.10.0
         with:
           args: --no-progress --verbose --retry-wait-time 2 --max-redirects 5 -- "**/*.md"
 
