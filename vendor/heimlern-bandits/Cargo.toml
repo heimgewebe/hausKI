@@ -1,0 +1,13 @@
+[package]
+name = "heimlern-bandits"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+description = "Stub heimlern-bandits implementation for policy API"
+
+[dependencies]
+heimlern-core = { path = "../heimlern-core" }
+serde_json = "1"
+
+[lib]
+path = "src/lib.rs"
