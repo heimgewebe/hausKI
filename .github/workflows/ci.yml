@@ -73,6 +73,12 @@ jobs:
           docs=false
           sh=false
 
+          # Use two-dot diff (git diff base_ref HEAD) instead of three-dot (git diff base_ref...HEAD).
+          # This is intentional: in some CI contexts, the merge base may be missing or ambiguous,
+          # especially for PRs from forks or with rebased histories. Using two-dot ensures we
+          # always compare the current HEAD against the latest base_ref, even if the merge base
+          # cannot be resolved. This avoids missing changes due to merge-base issues, at the cost
+          # of potentially including extra commits if the branch is not directly based on base_ref.
           git diff --name-only "${base_ref}" HEAD | while IFS= read -r file; do
             [ -z "$file" ] && continue
             case "$file" in
