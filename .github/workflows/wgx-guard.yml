@@ -169,7 +169,7 @@ jobs:
 
           version = '.'.join(version.split('.')[:2]) or '3.12'
           print(version)
-          PYTHON_SCRIPT
+PYTHON_SCRIPT
           )"
           else
             WGX_PY="3.12"
