@@ -29,7 +29,7 @@ jobs:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: stable
       # Pin to fixed v2.6.0 release to keep builds deterministic
-      - uses: Swatinem/rust-cache@v2.6.0
+      - uses: Swatinem/rust-cache@v2.7.7
         with:
           workspaces: .
       - name: Prepare lockfile (CI-only)
