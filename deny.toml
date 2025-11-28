@@ -11,9 +11,6 @@ vulnerability = "deny"
 unmaintained = "deny"
 unsound = "deny"
 yanked = "warn"
-# Warn on index errors (e.g., unable to check for yanked crates due to network issues)
-# to avoid build failures from transient registry access problems.
-index-failure = "warn"
 ignore = []
 
 [licenses]
