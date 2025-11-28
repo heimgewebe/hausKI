@@ -62,7 +62,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Fetch workspace crates index
-        run: cargo fetch --locked --workspace
+        run: cargo fetch --locked
 
       - name: Debug deny config (schema v2)
         run: |
@@ -113,7 +113,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Fetch workspace crates index
-        run: cargo fetch --locked --workspace
+        run: cargo fetch --locked
 
       - name: Dump deny.toml (debug)
         run: |
