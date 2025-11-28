@@ -15,7 +15,7 @@ resolver = "2"
 edition = "2021"
 
 [workspace.dependencies]
-anyhow = "1"
+anyhow = "1.0.100"
 thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "ansi"] }
@@ -47,9 +47,9 @@ hostname = "0.4"
 ulid = "1"
 
 [patch.crates-io]
-# Force all crates in this workspace to use the vendored minimal anyhow
-# implementation under vendor/anyhow instead of pulling from crates.io.
-# This keeps offline builds deterministic.
+# Keep selected crates pinned to vendored stubs for offline builds. We retain
+# a minimal local shim for `anyhow` instead of vendoring the full upstream
+# crate to avoid future drift between manual edits and cargo-vendor output.
 anyhow = { path = "vendor/anyhow" }
 signal-hook-registry = { path = "vendor/signal-hook-registry" }
 hostname = { path = "vendor/hostname" }
