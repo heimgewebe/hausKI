@@ -1,3 +1,10 @@
+# Dieses Repo ist Teil des Heimgewebes.
+# Systemweiter Kontext durch Heimgeist:
+#   metarepo/ai-contexts/heimgeist.ai-context.yml
+
+system_context:
+  heimgeist: "../metarepo/ai-contexts/heimgeist.ai-context.yml"
+
 ai_context_version: 1.0
 
 project:
