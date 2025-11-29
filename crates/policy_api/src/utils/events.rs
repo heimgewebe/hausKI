@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::{
     fs::{create_dir_all, OpenOptions},
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 pub fn write_event_line(kind: &str, payload: &Value) {
@@ -18,7 +18,7 @@ pub fn write_event_line(kind: &str, payload: &Value) {
         return;
     }
 
-    let file = dir.join(format!("{}.jsonl", Local::now().format("%Y-%m")));
+    let file_path = dir.join(format!("{}.jsonl", Local::now().format("%Y-%m")));
     let id = ulid::Ulid::new().to_string();
     let ts = Utc::now().timestamp_millis();
     let node_id = hostname::get()
@@ -32,7 +32,23 @@ pub fn write_event_line(kind: &str, payload: &Value) {
         "payload": payload,
     });
 
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(file) {
-        let _ = writeln!(file, "{line}");
+    match serde_json::to_string(&line) {
+        Ok(json_line) => {
+            if let Err(err) = append_line(&file_path, &json_line) {
+                eprintln!(
+                    "failed to write event line to {}: {err}",
+                    file_path.display()
+                );
+            }
+        }
+        Err(err) => {
+            eprintln!("failed to serialize event payload: {err}");
+        }
     }
+}
+
+fn append_line(path: &Path, line: &str) -> std::io::Result<()> {
+    let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+    writeln!(file, "{line}")?;
+    Ok(())
 }
