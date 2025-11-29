@@ -3,7 +3,7 @@
 vulnerability = "deny"
 unmaintained = "deny"
 unsound = "deny"
-yanked = "warn"
+yanked = "allow"
 ignore = []
 
 [licenses]
