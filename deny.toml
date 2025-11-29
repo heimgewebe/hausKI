@@ -1,8 +1,6 @@
 [graph]
-targets = [
-    { triple = "x86_64-unknown-linux-gnu" },
-    { triple = "aarch64-unknown-linux-gnu" },
-]
+output = "graph.svg"
+targets = ["all"]
 
 [advisories]
 version = 2
