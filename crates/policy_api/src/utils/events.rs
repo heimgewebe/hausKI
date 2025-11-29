@@ -5,6 +5,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+use tracing::warn;
 
 pub fn write_event_line(kind: &str, payload: &Value) {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
@@ -14,7 +15,7 @@ pub fn write_event_line(kind: &str, payload: &Value) {
     let dir = base.join("events");
 
     if let Err(err) = create_dir_all(&dir) {
-        eprintln!("failed to create event directory: {err}");
+        warn!(error = %err, "failed to create event directory");
         return;
     }
 
@@ -35,14 +36,15 @@ pub fn write_event_line(kind: &str, payload: &Value) {
     match serde_json::to_string(&line) {
         Ok(json_line) => {
             if let Err(err) = append_line(&file_path, &json_line) {
-                eprintln!(
-                    "failed to write event line to {}: {err}",
-                    file_path.display()
+                warn!(
+                    path = %file_path.display(),
+                    error = %err,
+                    "failed to write event line"
                 );
             }
         }
         Err(err) => {
-            eprintln!("failed to serialize event payload: {err}");
+            warn!(error = %err, "failed to serialize event payload");
         }
     }
 }
