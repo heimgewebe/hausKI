@@ -2,13 +2,14 @@
 name = "anyhow"
 version = "1.0.100"
 edition = "2021"
+description = "Workspace-local minimal anyhow-compatible stub for offline builds"
 license = "MIT OR Apache-2.0"
-description = "Minimal stub implementation of anyhow for offline builds"
+authors = ["HausKI developers"]
 
 [lib]
 path = "src/lib.rs"
 
 [features]
-default = []
-backtrace = []
+default = ["std"]
 std = []
+backtrace = []

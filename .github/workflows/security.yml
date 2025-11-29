@@ -50,6 +50,20 @@ jobs:
           cargo install cargo-deny --locked --force --version '^0.15'
           cargo deny --version
 
+      - name: Cache cargo registry and git index
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Fetch workspace crates index
+        run: cargo fetch --locked
+
       - name: Debug deny config (schema v2)
         run: |
           echo "=== deny.toml (first 200 lines) ==="
@@ -86,6 +100,20 @@ jobs:
         run: |
           cargo install cargo-deny --locked --force --version '^0.15'
           cargo deny --version
+
+      - name: Cache cargo registry and git index
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Fetch workspace crates index
+        run: cargo fetch --locked
 
       - name: Dump deny.toml (debug)
         run: |
