@@ -4,10 +4,6 @@ targets = [
     { triple = "aarch64-unknown-linux-gnu" },
 ]
 
-# Configure network behavior (allow offline checks to prevent failures if index is unreachable)
-[network]
-allow-offline = true
-
 [advisories]
 version = 2
 # Explicitly deny vulnerable, unmaintained, and unsound dependencies for strong security posture.
