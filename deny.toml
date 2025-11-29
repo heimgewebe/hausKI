@@ -50,7 +50,8 @@ unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = []
 
-# Lizenz-Mapping/Exceptions für verbreitete Kombis (nur falls nötig):
+# Lizenz-Mapping/Exceptions für verbreitete Kombis (nur falls nötig). Dieser Block muss am
+# Ende der Datei stehen; keine weiteren Konfigurationen danach platzieren.
 [[licenses.exceptions]]
 name = "ring"
 allowed = ["MIT", "ISC", "OpenSSL"]
