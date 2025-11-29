@@ -6,7 +6,7 @@ targets = [
 
 # Configure network behavior (allow offline checks to prevent failures if index is unreachable)
 [network]
-allow-offline = true
+offline = true
 
 [advisories]
 version = 2
@@ -59,8 +59,8 @@ allow-git = []
 # Lizenz-Mapping/Exceptions für verbreitete Kombis (nur falls nötig):
 [[licenses.exceptions]]
 name = "ring"
-allow = ["MIT", "ISC", "OpenSSL"]
+allowed = ["MIT", "ISC", "OpenSSL"]
 
 [[licenses.exceptions]]
 name = "openssl"
-allow = ["Apache-2.0", "OpenSSL"]
+allowed = ["Apache-2.0", "OpenSSL"]
