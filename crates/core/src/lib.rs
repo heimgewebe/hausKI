@@ -263,7 +263,14 @@ impl AppState {
 
     fn encode_metrics(&self) -> Result<String, std::fmt::Error> {
         let mut body = String::new();
-        let registry = self.0.registry.lock().unwrap();
+        let registry = self
+            .0
+            .registry
+            .lock()
+            .map_err(|e| {
+                tracing::error!(error = ?e, "metrics registry lock poisoned");
+                std::fmt::Error
+            })?;
         encode(&mut body, &registry)?;
         Ok(body)
     }
@@ -587,7 +594,11 @@ pub fn build_app_with_state(
         let expired_c = PromCounter::default();
         let manual_c = PromCounter::default();
 
-        let mut registry = state.0.registry.lock().unwrap();
+        let mut registry = state
+            .0
+            .registry
+            .lock()
+            .expect("failed to acquire registry lock during memory metrics registration");
         registry.register_with_unit(
             "memory_items_pinned",
             "Number of pinned items in hauski-memory",
