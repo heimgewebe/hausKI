@@ -55,5 +55,6 @@ node_modules/
 observability/k6/summary.json
 .lycheecache
 .hauski-reports
+sichter-reports
 artifacts/
 metrics.json
