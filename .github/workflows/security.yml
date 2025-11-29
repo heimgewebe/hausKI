@@ -57,12 +57,16 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
+            ~/.cargo/advisory-db
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
 
       - name: Fetch workspace crates index
         run: cargo fetch --locked
+
+      - name: Fetch advisory database
+        run: cargo deny fetch db
 
       - name: Debug deny config (schema v2)
         run: |
@@ -73,9 +77,9 @@ jobs:
       - name: cargo-deny (conditional)
         run: |
           if [ -f deny.toml ]; then
-            cargo deny check advisories
-            cargo deny check bans
-            cargo deny check licenses
+            cargo deny --offline check advisories
+            cargo deny --offline check bans
+            cargo deny --offline check licenses
           else
             echo "skip cargo-deny (deny.toml not found)"
           fi
