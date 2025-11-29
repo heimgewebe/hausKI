@@ -199,7 +199,7 @@ pub async fn assist_handler(
     let mode = route_mode(&req.question, &req.mode);
 
     // TODO(Phase 2): Für "code" Tooling-Hooks ergänzen.
-    let answer = format!("Router wählte {}. (MVP-Stub)", mode);
+    let answer = format!("Router wählte {mode}. (MVP-Stub)");
 
     // Knowledge-Modus: versuche Top-K aus /index/search; bei Fehler → leere Liste (MVP-Fallback)
     let citations = if mode == "knowledge" {

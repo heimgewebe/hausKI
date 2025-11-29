@@ -41,7 +41,7 @@ pub async fn call_ollama_chat(
         .json(&request)
         .send()
         .await
-        .with_context(|| format!("POST {}", url))?;
+        .with_context(|| format!("POST {url}"))?;
 
     if !response.status().is_success() {
         return Err(anyhow!("upstream status {}", response.status()));

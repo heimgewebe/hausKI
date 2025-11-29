@@ -430,7 +430,7 @@ mod tests {
         state
             .upsert(UpsertRequest {
                 doc_id: "doc-empty".into(),
-                namespace: "".into(),
+                namespace: String::new(),
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-empty#0".into()),
                     text: Some("Hello default namespace".into()),

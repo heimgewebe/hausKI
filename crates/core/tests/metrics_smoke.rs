@@ -44,8 +44,7 @@ async fn metrics_endpoint_exposes_prometheus_text() {
         .to_lowercase();
     assert!(
         ctype.contains("text/plain"),
-        "unexpected content-type: {}",
-        ctype
+        "unexpected content-type: {ctype}"
     );
 
     let body = resp.text().await.expect("reading response body failed");
