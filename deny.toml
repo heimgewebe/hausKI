@@ -4,10 +4,6 @@ targets = [
     { triple = "aarch64-unknown-linux-gnu" },
 ]
 
-# Configure network behavior (allow offline checks to prevent failures if index is unreachable)
-[network]
-offline = true
-
 [advisories]
 version = 2
 # Explicitly deny vulnerable, unmaintained, and unsound dependencies for strong security posture.
@@ -59,8 +55,8 @@ allow-git = []
 # Lizenz-Mapping/Exceptions für verbreitete Kombis (nur falls nötig):
 [[licenses.exceptions]]
 name = "ring"
-allowed = ["MIT", "ISC", "OpenSSL"]
+allow = ["MIT", "ISC", "OpenSSL"]
 
 [[licenses.exceptions]]
 name = "openssl"
-allowed = ["Apache-2.0", "OpenSSL"]
+allow = ["Apache-2.0", "OpenSSL"]
