@@ -139,9 +139,9 @@ fn main() -> Result<()> {
 
 fn run_playbook(playbook_path: &str) -> Result<()> {
     let content = std::fs::read_to_string(playbook_path)
-        .with_context(|| format!("Could not read playbook file: {}", playbook_path))?;
+        .with_context(|| format!("Could not read playbook file: {playbook_path}"))?;
     let playbook: serde_yaml::Value = serde_yaml::from_str(&content)
-        .with_context(|| format!("Could not parse playbook file: {}", playbook_path))?;
+        .with_context(|| format!("Could not parse playbook file: {playbook_path}"))?;
 
     if let Some(steps) = playbook.get("steps").and_then(|s| s.as_sequence()) {
         for (i, step) in steps.iter().enumerate() {
@@ -151,7 +151,7 @@ fn run_playbook(playbook_path: &str) -> Result<()> {
                     .arg("-c")
                     .arg(run_cmd)
                     .output()
-                    .with_context(|| format!("Failed to execute command: {}", run_cmd))?;
+                    .with_context(|| format!("Failed to execute command: {run_cmd}"))?;
 
                 if !output.status.success() {
                     bail!(
