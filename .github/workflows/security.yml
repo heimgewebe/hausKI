@@ -45,9 +45,9 @@ jobs:
         run: bash scripts/ensure-vendor.sh
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
-      - name: Install cargo-deny (supports config v2)
+      - name: Install cargo-deny
         run: |
-          cargo install cargo-deny --locked --force --version '^0.15'
+          cargo install cargo-deny --locked --force --version '0.15.1'
           cargo deny --version
 
       - name: Cache cargo registry and git index
@@ -100,9 +100,9 @@ jobs:
         run: bash scripts/ensure-vendor.sh
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
-      - name: Install cargo-deny (supports config v2)
+      - name: Install cargo-deny
         run: |
-          cargo install cargo-deny --locked --force --version '^0.15'
+          cargo install cargo-deny --locked --force --version '0.15.1'
           cargo deny --version
 
       - name: Cache cargo registry and git index
