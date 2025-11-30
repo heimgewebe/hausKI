@@ -86,7 +86,8 @@ fn raw_host_segment(url: &str) -> Option<&str> {
     let (_, remainder) = url.split_once("://")?;
     let end = remainder
         .char_indices()
-        .find(|(_, ch)| matches!(ch, '/' | '?' | '#')).map_or_else(|| remainder.len(), |(idx, _)| idx);
+        .find(|(_, ch)| matches!(ch, '/' | '?' | '#'))
+        .map_or_else(|| remainder.len(), |(idx, _)| idx);
     let authority = &remainder[..end];
     if authority.is_empty() {
         return None;

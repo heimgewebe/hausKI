@@ -114,8 +114,8 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
 
     // ensure schema exists
     {
-        let conn =
-            Connection::open(&db_path).with_context(|| format!("open sqlite at {}", db_path.display()))?;
+        let conn = Connection::open(&db_path)
+            .with_context(|| format!("open sqlite at {}", db_path.display()))?;
         conn.execute_batch(
             r"
             PRAGMA journal_mode=WAL;

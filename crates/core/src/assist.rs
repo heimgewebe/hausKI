@@ -142,7 +142,10 @@ fn extract_citations_from_value(v: &serde_json::Value) -> Vec<AssistCitation> {
                 .or_else(|| it.get("id"))
                 .and_then(|x| x.as_str())
                 .map(std::string::ToString::to_string)?;
-            let score = it.get("score").and_then(serde_json::Value::as_f64).map(|f| f as f32);
+            let score = it
+                .get("score")
+                .and_then(serde_json::Value::as_f64)
+                .map(|f| f as f32);
             Some(AssistCitation { title, score })
         })
         .collect()
