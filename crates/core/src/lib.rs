@@ -1,3 +1,8 @@
+//! HausKI Core Service.
+//!
+//! Dieses Modul implementiert den zentralen HTTP-Server für HausKI,
+//! einschließlich Chat-API, Indexierung, Memory-Verwaltung und Policy-Integration.
+
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::FromRef;
 use axum::{

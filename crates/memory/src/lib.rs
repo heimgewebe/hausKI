@@ -1,3 +1,8 @@
+//! Persistenter Key-Value-Store mit TTL-Support für HausKI.
+//!
+//! Dieses Modul stellt einen SQLite-basierten Key-Value-Store bereit,
+//! der automatisches Verfallen von Einträgen (TTL) und Prometheus-Metriken unterstützt.
+
 use std::{
     borrow::Cow,
     fmt,

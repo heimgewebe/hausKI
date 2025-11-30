@@ -1,3 +1,8 @@
+//! Indizierungs- und Suchmodul für HausKI.
+//!
+//! Dieses Modul stellt einen In-Memory-Index für Dokumente und Chunks bereit,
+//! mit Unterstützung für Namespaces und semantische Suche.
+
 use axum::{
     extract::{FromRef, State},
     http::{Method, StatusCode},
