@@ -9,9 +9,8 @@ use tracing::warn;
 
 pub fn write_event_line(kind: &str, payload: &Value) {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    let base: PathBuf = std::env::var("HAUSKI_DATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| home.join(".hauski"));
+    let base: PathBuf =
+        std::env::var("HAUSKI_DATA").map_or_else(|_| home.join(".hauski"), PathBuf::from);
     let dir = base.join("events");
 
     if let Err(err) = create_dir_all(&dir) {

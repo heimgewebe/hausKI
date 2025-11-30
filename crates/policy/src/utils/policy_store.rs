@@ -17,13 +17,13 @@ fn conn() -> rusqlite::Result<Connection> {
     }
     let c = Connection::open(p)?;
     c.execute_batch(
-        r#"
+        r"
         CREATE TABLE IF NOT EXISTS policy_param (
           name TEXT PRIMARY KEY,
           snapshot_json TEXT NOT NULL,
           updated_at INTEGER NOT NULL
         );
-    "#,
+    ",
     )?;
     Ok(c)
 }

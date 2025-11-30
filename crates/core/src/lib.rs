@@ -87,7 +87,7 @@ static MEMORY_ITEMS_UNPINNED_GAUGE: OnceCell<PromGauge> = OnceCell::new();
 static MEMORY_EVICTIONS_EXPIRED: OnceCell<PromCounter> = OnceCell::new();
 static MEMORY_EVICTIONS_MANUAL: OnceCell<PromCounter> = OnceCell::new();
 
-/// Inkrement aus dem /memory/evict-Handler (ohne AppState zu ändern).
+/// Inkrement aus dem /memory/evict-Handler (ohne `AppState` zu ändern).
 pub(crate) fn record_memory_manual_eviction() {
     if let Some(c) = MEMORY_EVICTIONS_MANUAL.get() {
         c.inc();

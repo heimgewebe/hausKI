@@ -525,7 +525,7 @@ mod tests {
         guard: std::sync::MutexGuard<'a, Vec<u8>>,
     }
 
-    impl<'a> Write for SharedWriterGuard<'a> {
+    impl Write for SharedWriterGuard<'_> {
         fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
             self.guard.write(buf)
         }

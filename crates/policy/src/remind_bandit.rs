@@ -95,8 +95,8 @@ impl RemindBandit {
 
     fn best_action(&self) -> Option<String> {
         self.actions.iter().cloned().max_by(|a, b| {
-            let left = self.stats.get(a).map(|s| s.average()).unwrap_or_default();
-            let right = self.stats.get(b).map(|s| s.average()).unwrap_or_default();
+            let left = self.stats.get(a).map(ArmStats::average).unwrap_or_default();
+            let right = self.stats.get(b).map(ArmStats::average).unwrap_or_default();
             left.partial_cmp(&right).unwrap_or(Ordering::Equal)
         })
     }
