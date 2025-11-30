@@ -441,8 +441,15 @@ fn resolve_bind_addr(bind_override: Option<String>, expose_config: bool) -> Resu
 
 async fn shutdown_signal() {
     let ctrl_c = async {
-        if let Err(e) = signal::ctrl_c().await {
-            warn!("Failed to install Ctrl+C handler: {}", e);
+        match signal::ctrl_c().await {
+            Ok(()) => {
+                info!("Ctrl+C empfangen");
+            }
+            Err(e) => {
+                warn!("Failed to install Ctrl+C handler: {}", e);
+                // Keep waiting indefinitely if signal handler fails
+                std::future::pending::<()>().await
+            }
         }
     };
 
@@ -451,9 +458,12 @@ async fn shutdown_signal() {
         match signal::unix::signal(signal::unix::SignalKind::terminate()) {
             Ok(mut sig) => {
                 sig.recv().await;
+                info!("SIGTERM empfangen");
             }
             Err(e) => {
                 warn!("Failed to install SIGTERM handler: {}", e);
+                // Keep waiting indefinitely if signal handler fails
+                std::future::pending::<()>().await
             }
         }
     };
