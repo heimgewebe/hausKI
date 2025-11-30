@@ -16,11 +16,10 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   # Provide toolchain variable from input or fallback to stable.
-  # `inputs.toolchain` would be set if this workflow is invoked via workflow_call (not currently supported),
-  # `github.event.inputs.toolchain` is set for workflow_dispatch.
-  # The fallback chain matches ci.yml for consistency.
-  toolchain: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
-  RUST_TOOLCHAIN: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
+  # Using vars.RUST_TOOLCHAIN allows overriding the toolchain via repository variables,
+  # otherwise defaulting to stable. This avoids issues with undefined inputs in PR triggers.
+  toolchain: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
+  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
 
 jobs:
   gate:
