@@ -110,12 +110,12 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
         .db_path
         .unwrap_or_else(|| base.join("hauski").join("memory.db"));
     std::fs::create_dir_all(db_path.parent().unwrap())
-        .with_context(|| format!("create parent dir for {db_path:?}"))?;
+        .with_context(|| format!("create parent dir for {}", db_path.display()))?;
 
     // ensure schema exists
     {
         let conn =
-            Connection::open(&db_path).with_context(|| format!("open sqlite at {db_path:?}"))?;
+            Connection::open(&db_path).with_context(|| format!("open sqlite at {}", db_path.display()))?;
         conn.execute_batch(
             r"
             PRAGMA journal_mode=WAL;

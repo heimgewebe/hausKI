@@ -126,7 +126,7 @@ fn main() -> Result<()> {
         },
         Commands::Config { cmd } => match cmd {
             ConfigCmd::Validate { file } => {
-                validate_config(file)?;
+                validate_config(&file)?;
             }
         },
         Commands::Assist { playbook } => {
@@ -170,6 +170,28 @@ fn run_playbook(playbook_path: &str) -> Result<()> {
 
 // ---- Modelle (nutzt hauski_core::ModelsFile) ----
 
+fn build_table_separator(widths: &[usize; 4]) -> String {
+    let mut parts = Vec::with_capacity(widths.len());
+    for &width in widths {
+        parts.push("-".repeat(width + 2));
+    }
+    format!("+{}+", parts.join("+"))
+}
+
+fn format_table_row(columns: [&str; 4], widths: &[usize; 4]) -> String {
+    let mut formatted = String::new();
+    formatted.push('|');
+    for (idx, column) in columns.iter().enumerate() {
+        let width = widths[idx];
+        formatted.push(' ');
+        formatted.push_str(column);
+        let padding = width.saturating_sub(column.chars().count());
+        formatted.push_str(&" ".repeat(padding + 1));
+        formatted.push('|');
+    }
+    formatted
+}
+
 fn print_models_table(file: &ModelsFile) {
     if file.models.is_empty() {
         println!("Keine Modelle in der Konfiguration gefunden.");
@@ -200,37 +222,15 @@ fn print_models_table(file: &ModelsFile) {
         rows.push(row);
     }
 
-    fn build_separator(widths: &[usize; 4]) -> String {
-        let mut parts = Vec::with_capacity(widths.len());
-        for &width in widths {
-            parts.push("-".repeat(width + 2));
-        }
-        format!("+{}+", parts.join("+"))
-    }
-
-    fn format_row(columns: [&str; 4], widths: &[usize; 4]) -> String {
-        let mut formatted = String::new();
-        formatted.push('|');
-        for (idx, column) in columns.iter().enumerate() {
-            let width = widths[idx];
-            formatted.push(' ');
-            formatted.push_str(column);
-            let padding = width.saturating_sub(column.chars().count());
-            formatted.push_str(&" ".repeat(padding + 1));
-            formatted.push('|');
-        }
-        formatted
-    }
-
-    let separator = build_separator(&widths);
+    let separator = build_table_separator(&widths);
     println!("{separator}");
-    println!("{}", format_row(HEADERS, &widths));
+    println!("{}", format_table_row(HEADERS, &widths));
     println!("{separator}");
 
     for row in &rows {
         println!(
             "{}",
-            format_row(
+            format_table_row(
                 [
                     row[0].as_str(),
                     row[1].as_str(),
@@ -277,8 +277,8 @@ struct PluginsConfig {
     enabled: Option<Vec<String>>,
 }
 
-fn validate_config(file: String) -> Result<()> {
-    let expanded_path = shellexpand::full(&file)?;
+fn validate_config(file: &str) -> Result<()> {
+    let expanded_path = shellexpand::full(file)?;
     let path = PathBuf::from(expanded_path.as_ref());
     if !path.exists() {
         bail!("Konfigurationsdatei {} existiert nicht", path.display());
