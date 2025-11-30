@@ -1,3 +1,8 @@
+//! Contextual bandit implementation for policy decisions.
+//!
+//! This module implements a simple epsilon-greedy contextual bandit algorithm
+//! for making and learning from policy decisions over time.
+
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
@@ -20,6 +25,10 @@ impl ArmStats {
     }
 }
 
+/// A contextual bandit that uses epsilon-greedy exploration.
+///
+/// The bandit maintains statistics for each action and chooses actions
+/// based on their historical performance, with occasional random exploration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemindBandit {
     actions: Vec<String>,
@@ -47,30 +56,46 @@ impl Default for RemindBandit {
     }
 }
 
+/// Context information for making a policy decision.
 #[derive(Debug, Clone)]
 pub struct DecisionContext {
+    /// The type of decision being made.
     pub kind: String,
+    /// Feature vector for the decision.
     pub features: Value,
 }
 
+/// The outcome of a policy decision.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecisionOutcome {
+    /// The action that was chosen.
     pub action: String,
+    /// Additional parameters for the action.
     #[serde(default)]
     pub parameters: Value,
 }
 
 impl RemindBandit {
+    /// Loads bandit state from a JSON snapshot.
+    ///
+    /// If the snapshot cannot be deserialized, the bandit state remains unchanged.
     pub fn load(&mut self, snapshot: Value) {
         if let Ok(loaded) = serde_json::from_value::<Self>(snapshot) {
             *self = loaded;
         }
     }
 
+    /// Creates a JSON snapshot of the current bandit state.
+    ///
+    /// Returns an empty object if serialization fails.
     pub fn snapshot(&self) -> Value {
         serde_json::to_value(self).unwrap_or_else(|_| json!({}))
     }
 
+    /// Makes a decision based on the given context.
+    ///
+    /// Chooses the action with the highest average reward. If no statistics
+    /// are available, falls back to the first action in the action list.
     pub fn decide(&mut self, ctx: &DecisionContext) -> DecisionOutcome {
         let _ = ctx;
         let action = self.best_action().unwrap_or_else(|| {
@@ -86,6 +111,15 @@ impl RemindBandit {
         }
     }
 
+    /// Provides feedback about a decision.
+    ///
+    /// Updates the statistics for the given action with the observed reward.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context in which the decision was made (currently unused)
+    /// * `action` - The action that was taken
+    /// * `reward` - The reward observed for this action
     pub fn feedback(&mut self, ctx: &DecisionContext, action: &str, reward: f32) {
         let _ = ctx;
         let entry = self.stats.entry(action.to_string()).or_default();

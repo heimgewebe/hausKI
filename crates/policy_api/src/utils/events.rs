@@ -1,3 +1,8 @@
+//! Event logging utilities for policy decisions.
+//!
+//! This module provides functionality to write structured event logs
+//! in JSONL format for auditing and analysis purposes.
+
 use chrono::{Local, Utc};
 use serde_json::Value;
 use std::{
@@ -7,6 +12,19 @@ use std::{
 };
 use tracing::warn;
 
+/// Writes an event line to the events log file.
+///
+/// Events are written to `$HAUSKI_DATA/events/YYYY-MM.jsonl` (or `~/.hauski/events/YYYY-MM.jsonl`
+/// if `HAUSKI_DATA` is not set). Each event includes an ID, timestamp, node ID, kind, and payload.
+///
+/// # Arguments
+///
+/// * `kind` - The type of event being logged
+/// * `payload` - JSON value containing event-specific data
+///
+/// # Panics
+///
+/// This function does not panic. Errors are logged as warnings and do not propagate.
 pub fn write_event_line(kind: &str, payload: &Value) {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
     let base: PathBuf =
