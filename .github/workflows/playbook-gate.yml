@@ -15,9 +15,12 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # Provide toolchain variable from input or fallback to stable
-  toolchain: ${{ github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
-  RUST_TOOLCHAIN: ${{ github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
+  # Provide toolchain variable from input or fallback to stable.
+  # `inputs.toolchain` would be set if this workflow is invoked via workflow_call (not currently supported),
+  # `github.event.inputs.toolchain` is set for workflow_dispatch.
+  # The fallback chain matches ci.yml for consistency.
+  toolchain: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
+  RUST_TOOLCHAIN: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
 
 jobs:
   gate:
