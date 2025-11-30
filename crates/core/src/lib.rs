@@ -263,11 +263,13 @@ impl AppState {
 
     fn encode_metrics(&self) -> Result<String, std::fmt::Error> {
         let mut body = String::new();
-        let registry = self
-            .0
-            .registry
-            .lock()
-            .expect("metrics registry lock poisoned");
+        let registry = match self.0.registry.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                tracing::error!(error = ?poisoned, "metrics registry lock poisoned – using inner value");
+                poisoned.into_inner()
+            }
+        };
         encode(&mut body, &registry)?;
         Ok(body)
     }
@@ -595,7 +597,7 @@ pub fn build_app_with_state(
             .0
             .registry
             .lock()
-            .expect("metrics registry lock poisoned during memory metrics setup");
+            .expect("failed to acquire registry lock during memory metrics registration");
         registry.register_with_unit(
             "memory_items_pinned",
             "Number of pinned items in hauski-memory",
