@@ -23,7 +23,7 @@ fn normalize_namespace(input: &str) -> String {
     }
 }
 
-fn resolve_namespace<'a>(namespace: Option<&'a str>) -> Cow<'a, str> {
+fn resolve_namespace(namespace: Option<&str>) -> Cow<'_, str> {
     match namespace {
         Some(raw) => Cow::Owned(normalize_namespace(raw)),
         None => Cow::Borrowed(DEFAULT_NAMESPACE),
@@ -131,10 +131,10 @@ impl IndexState {
                         .unwrap_or_else(|| format!("{}#{idx}", doc.doc_id)),
                     score,
                     text: text.clone(),
-                    meta: if !chunk.meta.is_null() {
-                        chunk.meta.clone()
-                    } else {
+                    meta: if chunk.meta.is_null() {
                         doc.meta.clone()
+                    } else {
+                        chunk.meta.clone()
                     },
                 });
             }

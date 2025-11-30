@@ -25,7 +25,7 @@ pub struct MemoryLabels<'a> {
     pub namespace: Cow<'a, str>,
     pub layer: Cow<'a, str>,
 }
-impl<'a> EncodeLabelSet for MemoryLabels<'a> {
+impl EncodeLabelSet for MemoryLabels<'_> {
     fn encode(&self, encoder: &mut LabelSetEncoder) -> fmt::Result {
         use prometheus_client::encoding::EncodeLabel;
         ("namespace", self.namespace.as_ref()).encode(encoder.encode_label())?;
@@ -38,7 +38,7 @@ impl<'a> EncodeLabelSet for MemoryLabels<'a> {
 pub struct EvictLabels<'a> {
     pub reason: Cow<'a, str>, // "expired" | "manual"
 }
-impl<'a> EncodeLabelSet for EvictLabels<'a> {
+impl EncodeLabelSet for EvictLabels<'_> {
     fn encode(&self, encoder: &mut LabelSetEncoder) -> fmt::Result {
         use prometheus_client::encoding::EncodeLabel;
         ("reason", self.reason.as_ref()).encode(encoder.encode_label())?;
@@ -67,7 +67,7 @@ pub struct Stats {
 
 #[derive(Clone, Debug)]
 pub struct MemoryConfig {
-    /// Optionaler Pfad zur DB-Datei. Default: $XDG_STATE_HOME/hauski/memory.db
+    /// Optionaler Pfad zur DB-Datei. Default: $`XDG_STATE_HOME/hauski/memory.db`
     pub db_path: Option<PathBuf>,
     /// Janitor-Intervall in Sekunden (Default 60).
     pub janitor_interval_secs: u64,
@@ -117,7 +117,7 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
         let conn =
             Connection::open(&db_path).with_context(|| format!("open sqlite at {db_path:?}"))?;
         conn.execute_batch(
-            r#"
+            r"
             PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS memory_items(
                 key TEXT PRIMARY KEY,
@@ -127,7 +127,7 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
                 created_ts TEXT NOT NULL,
                 updated_ts TEXT NOT NULL
             );
-            "#,
+            ",
         )?;
     }
 
@@ -159,7 +159,7 @@ impl MemoryStore {
         pinned: Option<bool>,
     ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
-        let pinned_i = if pinned.unwrap_or(false) { 1 } else { 0 };
+        let pinned_i = i32::from(pinned.unwrap_or(false));
         let conn = Connection::open(&self.db_path)?;
 
         // Bewahre created_ts, wenn vorhanden; sonst jetzt
@@ -173,13 +173,13 @@ impl MemoryStore {
         let created_ts = created.unwrap_or_else(|| now.clone());
 
         conn.execute(
-            r#"INSERT INTO memory_items(key,value,ttl_sec,pinned,created_ts,updated_ts)
+            r"INSERT INTO memory_items(key,value,ttl_sec,pinned,created_ts,updated_ts)
                 VALUES (?1,?2,?3,?4,?5,?6)
                 ON CONFLICT(key) DO UPDATE SET
                     value=excluded.value,
                     ttl_sec=excluded.ttl_sec,
                     pinned=excluded.pinned,
-                    updated_ts=excluded.updated_ts;"#,
+                    updated_ts=excluded.updated_ts;",
             params![key, value, ttl_sec, pinned_i, created_ts, now],
         )?;
 
@@ -195,8 +195,8 @@ impl MemoryStore {
         let conn = Connection::open(&self.db_path)?;
         let row = conn
             .query_row(
-                r#"SELECT key, value, ttl_sec, pinned, created_ts, updated_ts
-                    FROM memory_items WHERE key=?1"#,
+                r"SELECT key, value, ttl_sec, pinned, created_ts, updated_ts
+                    FROM memory_items WHERE key=?1",
                 params![key],
                 |r| {
                     let pinned_i: i64 = r.get(3)?;
@@ -265,10 +265,10 @@ async fn janitor_task(db_path: PathBuf, every_secs: u64) {
         if let Ok(conn) = Connection::open(&db_path) {
             // Lösche abgelaufene TTLs, wenn nicht gepinnt
             let n = conn.execute(
-                r#"DELETE FROM memory_items
+                r"DELETE FROM memory_items
                     WHERE pinned=0
                         AND ttl_sec IS NOT NULL
-                        AND (strftime('%s','now') - strftime('%s', updated_ts)) > ttl_sec"#,
+                        AND (strftime('%s','now') - strftime('%s', updated_ts)) > ttl_sec",
                 [],
             );
             if let Ok(count) = n {
@@ -286,7 +286,7 @@ mod tests {
     use std::time::Duration;
 
     /// Test-interne Hilfsfunktion, die einen isolierten Store für jeden Test erstellt.
-    /// Gibt den Store und das TempDir zurück, um dessen Lebensdauer an den Test zu binden.
+    /// Gibt den Store und das `TempDir` zurück, um dessen Lebensdauer an den Test zu binden.
     fn test_store(janitor_interval_secs: u64) -> (MemoryStore, tempfile::TempDir) {
         let tmp = tempfile::tempdir().unwrap();
         let db_path = tmp.path().join("m.db");
@@ -295,12 +295,12 @@ mod tests {
         {
             let conn = Connection::open(&db_path).unwrap();
             conn.execute_batch(
-                r#"
+                r"
                 PRAGMA journal_mode=WAL;
                 CREATE TABLE IF NOT EXISTS memory_items(
                     key TEXT PRIMARY KEY, value BLOB NOT NULL, ttl_sec INTEGER NULL,
                     pinned INTEGER NOT NULL DEFAULT 0, created_ts TEXT NOT NULL, updated_ts TEXT NOT NULL
-                );"#,
+                );",
             )
             .unwrap();
         }

@@ -41,7 +41,7 @@ enum Commands {
         #[command(subcommand)]
         cmd: AsrCmd,
     },
-    /// Audio-Profile (PipeWire)
+    /// Audio-Profile (`PipeWire`)
     Audio {
         #[command(subcommand)]
         cmd: AudioCmd,
@@ -116,12 +116,12 @@ fn main() -> Result<()> {
         }
         Commands::Asr { cmd } => match cmd {
             AsrCmd::Transcribe { input, model, out } => {
-                println!("(stub) asr transcribe {input} --model {model:?} --out {out:?}")
+                println!("(stub) asr transcribe {input} --model {model:?} --out {out:?}");
             }
         },
         Commands::Audio { cmd } => match cmd {
             AudioCmd::ProfileSet { profile } => {
-                println!("(stub) audio profile set {profile}")
+                println!("(stub) audio profile set {profile}");
             }
         },
         Commands::Config { cmd } => match cmd {
@@ -458,8 +458,8 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        () = ctrl_c => {},
+        () = terminate => {},
     }
 
     info!("Stoppsignal empfangen, fahre herunter");

@@ -181,7 +181,7 @@ pub async fn memory_set_handler(
     });
 
     match store.set(&req.key, req.value.as_bytes(), ttl, pinned) {
-        Ok(_) => (StatusCode::OK, Json(MemorySetResponse { ok: true })).into_response(),
+        Ok(()) => (StatusCode::OK, Json(MemorySetResponse { ok: true })).into_response(),
         Err(e) => {
             tracing::error!(error = ?e, "failed to set memory item");
             (StatusCode::INTERNAL_SERVER_ERROR).into_response()

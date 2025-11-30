@@ -47,8 +47,8 @@ async fn main() -> anyhow::Result<()> {
 
 /// Resolve bind address with safe defaults:
 /// - Default: 127.0.0.1:8080 (loopback only)
-/// - Respect $HAUSKI_BIND if set (e.g. "0.0.0.0:8080")
-/// - If EXPOSE_CONFIG=true, enforce loopback-only
+/// - Respect $`HAUSKI_BIND` if set (e.g. "0.0.0.0:8080")
+/// - If `EXPOSE_CONFIG=true`, enforce loopback-only
 fn resolve_bind_addr(expose_config: bool) -> anyhow::Result<SocketAddr> {
     let bind = env::var("HAUSKI_BIND").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
     let addr: SocketAddr = bind
@@ -91,8 +91,8 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        () = ctrl_c => {},
+        () = terminate => {},
     }
 
     tracing::info!("shutdown signal received");

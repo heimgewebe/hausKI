@@ -20,7 +20,7 @@ struct AllowedTarget {
 impl AllowedTarget {
     fn new(scheme: Option<&str>, host: &str, port: Option<u16>) -> Self {
         Self {
-            scheme: scheme.map(|value| value.to_ascii_lowercase()),
+            scheme: scheme.map(str::to_ascii_lowercase),
             host: normalize_host(host),
             port,
         }
@@ -86,9 +86,7 @@ fn raw_host_segment(url: &str) -> Option<&str> {
     let (_, remainder) = url.split_once("://")?;
     let end = remainder
         .char_indices()
-        .find(|(_, ch)| matches!(ch, '/' | '?' | '#'))
-        .map(|(idx, _)| idx)
-        .unwrap_or_else(|| remainder.len());
+        .find(|(_, ch)| matches!(ch, '/' | '?' | '#')).map_or_else(|| remainder.len(), |(idx, _)| idx);
     let authority = &remainder[..end];
     if authority.is_empty() {
         return None;
@@ -96,8 +94,7 @@ fn raw_host_segment(url: &str) -> Option<&str> {
 
     let host_port = authority
         .rsplit_once('@')
-        .map(|(_, host)| host)
-        .unwrap_or(authority);
+        .map_or(authority, |(_, host)| host);
     if host_port.is_empty() {
         return None;
     }
@@ -384,10 +381,10 @@ mod tests {
     #[test]
     fn guard_not_enforced_when_default_allow() {
         let policy = policy_from_yaml(
-            r#"
+            r"
 routing:
   prefer_local: true
-"#,
+",
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
         assert!(!guard.is_enforced());
@@ -396,13 +393,13 @@ routing:
     #[test]
     fn guard_enforced_when_default_deny() {
         let policy = policy_from_yaml(
-            r#"
+            r"
 egress:
   default: deny
   allow:
     - https://api.matrix.example
     - internal.service:8443
-"#,
+",
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
         assert!(guard.is_enforced());
@@ -421,12 +418,12 @@ egress:
     #[test]
     fn guard_rejects_mismatched_port_for_scheme_entries() {
         let policy = policy_from_yaml(
-            r#"
+            r"
 egress:
   default: deny
   allow:
     - https://api.matrix.example
-"#,
+",
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
 
@@ -443,12 +440,12 @@ egress:
     #[test]
     fn guard_supports_host_only_entries() {
         let policy = policy_from_yaml(
-            r#"
+            r"
 egress:
   default: deny
   allow:
     - metrics.internal
-"#,
+",
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
         guard
@@ -459,10 +456,10 @@ egress:
     #[test]
     fn guard_rejects_unknown_default_action() {
         let policy = policy_from_yaml(
-            r#"
+            r"
 egress:
   default: maybe
-"#,
+",
         );
         let err = EgressGuard::from_policy(&policy).unwrap_err();
         match err {
@@ -474,12 +471,12 @@ egress:
     #[test]
     fn guard_rejects_common_evasion_patterns() {
         let policy = policy_from_yaml(
-            r#"
+            r"
 egress:
   default: deny
   allow:
     - https://api.matrix.example
-"#,
+",
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
 
@@ -510,12 +507,12 @@ egress:
     #[test]
     fn guard_allows_ipv6_targets_with_explicit_port() {
         let policy = policy_from_yaml(
-            r#"
+            r"
 egress:
   default: deny
   allow:
     - https://[2001:db8::1]:8443
-"#,
+",
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
         guard
@@ -530,12 +527,12 @@ egress:
     #[test]
     fn guard_rejects_http_when_only_https_allowed() {
         let policy = policy_from_yaml(
-            r#"
+            r"
 egress:
   default: deny
   allow:
     - https://api.matrix.example
-"#,
+",
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
         guard.ensure_allowed("https://api.matrix.example").unwrap();
@@ -548,12 +545,12 @@ egress:
     #[test]
     fn allowlisted_client_blocks_disallowed_hosts() {
         let policy = policy_from_yaml(
-            r#"
+            r"
 egress:
   default: deny
   allow:
     - https://api.matrix.example
-"#,
+",
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
         let client = AllowlistedClient::new(Client::new(), guard);
@@ -567,12 +564,12 @@ egress:
     #[test]
     fn allowlisted_client_allows_permitted_host() {
         let policy = policy_from_yaml(
-            r#"
+            r"
 egress:
   default: deny
   allow:
     - https://api.matrix.example
-"#,
+",
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
         let client = AllowlistedClient::new(Client::new(), guard);
@@ -587,12 +584,12 @@ egress:
     #[tokio::test(flavor = "current_thread")]
     async fn execute_blocks_disallowed_request() {
         let policy = policy_from_yaml(
-            r#"
+            r"
 egress:
   default: deny
   allow:
     - https://api.matrix.example
-"#,
+",
         );
         let guard = EgressGuard::from_policy(&policy).unwrap();
         let reqwest_client = Client::new();
@@ -601,7 +598,7 @@ egress:
         let err = client.execute(request).await.unwrap_err();
         match err {
             GuardedRequestError::Guard(GuardError::HostDenied { host }) => {
-                assert!(host.contains("evil.example"))
+                assert!(host.contains("evil.example"));
             }
             other => panic!("unexpected error: {other:?}"),
         }
