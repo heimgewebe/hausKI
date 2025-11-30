@@ -2,13 +2,13 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-/// Trait für Embedding-Anbieter.
+/// Trait for embedding providers.
 pub trait Embedder {
-    /// Erstellt Embeddings für mehrere Texte.
+    /// Creates embeddings for multiple texts.
     fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>>;
 }
 
-/// Stub-Implementierung für Ollama.
+/// Stub implementation for Ollama.
 #[derive(Debug, Clone)]
 pub struct OllamaEmbedder {
     base_url: Url,
@@ -48,7 +48,7 @@ impl Embedder for OllamaEmbedder {
         if texts.is_empty() {
             return Ok(Vec::new());
         }
-        // Stub: liefert leere Vektoren, bis die HTTP-Integration steht.
+        // Stub: returns empty vectors until HTTP integration is implemented.
         Ok(texts.iter().map(|_| Vec::new()).collect())
     }
 }
