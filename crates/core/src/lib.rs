@@ -263,14 +263,13 @@ impl AppState {
 
     fn encode_metrics(&self) -> Result<String, std::fmt::Error> {
         let mut body = String::new();
-        let registry = self
-            .0
-            .registry
-            .lock()
-            .map_err(|e| {
-                tracing::error!(error = ?e, "metrics registry lock poisoned");
-                std::fmt::Error
-            })?;
+        let registry = match self.0.registry.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                tracing::error!(error = ?poisoned, "metrics registry lock poisoned – using inner value");
+                poisoned.into_inner()
+            }
+        };
         encode(&mut body, &registry)?;
         Ok(body)
     }
