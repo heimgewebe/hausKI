@@ -13,7 +13,7 @@ pub trait Embedder {
     fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>>;
 }
 
-/// Stub-Implementierung für Ollama-Embeddings.
+/// Client-Implementierung für Ollama-Embeddings.
 ///
 /// Diese Implementierung kommuniziert mit einem lokalen Ollama-Server
 /// für die Generierung von Text-Embeddings.

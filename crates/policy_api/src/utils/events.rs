@@ -22,9 +22,9 @@ use tracing::warn;
 /// * `kind` - The type of event being logged
 /// * `payload` - JSON value containing event-specific data
 ///
-/// # Panics
+/// # Errors
 ///
-/// This function does not panic. Errors are logged as warnings and do not propagate.
+/// Errors during file operations or serialization are logged as warnings and do not propagate.
 pub fn write_event_line(kind: &str, payload: &Value) {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
     let base: PathBuf =
