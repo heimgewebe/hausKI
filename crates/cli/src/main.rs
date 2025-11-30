@@ -443,7 +443,7 @@ async fn shutdown_signal() {
     let ctrl_c = async {
         match signal::ctrl_c().await {
             Ok(()) => {
-                info!("Ctrl+C empfangen");
+                info!("Ctrl+C received");
             }
             Err(e) => {
                 warn!("Failed to install Ctrl+C handler: {}", e);
@@ -458,7 +458,7 @@ async fn shutdown_signal() {
         match signal::unix::signal(signal::unix::SignalKind::terminate()) {
             Ok(mut sig) => {
                 sig.recv().await;
-                info!("SIGTERM empfangen");
+                info!("SIGTERM received");
             }
             Err(e) => {
                 warn!("Failed to install SIGTERM handler: {}", e);
@@ -476,7 +476,7 @@ async fn shutdown_signal() {
         () = terminate => {},
     }
 
-    info!("Stoppsignal empfangen, fahre herunter");
+    info!("Shutdown signal received, shutting down");
 }
 
 #[cfg(test)]
