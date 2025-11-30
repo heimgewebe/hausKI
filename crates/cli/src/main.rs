@@ -441,17 +441,21 @@ fn resolve_bind_addr(bind_override: Option<String>, expose_config: bool) -> Resu
 
 async fn shutdown_signal() {
     let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
+        if let Err(e) = signal::ctrl_c().await {
+            warn!("Failed to install Ctrl+C handler: {}", e);
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install SIGTERM handler")
-            .recv()
-            .await;
+        match signal::unix::signal(signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => {
+                warn!("Failed to install SIGTERM handler: {}", e);
+            }
+        }
     };
 
     #[cfg(not(unix))]

@@ -107,11 +107,19 @@ async fn main() {
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 8779)));
+    
     println!("policy api on http://{addr}");
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .expect("failed to bind policy api listener");
-    axum::serve(listener, app.into_make_service())
-        .await
-        .expect("policy api server failed");
+    
+    let listener = match tokio::net::TcpListener::bind(addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("Failed to bind policy api listener on {addr}: {e}");
+            std::process::exit(1);
+        }
+    };
+    
+    if let Err(e) = axum::serve(listener, app.into_make_service()).await {
+        eprintln!("Policy api server failed: {e}");
+        std::process::exit(1);
+    }
 }
