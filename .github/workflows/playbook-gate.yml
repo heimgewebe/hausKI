@@ -15,12 +15,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # Provide toolchain variable from input or fallback to stable.
-  # Using vars.RUST_TOOLCHAIN allows overriding the toolchain via repository variables,
-  # otherwise defaulting to stable. This avoids issues with undefined inputs in PR triggers.
-  # The explicit != '' check ensures proper evaluation even when the variable is empty.
-  toolchain: ${{ (github.event_name == 'workflow_dispatch' && inputs.toolchain) || (github.event_name == 'workflow_dispatch' && github.event.inputs.toolchain) || (vars.RUST_TOOLCHAIN != '' && vars.RUST_TOOLCHAIN) || 'stable' }}
-  RUST_TOOLCHAIN: ${{ (github.event_name == 'workflow_dispatch' && inputs.toolchain) || (github.event_name == 'workflow_dispatch' && github.event.inputs.toolchain) || (vars.RUST_TOOLCHAIN != '' && vars.RUST_TOOLCHAIN) || 'stable' }}
+  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN != '' && vars.RUST_TOOLCHAIN || 'stable' }}
 
 jobs:
   gate:
