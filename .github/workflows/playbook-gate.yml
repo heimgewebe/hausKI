@@ -19,8 +19,8 @@ env:
   # Using vars.RUST_TOOLCHAIN allows overriding the toolchain via repository variables,
   # otherwise defaulting to stable. This avoids issues with undefined inputs in PR triggers.
   # The explicit != '' check ensures proper evaluation even when the variable is empty.
-  toolchain: ${{ (github.event_name == 'workflow_dispatch' && inputs.toolchain) || (github.event_name == 'workflow_dispatch' && github.event.inputs.toolchain) || (vars.RUST_TOOLCHAIN != '' && vars.RUST_TOOLCHAIN) || 'stable' }}
-  RUST_TOOLCHAIN: ${{ (github.event_name == 'workflow_dispatch' && inputs.toolchain) || (github.event_name == 'workflow_dispatch' && github.event.inputs.toolchain) || (vars.RUST_TOOLCHAIN != '' && vars.RUST_TOOLCHAIN) || 'stable' }}
+  toolchain: ${{ inputs.toolchain || github.event.inputs.toolchain || (vars.RUST_TOOLCHAIN != '' && vars.RUST_TOOLCHAIN) || 'stable' }}
+  RUST_TOOLCHAIN: ${{ inputs.toolchain || github.event.inputs.toolchain || (vars.RUST_TOOLCHAIN != '' && vars.RUST_TOOLCHAIN) || 'stable' }}
 
 jobs:
   gate:
@@ -36,6 +36,13 @@ jobs:
 
       - name: Show resolved toolchain
         run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
+
+      - name: Validate toolchain input
+        run: |
+          if [[ -z "${{ env.RUST_TOOLCHAIN }}" ]]; then
+            echo "ERROR: Kein toolchain-Input gesetzt. Bitte stable oder explizit gewünschte Version angeben."
+            exit 1
+          fi
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
