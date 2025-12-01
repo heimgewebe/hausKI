@@ -7,6 +7,8 @@ members = [
   "crates/memory",
   "crates/policy",
   "crates/policy_api",
+  "vendor/heimlern-core",
+  "vendor/heimlern-bandits",
   # weitere später: indexd, llm, asr, tts, audio, memory, commentary, bridge, observability, security, adapters/*
 ]
 resolver = "2"
@@ -16,7 +18,7 @@ edition = "2021"
 
 [workspace.dependencies]
 anyhow = "1.0.100"
-thiserror = "1"
+thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "ansi"] }
 tracing-appender = "0.2"
