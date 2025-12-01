@@ -1,0 +1,10 @@
+[package]
+name = "utoipa-swagger-ui-vendored"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Vendored Swagger UI assets for offline builds"
+
+[lib]
+name = "utoipa_swagger_ui_vendored"
+path = "src/lib.rs"
