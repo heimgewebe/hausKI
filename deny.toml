@@ -12,16 +12,11 @@ allow = [
   "MIT",
   "Apache-2.0",
   "BSD-3-Clause",
-  "BSD-2-Clause",
-  "BSD-3-Clause-Clear",
   "MPL-2.0",
   "Unicode-3.0",
-  "Unicode-DFS-2016",
   "Zlib",
   "ISC",
   "CDLA-Permissive-2.0",
-  "OpenSSL",
-  "CC0-1.0",
 ]
 confidence-threshold = 0.9
 # Umgang mit problematischen Klassen:
@@ -32,14 +27,25 @@ private = { ignore = true }
 # Lizenz-Mapping/Exceptions für verbreitete Kombis (nur falls nötig).
 exceptions = [
   { allow = ["MIT", "ISC", "OpenSSL"], crate = "ring" },
-  { allow = ["Apache-2.0", "OpenSSL"], crate = "openssl" },
 ]
 
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
 deny = []
-skip = []
+skip = [
+    { name = "windows_x86_64_gnullvm" },
+    { name = "windows_x86_64_msvc" },
+    { name = "windows_x86_64_gnu" },
+    { name = "windows_i686_msvc" },
+    { name = "windows_i686_gnullvm" },
+    { name = "windows_i686_gnu" },
+    { name = "windows_aarch64_gnullvm" },
+    { name = "windows_aarch64_msvc" },
+    { name = "windows-targets" },
+    { name = "windows-sys" },
+    { name = "hashbrown" }
+]
 skip-tree = []
 
 # Optional: Quellen-Policy (nur crates.io und Git mit Pinnen zulassen)
