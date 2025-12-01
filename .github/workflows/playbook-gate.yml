@@ -15,7 +15,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN != '' && vars.RUST_TOOLCHAIN || 'stable' }}
+  RUST_TOOLCHAIN: ${{ vars.RUST_TOOLCHAIN || 'stable' }}
 
 jobs:
   gate:
