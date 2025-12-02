@@ -125,30 +125,40 @@ pub async fn memory_get_handler(
     _state: State<AppState>,
     Json(req): Json<MemoryGetRequest>,
 ) -> Response {
-    let store = mem::global();
-    match store.get(&req.key) {
-        Ok(Some(item)) => (
+    let key = req.key.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let store = mem::global();
+        store.get(&req.key)
+    })
+    .await;
+
+    match result {
+        Ok(Ok(Some(item))) => (
             StatusCode::OK,
             Json(MemoryGetResponse {
-                key: req.key,
+                key, // Use the cloned key here
                 value: Some(String::from_utf8_lossy(&item.value).into_owned()),
                 ttl_sec: item.ttl_sec,
                 pinned: Some(item.pinned),
             }),
         )
             .into_response(),
-        Ok(None) => (
+        Ok(Ok(None)) => (
             StatusCode::OK,
             Json(MemoryGetResponse {
-                key: req.key,
+                key, // And here
                 value: None,
                 ttl_sec: None,
                 pinned: None,
             }),
         )
             .into_response(),
-        Err(e) => {
+        Ok(Err(e)) => {
             tracing::error!(error = ?e, "failed to get memory item");
+            (StatusCode::INTERNAL_SERVER_ERROR).into_response()
+        }
+        Err(join_err) => {
+            tracing::error!(error = ?join_err, "spawn_blocking failed");
             (StatusCode::INTERNAL_SERVER_ERROR).into_response()
         }
     }
@@ -165,13 +175,13 @@ pub async fn memory_set_handler(
     _state: State<AppState>,
     Json(req): Json<MemorySetRequest>,
 ) -> Response {
-    let store = mem::global();
     let pol = policy_load_once();
 
     // TTL: falls im Request nicht gesetzt, Policy-Default verwenden
     let ttl = req.ttl_sec.or(pol.default_ttl_sec);
 
     // pinned: falls im Request nicht gesetzt, Allowlist aus Policy prüfen
+    // Note: This check is purely logical and doesn't block (much), so we can keep it here.
     let pinned = req.pinned.or_else(|| {
         if is_pin_allowed(&req.key, &pol.pin_allowlist) {
             Some(true)
@@ -180,10 +190,20 @@ pub async fn memory_set_handler(
         }
     });
 
-    match store.set(&req.key, req.value.as_bytes(), ttl, pinned) {
-        Ok(()) => (StatusCode::OK, Json(MemorySetResponse { ok: true })).into_response(),
-        Err(e) => {
+    let result = tokio::task::spawn_blocking(move || {
+        let store = mem::global();
+        store.set(&req.key, req.value.as_bytes(), ttl, pinned)
+    })
+    .await;
+
+    match result {
+        Ok(Ok(())) => (StatusCode::OK, Json(MemorySetResponse { ok: true })).into_response(),
+        Ok(Err(e)) => {
             tracing::error!(error = ?e, "failed to set memory item");
+            (StatusCode::INTERNAL_SERVER_ERROR).into_response()
+        }
+        Err(join_err) => {
+            tracing::error!(error = ?join_err, "spawn_blocking failed");
             (StatusCode::INTERNAL_SERVER_ERROR).into_response()
         }
     }
@@ -200,17 +220,26 @@ pub async fn memory_evict_handler(
     _state: State<AppState>,
     Json(req): Json<MemoryEvictRequest>,
 ) -> Response {
-    let store = mem::global();
-    match store.evict(&req.key) {
-        Ok(ok) => {
+    let result = tokio::task::spawn_blocking(move || {
+        let store = mem::global();
+        store.evict(&req.key)
+    })
+    .await;
+
+    match result {
+        Ok(Ok(ok)) => {
             if ok {
                 // Nur inkrementieren, wenn wirklich ein Key gelöscht wurde.
                 record_memory_manual_eviction();
             }
             (StatusCode::OK, Json(MemoryEvictResponse { ok })).into_response()
         }
-        Err(e) => {
+        Ok(Err(e)) => {
             tracing::error!(error = ?e, "failed to evict memory item");
+            (StatusCode::INTERNAL_SERVER_ERROR).into_response()
+        }
+        Err(join_err) => {
+            tracing::error!(error = ?join_err, "spawn_blocking failed");
             (StatusCode::INTERNAL_SERVER_ERROR).into_response()
         }
     }
