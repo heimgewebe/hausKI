@@ -35,8 +35,8 @@ fn conn(custom_path: Option<PathBuf>) -> rusqlite::Result<Connection> {
     Ok(c)
 }
 
-/// Internal helper: Speichert Snapshot JSON unter `name` (upsert).
-/// Async-Wrapper um blockierende SQLite-Calls.
+/// Internal helper: Stores snapshot JSON under `name` (upsert).
+/// Async wrapper around blocking SQLite calls.
 async fn save_snapshot_with_path(
     name: String,
     snapshot: Value,
@@ -58,8 +58,8 @@ async fn save_snapshot_with_path(
     Ok(())
 }
 
-/// Internal helper: Lädt Snapshot JSON, falls vorhanden.
-/// Async-Wrapper um blockierende SQLite-Calls.
+/// Internal helper: Loads snapshot JSON if present.
+/// Async wrapper around blocking SQLite calls.
 async fn load_snapshot_with_path(
     name: String,
     custom_path: Option<PathBuf>,
@@ -67,11 +67,11 @@ async fn load_snapshot_with_path(
     let res = tokio::task::spawn_blocking(move || {
         let c = conn(custom_path)?;
         let mut stmt = c.prepare("SELECT snapshot_json FROM policy_param WHERE name=?1")?;
-        let mut rows = stmt.query(params![name])?;
+        let mut rows = stmt.query(params![&name])?;
         if let Some(row) = rows.next()? {
             let s: String = row.get(0)?;
             let value: Value = serde_json::from_str(&s)
-                .context("failed to deserialize stored JSON snapshot")?;
+                .with_context(|| format!("failed to deserialize stored JSON snapshot '{}'", name))?;
             Ok::<Option<Value>, anyhow::Error>(Some(value))
         } else {
             Ok(None)
@@ -82,14 +82,14 @@ async fn load_snapshot_with_path(
     Ok(res)
 }
 
-/// Speichert Snapshot JSON unter `name` (upsert).
-/// Async-Wrapper um blockierende SQLite-Calls.
+/// Stores snapshot JSON under `name` (upsert).
+/// Async wrapper around blocking SQLite calls.
 pub async fn save_snapshot(name: String, snapshot: Value) -> Result<()> {
     save_snapshot_with_path(name, snapshot, None).await
 }
 
-/// Lädt Snapshot JSON, falls vorhanden.
-/// Async-Wrapper um blockierende SQLite-Calls.
+/// Loads snapshot JSON if present.
+/// Async wrapper around blocking SQLite calls.
 pub async fn load_snapshot(name: String) -> Result<Option<Value>> {
     load_snapshot_with_path(name, None).await
 }
