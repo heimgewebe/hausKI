@@ -2,11 +2,14 @@ version: 1
 name: code-assist-gated
 steps:
 - id: lint
-  run: "wgx lint --export tmp/metrics.json"
+  run: |
+    if [ -x ./scripts/wgx ]; then WGX=./scripts/wgx; else WGX=wgx; fi
+    $WGX lint --export tmp/metrics.json
 - id: kg-validate
   run: |
-    wgx knowledge extract --repo . --out knowledge.graph.json
-    wgx knowledge validate --file knowledge.graph.json
+    if [ -x ./scripts/wgx ]; then WGX=./scripts/wgx; else WGX=wgx; fi
+    $WGX knowledge extract --repo . --out knowledge.graph.json
+    $WGX knowledge validate --file knowledge.graph.json
 - id: ai-assist
   needs: [lint, kg-validate]
   run: "hauski assist --playbook code_review --metrics tmp/metrics.json --kg knowledge.graph.json"
