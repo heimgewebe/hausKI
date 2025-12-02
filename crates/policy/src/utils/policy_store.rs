@@ -70,9 +70,10 @@ async fn load_snapshot_with_path(
         let mut rows = stmt.query(params![name])?;
         if let Some(row) = rows.next()? {
             let s: String = row.get(0)?;
-            let value: Value = serde_json::from_str(&s)
-                .with_context(|| format!("failed to deserialize stored JSON snapshot '{}'", name))?;
-            Ok::<Option<Value>, anyhow::Error>(Some(value))
+            let value: Value = serde_json::from_str(&s).with_context(|| {
+                format!("failed to deserialize stored JSON snapshot '{}'", name)
+            })?;
+            Ok::<_, anyhow::Error>(Some(value))
         } else {
             Ok(None)
         }
