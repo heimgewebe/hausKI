@@ -37,11 +37,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shfmt
 
       - name: Show resolved toolchain
-        run: 'echo "Using toolchain: $RUST_TOOLCHAIN"'
+        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
 
       - name: Validate toolchain input
         run: |
-          if [[ -z "${RUST_TOOLCHAIN}" ]]; then
+          if [[ -z "${{ env.RUST_TOOLCHAIN }}" ]]; then
             echo "ERROR: RUST_TOOLCHAIN ist leer. Bitte stable oder explizite Version setzen."
             exit 1
           fi
