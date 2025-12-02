@@ -154,11 +154,25 @@ fn run_playbook(playbook_path: &str) -> Result<()> {
                     .with_context(|| format!("Failed to execute command: {run_cmd}"))?;
 
                 if !output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    let mut error_output = String::new();
+                    if !stdout.is_empty() {
+                        error_output.push_str("stdout:\n");
+                        error_output.push_str(&stdout);
+                    }
+                    if !stderr.is_empty() {
+                        if !error_output.is_empty() {
+                            error_output.push('\n');
+                        }
+                        error_output.push_str("stderr:\n");
+                        error_output.push_str(&stderr);
+                    }
                     bail!(
                         "Step {} failed with status {}:\n{}",
                         i + 1,
                         output.status,
-                        String::from_utf8_lossy(&output.stderr)
+                        error_output
                     );
                 }
             }
