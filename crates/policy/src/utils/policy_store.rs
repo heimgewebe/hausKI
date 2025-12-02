@@ -67,7 +67,7 @@ async fn load_snapshot_with_path(
     let res = tokio::task::spawn_blocking(move || {
         let c = conn(custom_path)?;
         let mut stmt = c.prepare("SELECT snapshot_json FROM policy_param WHERE name=?1")?;
-        let mut rows = stmt.query(params![&name])?;
+        let mut rows = stmt.query(params![name])?;
         if let Some(row) = rows.next()? {
             let s: String = row.get(0)?;
             let value: Value = serde_json::from_str(&s)
