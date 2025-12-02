@@ -1,8 +1,6 @@
 [advisories]
 # Explicitly deny vulnerable, unmaintained, and unsound dependencies for strong security posture.
-vulnerability = "deny"
-unmaintained = "deny"
-unsound = "deny"
+version = 2
 yanked = "allow"
 ignore = []
 
@@ -20,8 +18,6 @@ allow = [
 ]
 confidence-threshold = 0.9
 # Umgang mit problematischen Klassen:
-unlicensed = "deny"
-copyleft = "warn"
 # Private Crates im Monorepo aus Lizenz-Gate ausnehmen (nur für "private")
 private = { ignore = true }
 # Lizenz-Mapping/Exceptions für verbreitete Kombis (nur falls nötig).
