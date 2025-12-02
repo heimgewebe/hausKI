@@ -10,6 +10,9 @@ fn db_path() -> PathBuf {
     base.join("state").join("hauski.db")
 }
 
+// TODO: rusqlite calls in this module are synchronous and may block async runtimes.
+// Consider wrapping them in tokio::task::spawn_blocking or migrating to an async-native
+// solution (e.g. tokio-rusqlite or sqlx) for high-concurrency paths.
 fn conn() -> rusqlite::Result<Connection> {
     let p = db_path();
     if let Some(dir) = p.parent() {
