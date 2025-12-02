@@ -5,11 +5,6 @@ steps:
   run: |
     if [ -x ./scripts/wgx ]; then WGX=./scripts/wgx; else WGX=wgx; fi
     $WGX lint --export tmp/metrics.json
-- id: kg-validate
-  run: |
-    if [ -x ./scripts/wgx ]; then WGX=./scripts/wgx; else WGX=wgx; fi
-    $WGX knowledge extract --repo . --out knowledge.graph.json
-    $WGX knowledge validate --file knowledge.graph.json
 - id: ai-assist
-  needs: [lint, kg-validate]
-  run: "hauski assist --playbook code_review --metrics tmp/metrics.json --kg knowledge.graph.json"
+  needs: [lint]
+  run: "hauski assist --playbook code_review --metrics tmp/metrics.json"
