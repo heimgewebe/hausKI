@@ -16,3 +16,6 @@ reqwest.workspace = true
 dirs.workspace = true
 rusqlite.workspace = true
 chrono.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
