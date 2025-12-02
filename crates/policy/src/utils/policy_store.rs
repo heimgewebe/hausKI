@@ -3,17 +3,22 @@ use rusqlite::{params, Connection};
 use serde_json::Value;
 use std::path::PathBuf;
 
-fn db_path() -> PathBuf {
-    let home = dirs::home_dir().unwrap_or_else(|| ".".into());
-    let base: PathBuf = std::env::var("HAUSKI_DATA")
-        .map(Into::into)
-        .unwrap_or(home.join(".hauski"));
-    base.join("state").join("hauski.db")
+fn db_path(custom: Option<PathBuf>) -> PathBuf {
+    match custom {
+        Some(p) => p,
+        None => {
+            let home = dirs::home_dir().unwrap_or_else(|| ".".into());
+            let base: PathBuf = std::env::var("HAUSKI_DATA")
+                .map(Into::into)
+                .unwrap_or(home.join(".hauski"));
+            base.join("state").join("hauski.db")
+        }
+    }
 }
 
 // Helper: Synchronous connection setup (to be called inside spawn_blocking)
-fn conn() -> rusqlite::Result<Connection> {
-    let p = db_path();
+fn conn(custom_path: Option<PathBuf>) -> rusqlite::Result<Connection> {
+    let p = db_path(custom_path);
     if let Some(dir) = p.parent() {
         std::fs::create_dir_all(dir).ok();
     }
@@ -30,11 +35,15 @@ fn conn() -> rusqlite::Result<Connection> {
     Ok(c)
 }
 
-/// Speichert Snapshot JSON unter `name` (upsert).
+/// Internal helper: Speichert Snapshot JSON unter `name` (upsert).
 /// Async-Wrapper um blockierende SQLite-Calls.
-pub async fn save_snapshot(name: String, snapshot: Value) -> Result<()> {
+async fn save_snapshot_with_path(
+    name: String,
+    snapshot: Value,
+    custom_path: Option<PathBuf>,
+) -> Result<()> {
     tokio::task::spawn_blocking(move || {
-        let c = conn()?;
+        let c = conn(custom_path)?;
         let now = chrono::Utc::now().timestamp();
         let js = snapshot.to_string();
         c.execute(
@@ -49,11 +58,14 @@ pub async fn save_snapshot(name: String, snapshot: Value) -> Result<()> {
     Ok(())
 }
 
-/// Lädt Snapshot JSON, falls vorhanden.
+/// Internal helper: Lädt Snapshot JSON, falls vorhanden.
 /// Async-Wrapper um blockierende SQLite-Calls.
-pub async fn load_snapshot(name: String) -> Result<Option<Value>> {
+async fn load_snapshot_with_path(
+    name: String,
+    custom_path: Option<PathBuf>,
+) -> Result<Option<Value>> {
     let res = tokio::task::spawn_blocking(move || {
-        let c = conn()?;
+        let c = conn(custom_path)?;
         let mut stmt = c.prepare("SELECT snapshot_json FROM policy_param WHERE name=?1")?;
         let mut rows = stmt.query(params![name])?;
         if let Some(row) = rows.next()? {
@@ -68,6 +80,18 @@ pub async fn load_snapshot(name: String) -> Result<Option<Value>> {
     Ok(res)
 }
 
+/// Speichert Snapshot JSON unter `name` (upsert).
+/// Async-Wrapper um blockierende SQLite-Calls.
+pub async fn save_snapshot(name: String, snapshot: Value) -> Result<()> {
+    save_snapshot_with_path(name, snapshot, None).await
+}
+
+/// Lädt Snapshot JSON, falls vorhanden.
+/// Async-Wrapper um blockierende SQLite-Calls.
+pub async fn load_snapshot(name: String) -> Result<Option<Value>> {
+    load_snapshot_with_path(name, None).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -75,19 +99,28 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_and_load_snapshot() {
-        // Use a random name to avoid collisions if running against a shared DB (though tests should ideally use isolated DBs)
-        // Since we can't easily inject the DB path in this helper without refactoring `db_path()`,
-        // we'll rely on the fact that this is a local dev environment test.
-        // Better: refactor to allow injecting DB path, but for now strict adherence to existing logic with async wrapper.
+        // Use a temporary directory to isolate test from shared state
+        let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+        let test_db_path = temp_dir.path().join("test.db");
+
         let name = format!("test_key_{}", chrono::Utc::now().timestamp_millis());
         let data = json!({"foo": "bar", "baz": 123});
 
-        save_snapshot(name.clone(), data.clone()).await.expect("save failed");
+        save_snapshot_with_path(name.clone(), data.clone(), Some(test_db_path.clone()))
+            .await
+            .expect("save failed");
 
-        let loaded = load_snapshot(name.clone()).await.expect("load failed");
+        let loaded = load_snapshot_with_path(name.clone(), Some(test_db_path.clone()))
+            .await
+            .expect("load failed");
         assert_eq!(loaded, Some(data));
 
-        let missing = load_snapshot("non_existent_key_9999".to_string()).await.expect("load missing failed");
+        let missing = load_snapshot_with_path(
+            "non_existent_key_9999".to_string(),
+            Some(test_db_path.clone()),
+        )
+        .await
+        .expect("load missing failed");
         assert!(missing.is_none());
     }
 }
