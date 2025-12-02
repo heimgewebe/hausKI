@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       toolchain:
-        description: "Rust toolchain version to use (z.B. stable, 1.80, nightly)"
+        description: "Zu verwendende Rust-Toolchain-Version (z.B. stable, 1.80, nightly)"
         default: stable
         required: false
 
@@ -61,7 +61,7 @@ jobs:
 
       # WGX ist ein Shell-Tool, kein Rust-Crate.
       # Wir checken heimgewebe/wgx aus und hängen cli/ an den PATH.
-      - name: Install wgx (Checkout)
+      - name: Checkout wgx repository
         uses: actions/checkout@v4.2.2
         with:
           repository: heimgewebe/wgx
