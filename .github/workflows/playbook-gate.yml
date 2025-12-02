@@ -1,11 +1,13 @@
 name: playbook-gate
 
 on:
-  pull_request:
+  # Aktuell nur manuell. Wenn das Assist-Playbook stabil ist,
+  # kannst du den PR-Trigger wieder aktivieren.
+  # pull_request:
   workflow_dispatch:
     inputs:
       toolchain:
-        description: "Rust toolchain version to use"
+        description: "Rust toolchain version to use (z.B. stable, 1.80, nightly)"
         default: stable
         required: false
 
@@ -24,26 +26,27 @@ env:
 jobs:
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
         # Pin to fixed v4.2.2 release to keep builds deterministic
         uses: actions/checkout@v4.2.2
 
-      - name: Install shfmt
+      - name: Install shfmt (für Shell-Checks im Playbook, falls nötig)
         run: sudo apt-get update && sudo apt-get install -y shfmt
 
       - name: Show resolved toolchain
-        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
+        run: 'echo "Using toolchain: $RUST_TOOLCHAIN"'
 
       - name: Validate toolchain input
         run: |
-          if [[ -z "${{ env.RUST_TOOLCHAIN }}" ]]; then
-            echo "ERROR: Kein toolchain-Input gesetzt. Bitte stable oder explizit gewünschte Version angeben."
+          if [[ -z "${RUST_TOOLCHAIN}" ]]; then
+            echo "ERROR: RUST_TOOLCHAIN ist leer. Bitte stable oder explizite Version setzen."
             exit 1
           fi
 
-      - name: Set up Rust toolchain
+      - name: Use Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
@@ -56,10 +59,9 @@ jobs:
           shared-key: ${{ runner.os }}-hauski-cli-${{ hashFiles('**/Cargo.lock') }}
           cache-on-failure: true
 
-      # Fix: wgx is a shell tool, not a rust crate.
-      # Checkout heimgewebe/wgx and add cli/ to PATH.
+      # WGX ist ein Shell-Tool, kein Rust-Crate.
+      # Wir checken heimgewebe/wgx aus und hängen cli/ an den PATH.
       - name: Install wgx (Checkout)
-        # Pin to fixed v4.2.2 release to keep builds deterministic
         uses: actions/checkout@v4.2.2
         with:
           repository: heimgewebe/wgx
@@ -68,8 +70,10 @@ jobs:
       - name: Add wgx to PATH
         run: echo "${{ github.workspace }}/wgx-tool/cli" >> "$GITHUB_PATH"
 
+      # Hauski-CLI bauen
       - name: Build hauski CLI (release, locked)
         run: cargo build --package hauski-cli --release --locked
 
+      # Assist-Playbook über die gebaute CLI ausführen
       - name: Run assist playbook
         run: ./target/release/hauski-cli assist --playbook playbooks/code_assist.yml
