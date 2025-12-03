@@ -15,6 +15,14 @@ theme:
     - search.highlight
 nav:
   - Start: index.md
+  - Architektur:
+      - Vision: hauski-skizze.md
+      - Stack: hauski-stack.md
+      - Status: ist-stand-vs-roadmap.md
+      - Inkonsistenzen: inconsistencies.md
+      - Ambient Assistant: ambient-assistant.md
+      - Heimgeist Integration: integration_with_heimgeist.md
+      - Vision (RAG): vision/multi-agent-rag.md
   - API: api.md
   - CLI: cli.md
   - Module:
@@ -33,8 +41,10 @@ nav:
       - Sprache: process/sprache.md
       - Tests & Qualität: process/testing.md
       - Release: process/release.md
-  - Vision: vision/multi-agent-rag.md
+      - Review-Cycle: review-cycle.md
   - ADRs:
+      - Übersicht: adr/README.md
+      - Ziele & Scope: adr/ADR-0001__ziele-und-scope.md
       - Toolchain-Strategie: adrs/ADR-0001-toolchain-strategy.md
   - Runbooks:
       - Übersicht: runbooks/index.md
@@ -47,6 +57,9 @@ nav:
       - Upgrade-Guide: runbooks/upgrade-guide.md
   - semantAH: semantah.md
   - Audit: audit-hauski.md
+  - Contributing: CONTRIBUTING.md
+  - Canvas:
+      - Codex: canvas/codex/README.md
 markdown_extensions:
   - admonition
   - toc:

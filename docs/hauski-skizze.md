@@ -2,7 +2,7 @@
 
 > **⚠️ Hinweis:** Dieses Dokument beschreibt die **Architektur-Vision** von HausKI.
 > Nicht alle hier beschriebenen Features sind bereits implementiert.
-> Für den **aktuellen Implementierungsstatus** siehe [`docs/ist-stand-vs-roadmap.md`](docs/ist-stand-vs-roadmap.md).
+> Für den **aktuellen Implementierungsstatus** siehe [`ist-stand-vs-roadmap.md`](ist-stand-vs-roadmap.md).
 
 ## 0) Kurzfassung
 
