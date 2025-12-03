@@ -1,3 +1,4 @@
+use crate::error::{HauskiError, Result};
 use serde::{Deserialize, Serialize};
 use std::{env, fs, path::Path};
 
@@ -137,104 +138,54 @@ fn parse_env_bool(value: &str) -> Option<bool> {
     }
 }
 
-pub fn load_limits<P: AsRef<Path>>(path: P) -> anyhow::Result<Limits> {
+pub fn load_limits<P: AsRef<Path>>(path: P) -> Result<Limits> {
     let path = path.as_ref();
-    match fs::read_to_string(path) {
-        Ok(content) => match serde_yaml::from_str(&content) {
-            Ok(limits) => Ok(limits),
-            Err(err) => {
-                tracing::warn!(
-                    path = %path.display(),
-                    error = %err,
-                    "failed to parse limits YAML, falling back to defaults"
-                );
-                Ok(Limits::default())
-            }
-        },
-        Err(err) => {
-            tracing::warn!(
-                path = %path.display(),
-                error = %err,
-                "failed to read limits YAML, falling back to defaults"
-            );
-            Ok(Limits::default())
-        }
-    }
+    let content = fs::read_to_string(path).map_err(|e| {
+        HauskiError::Config(format!("failed to read limits YAML at {:?}: {}", path, e))
+    })?;
+
+    let limits = serde_yaml::from_str(&content).map_err(|e| {
+        HauskiError::Config(format!("failed to parse limits YAML at {:?}: {}", path, e))
+    })?;
+
+    Ok(limits)
 }
 
-pub fn load_models<P: AsRef<Path>>(path: P) -> anyhow::Result<ModelsFile> {
+pub fn load_models<P: AsRef<Path>>(path: P) -> Result<ModelsFile> {
     let path = path.as_ref();
-    match fs::read_to_string(path) {
-        Ok(content) => match serde_yaml::from_str(&content) {
-            Ok(models) => Ok(models),
-            Err(err) => {
-                tracing::warn!(
-                    path = %path.display(),
-                    error = %err,
-                    "failed to parse models YAML, falling back to defaults"
-                );
-                Ok(ModelsFile::default())
-            }
-        },
-        Err(err) => {
-            tracing::warn!(
-                path = %path.display(),
-                error = %err,
-                "failed to read models YAML, falling back to defaults"
-            );
-            Ok(ModelsFile::default())
-        }
-    }
+    let content = fs::read_to_string(path).map_err(|e| {
+        HauskiError::Config(format!("failed to read models YAML at {:?}: {}", path, e))
+    })?;
+
+    let models = serde_yaml::from_str(&content).map_err(|e| {
+        HauskiError::Config(format!("failed to parse models YAML at {:?}: {}", path, e))
+    })?;
+
+    Ok(models)
 }
 
-pub fn load_routing<P: AsRef<Path>>(path: P) -> anyhow::Result<RoutingPolicy> {
+pub fn load_routing<P: AsRef<Path>>(path: P) -> Result<RoutingPolicy> {
     let path = path.as_ref();
-    match fs::read_to_string(path) {
-        Ok(content) => match serde_yaml::from_str(&content) {
-            Ok(routing) => Ok(routing),
-            Err(err) => {
-                tracing::warn!(
-                    path = %path.display(),
-                    error = %err,
-                    "failed to parse routing YAML, falling back to defaults"
-                );
-                Ok(RoutingPolicy::default())
-            }
-        },
-        Err(err) => {
-            tracing::warn!(
-                path = %path.display(),
-                error = %err,
-                "failed to read routing YAML, falling back to defaults"
-            );
-            Ok(RoutingPolicy::default())
-        }
-    }
+    let content = fs::read_to_string(path).map_err(|e| {
+        HauskiError::Config(format!("failed to read routing YAML at {:?}: {}", path, e))
+    })?;
+
+    let routing = serde_yaml::from_str(&content).map_err(|e| {
+        HauskiError::Config(format!("failed to parse routing YAML at {:?}: {}", path, e))
+    })?;
+
+    Ok(routing)
 }
 
-pub fn load_flags<P: AsRef<Path>>(path: P) -> anyhow::Result<FeatureFlags> {
+pub fn load_flags<P: AsRef<Path>>(path: P) -> Result<FeatureFlags> {
     let path = path.as_ref();
-    let mut flags = match fs::read_to_string(path) {
-        Ok(content) => match serde_yaml::from_str(&content) {
-            Ok(flags) => flags,
-            Err(err) => {
-                tracing::warn!(
-                    path = %path.display(),
-                    error = %err,
-                    "failed to parse flags YAML, falling back to defaults"
-                );
-                FeatureFlags::default()
-            }
-        },
-        Err(err) => {
-            tracing::warn!(
-                path = %path.display(),
-                error = %err,
-                "failed to read flags YAML, falling back to defaults"
-            );
-            FeatureFlags::default()
-        }
-    };
+    let content = fs::read_to_string(path).map_err(|e| {
+        HauskiError::Config(format!("failed to read flags YAML at {:?}: {}", path, e))
+    })?;
+
+    let mut flags: FeatureFlags = serde_yaml::from_str(&content).map_err(|e| {
+        HauskiError::Config(format!("failed to parse flags YAML at {:?}: {}", path, e))
+    })?;
 
     if let Ok(value) = env::var("HAUSKI_SAFE_MODE") {
         match parse_env_bool(&value) {
@@ -304,11 +255,14 @@ mod tests {
         }
     }
 
+    // NOTE: Previous tests asserted fallback to defaults on missing file.
+    // Now we assert error. We must update tests to expect errors.
+
     #[test]
-    fn missing_limits_file_falls_back_to_defaults() {
-        let limits = load_limits("/does/not/exist.yaml").unwrap();
-        assert_eq!(limits.latency.llm_p95_ms, default_llm_p95_ms());
-        assert_eq!(limits.latency.index_topk20_ms, default_index_topk20_ms());
+    fn missing_limits_file_returns_error() {
+        let result = load_limits("/does/not/exist.yaml");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), HauskiError::Config(_)));
     }
 
     #[test]
@@ -319,6 +273,7 @@ mod tests {
 
         let limits = load_limits(file.path()).unwrap();
         assert_eq!(limits.latency.llm_p95_ms, 350);
+        // Deserialization of struct with default fields handles missing fields
         assert_eq!(limits.latency.index_topk20_ms, default_index_topk20_ms());
         assert_eq!(limits.thermal.gpu_max_c, default_gpu_max_c());
         assert_eq!(limits.asr.wer_max_pct, default_wer_max_pct());
@@ -345,37 +300,37 @@ mod tests {
     }
 
     #[test]
-    fn missing_models_file_falls_back_to_empty_list() {
-        let models = load_models("/does/not/exist/models.yaml").unwrap();
-        assert!(models.models.is_empty());
+    fn missing_models_file_returns_error() {
+        let result = load_models("/does/not/exist/models.yaml");
+        assert!(result.is_err());
     }
 
     #[test]
-    fn invalid_models_yaml_falls_back_to_defaults() {
+    fn invalid_models_yaml_returns_error() {
         let mut file = NamedTempFile::new().unwrap();
         writeln!(file, "models: not-a-list").unwrap();
         file.flush().unwrap();
 
-        let models = load_models(file.path()).unwrap();
-        assert!(models.models.is_empty());
+        let result = load_models(file.path());
+        assert!(result.is_err());
     }
 
     #[test]
-    fn invalid_routing_yaml_falls_back_to_defaults() {
+    fn invalid_routing_yaml_returns_error() {
         let mut file = NamedTempFile::new().unwrap();
         write!(file, "routing: [invalid").unwrap();
         file.flush().unwrap();
 
-        let routing = load_routing(file.path()).unwrap();
-        assert_eq!(routing, RoutingPolicy::default());
+        let result = load_routing(file.path());
+        assert!(result.is_err());
     }
 
     #[serial]
     #[test]
-    fn missing_flags_file_defaults_to_safe_mode_off() {
+    fn missing_flags_file_returns_error() {
         let _guard = EnvVarGuard::removed("HAUSKI_SAFE_MODE");
-        let flags = load_flags("/does/not/exist-flags.yaml").unwrap();
-        assert!(!flags.safe_mode);
+        let result = load_flags("/does/not/exist-flags.yaml");
+        assert!(result.is_err());
     }
 
     #[serial]
