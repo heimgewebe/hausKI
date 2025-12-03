@@ -6,7 +6,7 @@ use axum::{
     http::{header, HeaderValue, Method, Request, StatusCode},
     middleware::{from_fn_with_state, Next},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{any, get, post},
     Json, Router,
 };
 use hauski_indexd::{router as index_router, IndexState};
@@ -683,14 +683,32 @@ fn config_routes() -> Router<AppState> {
         .route("/config/routing", get(get_routing))
 }
 
-// TODO: Implement plugin routes. This is a placeholder returning an empty router.
+// TODO: Implement plugin routes. Currently returns 501 placeholders.
 fn plugin_routes() -> Router<AppState> {
     Router::<AppState>::new()
+        .route("/plugins", any(not_implemented_plugins))
+        .route("/plugins/{*path}", any(not_implemented_plugins))
 }
 
-// TODO: Implement cloud routes. This is a placeholder returning an empty router.
+// TODO: Implement cloud routes. Currently returns 501 placeholders.
 fn cloud_routes() -> Router<AppState> {
     Router::<AppState>::new()
+        .route("/cloud", any(not_implemented_cloud))
+        .route("/cloud/{*path}", any(not_implemented_cloud))
+}
+
+async fn not_implemented_plugins() -> (StatusCode, &'static str) {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        "Plugins are not yet implemented (see docs/inconsistencies.md)",
+    )
+}
+
+async fn not_implemented_cloud() -> (StatusCode, &'static str) {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        "Cloud fallback is not yet implemented (see docs/inconsistencies.md)",
+    )
 }
 
 type CorsState = Arc<HeaderValue>;
@@ -1320,5 +1338,55 @@ mod tests {
         );
         assert!(state.safe_mode());
         assert!(state.flags().safe_mode);
+    }
+
+    #[tokio::test]
+    async fn plugin_routes_return_501() {
+        let app = demo_app(false);
+
+        let res = app
+            .clone()
+            .oneshot(Request::get("/plugins").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(
+            body,
+            "Plugins are not yet implemented (see docs/inconsistencies.md)"
+        );
+
+        let res = app
+            .oneshot(
+                Request::get("/plugins/foo/bar")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+    }
+
+    #[tokio::test]
+    async fn cloud_routes_return_501() {
+        let app = demo_app(false);
+
+        let res = app
+            .clone()
+            .oneshot(Request::post("/cloud").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(
+            body,
+            "Cloud fallback is not yet implemented (see docs/inconsistencies.md)"
+        );
+
+        let res = app
+            .oneshot(Request::post("/cloud/sync").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
     }
 }
