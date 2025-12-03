@@ -636,7 +636,7 @@ pub fn build_app_with_state(
             loop {
                 tokio::time::sleep(Duration::from_secs(30)).await;
                 // Snapshot
-                if let Ok(stats) = memory::global().stats() {
+                if let Ok(stats) = memory::global().stats().await {
                     if let Some(g) = MEMORY_ITEMS_PINNED_GAUGE.get() {
                         g.set(stats.pinned as i64);
                     }
