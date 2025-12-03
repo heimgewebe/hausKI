@@ -1351,10 +1351,17 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
         let body = res.into_body().collect().await.unwrap().to_bytes();
-        assert_eq!(body, "Plugins are not yet implemented (see docs/inconsistencies.md)");
+        assert_eq!(
+            body,
+            "Plugins are not yet implemented (see docs/inconsistencies.md)"
+        );
 
         let res = app
-            .oneshot(Request::get("/plugins/foo/bar").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::get("/plugins/foo/bar")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
