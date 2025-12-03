@@ -26,9 +26,11 @@ MODEL="${HAUSKI_CHAT_MODEL:-}"
 # aus flags.yaml ziehen, wenn ENV leer
 if [[ -z "${URL}" && -f "${FLAGS_FILE}" ]]; then
   URL="$(awk -F': *' '/^chat_upstream_url:/ {print $2}' "${FLAGS_FILE}" | tr -d '"' || true)"
+  if [[ "${URL}" == "null" ]]; then URL=""; fi
 fi
 if [[ -z "${MODEL}" && -f "${FLAGS_FILE}" ]]; then
   MODEL="$(awk -F': *' '/^chat_model:/ {print $2}' "${FLAGS_FILE}" | tr -d '"' || true)"
+  if [[ "${MODEL}" == "null" ]]; then MODEL=""; fi
 fi
 
 # konservativer Default für URL; Modell lieber explizit

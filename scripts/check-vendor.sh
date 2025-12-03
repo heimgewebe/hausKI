@@ -7,9 +7,9 @@ set -euo pipefail
 # "no matching package" error because the workspace is configured to replace the
 # crates.io registry with the local vendor tree.
 REQUIRED_CRATES=(
-  "axum"
-  "tokio"
-  "serde"
+  "heimlern-core"
+  "anyhow"
+  "hostname"
 )
 
 missing=()
