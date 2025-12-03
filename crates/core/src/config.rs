@@ -140,44 +140,52 @@ fn parse_env_bool(value: &str) -> Option<bool> {
 
 pub fn load_limits<P: AsRef<Path>>(path: P) -> Result<Limits> {
     let path = path.as_ref();
-    let content = fs::read_to_string(path)
-        .map_err(|e| HauskiError::Config(format!("failed to read limits YAML at {:?}: {}", path, e)))?;
+    let content = fs::read_to_string(path).map_err(|e| {
+        HauskiError::Config(format!("failed to read limits YAML at {:?}: {}", path, e))
+    })?;
 
-    let limits = serde_yaml::from_str(&content)
-        .map_err(|e| HauskiError::Config(format!("failed to parse limits YAML at {:?}: {}", path, e)))?;
+    let limits = serde_yaml::from_str(&content).map_err(|e| {
+        HauskiError::Config(format!("failed to parse limits YAML at {:?}: {}", path, e))
+    })?;
 
     Ok(limits)
 }
 
 pub fn load_models<P: AsRef<Path>>(path: P) -> Result<ModelsFile> {
     let path = path.as_ref();
-    let content = fs::read_to_string(path)
-        .map_err(|e| HauskiError::Config(format!("failed to read models YAML at {:?}: {}", path, e)))?;
+    let content = fs::read_to_string(path).map_err(|e| {
+        HauskiError::Config(format!("failed to read models YAML at {:?}: {}", path, e))
+    })?;
 
-    let models = serde_yaml::from_str(&content)
-        .map_err(|e| HauskiError::Config(format!("failed to parse models YAML at {:?}: {}", path, e)))?;
+    let models = serde_yaml::from_str(&content).map_err(|e| {
+        HauskiError::Config(format!("failed to parse models YAML at {:?}: {}", path, e))
+    })?;
 
     Ok(models)
 }
 
 pub fn load_routing<P: AsRef<Path>>(path: P) -> Result<RoutingPolicy> {
     let path = path.as_ref();
-    let content = fs::read_to_string(path)
-        .map_err(|e| HauskiError::Config(format!("failed to read routing YAML at {:?}: {}", path, e)))?;
+    let content = fs::read_to_string(path).map_err(|e| {
+        HauskiError::Config(format!("failed to read routing YAML at {:?}: {}", path, e))
+    })?;
 
-    let routing = serde_yaml::from_str(&content)
-        .map_err(|e| HauskiError::Config(format!("failed to parse routing YAML at {:?}: {}", path, e)))?;
+    let routing = serde_yaml::from_str(&content).map_err(|e| {
+        HauskiError::Config(format!("failed to parse routing YAML at {:?}: {}", path, e))
+    })?;
 
     Ok(routing)
 }
 
 pub fn load_flags<P: AsRef<Path>>(path: P) -> Result<FeatureFlags> {
     let path = path.as_ref();
-    let content = fs::read_to_string(path)
-        .map_err(|e| HauskiError::Config(format!("failed to read flags YAML at {:?}: {}", path, e)))?;
+    let content = fs::read_to_string(path).map_err(|e| {
+        HauskiError::Config(format!("failed to read flags YAML at {:?}: {}", path, e))
+    })?;
 
-    let mut flags: FeatureFlags = serde_yaml::from_str(&content)
-        .map_err(|e| HauskiError::Config(format!("failed to parse flags YAML at {:?}: {}", path, e)))?;
+    let mut flags: FeatureFlags = serde_yaml::from_str(&content).map_err(|e| {
+        HauskiError::Config(format!("failed to parse flags YAML at {:?}: {}", path, e))
+    })?;
 
     if let Ok(value) = env::var("HAUSKI_SAFE_MODE") {
         match parse_env_bool(&value) {
