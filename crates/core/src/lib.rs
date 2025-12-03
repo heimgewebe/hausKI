@@ -37,6 +37,7 @@ mod chat;
 mod chat_upstream;
 mod config;
 mod egress;
+pub mod error;
 mod memory_api;
 pub use config::{
     load_flags, load_limits, load_models, load_routing, FeatureFlags, Limits, ModelEntry,
@@ -263,13 +264,12 @@ impl AppState {
 
     fn encode_metrics(&self) -> Result<String, std::fmt::Error> {
         let mut body = String::new();
-        let registry = match self.0.registry.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                tracing::error!(error = ?poisoned, "metrics registry lock poisoned – using inner value");
-                poisoned.into_inner()
-            }
-        };
+        // Use mapping to handle PoisonError gracefully
+        let registry = self
+            .0
+            .registry
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         encode(&mut body, &registry)?;
         Ok(body)
     }
@@ -597,7 +597,7 @@ pub fn build_app_with_state(
             .0
             .registry
             .lock()
-            .expect("failed to acquire registry lock during memory metrics registration");
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         registry.register_with_unit(
             "memory_items_pinned",
             "Number of pinned items in hauski-memory",
