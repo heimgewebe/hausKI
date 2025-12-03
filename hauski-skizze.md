@@ -1,13 +1,17 @@
 # HausKI – Skizze vNext (Rust-first, Pop!\_OS, RTX 4070 Ti)
 
+> **⚠️ Hinweis:** Dieses Dokument beschreibt die **Architektur-Vision** von HausKI.
+> Nicht alle hier beschriebenen Features sind bereits implementiert.
+> Für den **aktuellen Implementierungsstatus** siehe [`docs/ist-stand-vs-roadmap.md`](docs/ist-stand-vs-roadmap.md).
+
 ## 0) Kurzfassung
 
 HausKI ist ein **lokaler KI-Orchestrator** mit strengem Offline-Default. Hot-Path vollständig in **Rust**.
-Inference: **llama.cpp** (GGUF, CUDA), **whisper-rs** (ASR), **piper-rs** (TTS).
-Wissen: **SQLite** + **tantivy+hnsw** (leicht) → optional **Qdrant** via Feature.
-UX: **TUI (ratatui)**, **VS-Code-Extension**, **schlankes Obsidian-Plugin**.
-Policies regeln lokal↔Cloud. **GPU-Scheduler** + **CPU-Fallback** sichern Realtime.
-Neu: `trait VectorStore`, `audio/profiles.yaml`, **Wasm-Default** für riskante Adapter, **harte p95/p99-Budgets**.
+Inference: **llama.cpp** (GGUF, CUDA), **whisper-rs** (ASR), **piper-rs** (TTS). **(🔮 Geplant P1)**
+Wissen: **SQLite** + **tantivy+hnsw** (leicht) → optional **Qdrant** via Feature. **(🔮 Geplant P2)**
+UX: **TUI (ratatui)**, **VS-Code-Extension**, **schlankes Obsidian-Plugin**. **(🔮 Geplant P3)**
+Policies regeln lokal↔Cloud. **GPU-Scheduler** + **CPU-Fallback** sichern Realtime. **(🔮 Geplant P2)**
+Neu: `trait VectorStore`, `audio/profiles.yaml`, **Wasm-Default** für riskante Adapter, **harte p95/p99-Budgets**. **(🔮 Geplant P1-P2)**
 
 ---
 
@@ -97,16 +101,23 @@ Clients (TUI • VSCode • Obsidian • CLI • Audio • Comm)
 
 ### 2.2 Module (Crates)
 
-* `core/` (axum API, Policy-Engine, Auth)
-* `indexd/` (SQLite + **`trait VectorStore`**: backends `tantivy+hnsw` | `qdrant`)
-* `llm/` (llama.cpp-Binding, Token-Budget, Prompt-Cache)
-* `asr/`, `tts/`, `audio/` (PipeWire-Profile via `profiles.yaml` + CLI-Fassade)
-* `memory/` (Retrieval-Policies)
-* `commentary/` (Live-Kommentare, Δ-Heuristik)
-* `bridge/` (JetStream + GeoJSON)
-* `observability/` (tracing, Prometheus-Export, **Budget-Guards**)
-* `cli/` (clap-Tools)
-* `adapters/*` (optional, **Wasm-Sandbox**, per Feature-Flag)
+**✅ Implementiert:**
+* `core/` (axum API, Policy-Engine, Auth, HTTP-Endpoints)
+* `indexd/` (In-Memory-Index mit Substring-Suche, Namespace-Support)
+* `memory/` (SQLite Key-Value-Store, TTL, Pin/Unpin-Mechanismus)
+* `policy/` (Policy-Datenstrukturen)
+* `policy_api/` (Policy-API-Layer, optional `heimlern` Feature)
+* `cli/` (clap-basierte CLI-Tools)
+* `embeddings/` (Basis-Struktur)
+
+**🔮 Geplant:**
+* `indexd/` → SQLite + **`trait VectorStore`**: backends `tantivy+hnsw` | `qdrant` **(P2)**
+* `llm/` (llama.cpp-Binding, Token-Budget, Prompt-Cache) **(P1)**
+* `asr/`, `tts/`, `audio/` (PipeWire-Profile via `profiles.yaml` + CLI-Fassade) **(P1-P2)**
+* `commentary/` (Live-Kommentare, Δ-Heuristik) **(P2)**
+* `bridge/` (JetStream + GeoJSON, Weltgewebe-Integration) **(P3)**
+* `observability/` (erweiterte Metriken, GPU-Tracking, Budget-Guards) **(P2)**
+* `adapters/*` (optional, **Wasm-Sandbox**, per Feature-Flag) **(P2)**
 
 ---
 
