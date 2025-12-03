@@ -201,7 +201,9 @@ impl MemoryStore {
             });
             c.inc();
             Ok::<(), anyhow::Error>(())
-        }).await.map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
     }
 
     pub async fn get(&self, key: String) -> Result<Option<Item>> {
@@ -243,7 +245,9 @@ impl MemoryStore {
             });
             c.inc();
             Ok::<Option<Item>, anyhow::Error>(row)
-        }).await.map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
     }
 
     pub async fn evict(&self, key: String) -> Result<bool> {
@@ -260,7 +264,9 @@ impl MemoryStore {
                 c.inc();
             }
             Ok::<bool, anyhow::Error>(n > 0)
-        }).await.map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
     }
 
     pub async fn stats(&self) -> Result<Stats> {
@@ -281,7 +287,9 @@ impl MemoryStore {
                 unpinned,
                 expired_evictions_total: expired_evictions_total(),
             })
-        }).await.map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
     }
 }
 
@@ -307,8 +315,10 @@ async fn janitor_task(db_path: PathBuf, every_secs: u64) {
                     }
                 }
             }
-        }).await {
-             tracing::warn!("janitor task panicked: {:?}", e);
+        })
+        .await
+        {
+            tracing::warn!("janitor task panicked: {:?}", e);
         }
     }
 }
