@@ -126,14 +126,10 @@ pub async fn memory_get_handler(
     Json(req): Json<MemoryGetRequest>,
 ) -> Response {
     let key = req.key.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        let store = mem::global();
-        store.get(&req.key)
-    })
-    .await;
+    let result = mem::global().get(req.key).await;
 
     match result {
-        Ok(Ok(Some(item))) => (
+        Ok(Some(item)) => (
             StatusCode::OK,
             Json(MemoryGetResponse {
                 key, // Use the cloned key here
@@ -143,7 +139,7 @@ pub async fn memory_get_handler(
             }),
         )
             .into_response(),
-        Ok(Ok(None)) => (
+        Ok(None) => (
             StatusCode::OK,
             Json(MemoryGetResponse {
                 key, // And here
@@ -153,12 +149,8 @@ pub async fn memory_get_handler(
             }),
         )
             .into_response(),
-        Ok(Err(e)) => {
+        Err(e) => {
             tracing::error!(error = ?e, "failed to get memory item");
-            (StatusCode::INTERNAL_SERVER_ERROR).into_response()
-        }
-        Err(join_err) => {
-            tracing::error!(error = ?join_err, "spawn_blocking failed");
             (StatusCode::INTERNAL_SERVER_ERROR).into_response()
         }
     }
@@ -190,20 +182,14 @@ pub async fn memory_set_handler(
         }
     });
 
-    let result = tokio::task::spawn_blocking(move || {
-        let store = mem::global();
-        store.set(&req.key, req.value.as_bytes(), ttl, pinned)
-    })
-    .await;
+    let result = mem::global()
+        .set(req.key, req.value.into_bytes(), ttl, pinned)
+        .await;
 
     match result {
-        Ok(Ok(())) => (StatusCode::OK, Json(MemorySetResponse { ok: true })).into_response(),
-        Ok(Err(e)) => {
+        Ok(()) => (StatusCode::OK, Json(MemorySetResponse { ok: true })).into_response(),
+        Err(e) => {
             tracing::error!(error = ?e, "failed to set memory item");
-            (StatusCode::INTERNAL_SERVER_ERROR).into_response()
-        }
-        Err(join_err) => {
-            tracing::error!(error = ?join_err, "spawn_blocking failed");
             (StatusCode::INTERNAL_SERVER_ERROR).into_response()
         }
     }
@@ -220,26 +206,18 @@ pub async fn memory_evict_handler(
     _state: State<AppState>,
     Json(req): Json<MemoryEvictRequest>,
 ) -> Response {
-    let result = tokio::task::spawn_blocking(move || {
-        let store = mem::global();
-        store.evict(&req.key)
-    })
-    .await;
+    let result = mem::global().evict(req.key).await;
 
     match result {
-        Ok(Ok(ok)) => {
+        Ok(ok) => {
             if ok {
                 // Nur inkrementieren, wenn wirklich ein Key gelöscht wurde.
                 record_memory_manual_eviction();
             }
             (StatusCode::OK, Json(MemoryEvictResponse { ok })).into_response()
         }
-        Ok(Err(e)) => {
+        Err(e) => {
             tracing::error!(error = ?e, "failed to evict memory item");
-            (StatusCode::INTERNAL_SERVER_ERROR).into_response()
-        }
-        Err(join_err) => {
-            tracing::error!(error = ?join_err, "spawn_blocking failed");
             (StatusCode::INTERNAL_SERVER_ERROR).into_response()
         }
     }
