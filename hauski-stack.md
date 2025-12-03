@@ -1,15 +1,19 @@
 
 # HausKI – Stack vNext (Rust-first, Offline-Default)
 
-## 0)
+> **⚠️ Hinweis:** Dieses Dokument beschreibt die **angestrebte Technologie-Stack-Vision**.
+> Nicht alle hier aufgeführten Komponenten sind bereits implementiert.
+> Für den **aktuellen Implementierungsstatus** siehe [`docs/ist-stand-vs-roadmap.md`](docs/ist-stand-vs-roadmap.md).
 
-* **Core/API/Daemon:** Rust (axum + tokio + tower + tracing)
-* **LLM/ASR/TTS:** llama.cpp (FFI), whisper-rs, piper-rs
-* **Embeddings & RAG:** candle-transformers + `trait VectorStore` → (tantivy+hnsw **oder** Qdrant)
-* **Persistenz:** SQLite (sqlx) für Meta/Audit; Files für große Artefakte
-* **Events/Bridge:** async-nats lokal; JetStream nur in der Bridge (Weltgewebe)
-* **Security & Ops:** rage (age), egress deny-by-default, Prometheus-Exporter, systemd slices, SBOM+Sign (Syft+cosign)
-* **Plugins/Adapter:** UI-Plugins minimal (TS: VS Code/Obsidian), risikobehaftete Adapter in **Wasm** (wasmtime)
+## 0) Übersicht
+
+* **Core/API/Daemon:** Rust (axum + tokio + tower + tracing) **✅ Implementiert**
+* **LLM/ASR/TTS:** llama.cpp (FFI), whisper-rs, piper-rs **🔮 Geplant (P1)**
+* **Embeddings & RAG:** candle-transformers + `trait VectorStore` → (tantivy+hnsw **oder** Qdrant) **🔮 Geplant (P2)**
+* **Persistenz:** SQLite für Memory-KV-Store **✅ Basis implementiert**, erweitert für Meta/Audit **🔮 Geplant (P2)**
+* **Events/Bridge:** async-nats lokal; JetStream nur in der Bridge (Weltgewebe) **🔮 Geplant (P3)**
+* **Security & Ops:** Egress-Guard **✅ Implementiert**, rage (age) **🔮 Geplant (P1)**, Prometheus-Exporter **✅ Implementiert**, systemd slices **🔮 Geplant (P2)**, SBOM+Sign **🔮 Geplant (P3)**
+* **Plugins/Adapter:** UI-Plugins minimal (TS: VS Code/Obsidian), risikobehaftete Adapter in **Wasm** (wasmtime) **🔮 Geplant (P2-P3)**
 
 ---
 
@@ -40,24 +44,32 @@
 ```
 hauski/
 ├─ crates/
-│  ├─ core/           # axum API, policies, auth
-│  ├─ event/          # async-nats client, subjects, codecs
-│  ├─ indexd/         # sqlite + VectorStore (tantivy/hnsw | qdrant)
-│  ├─ llm/            # llama.cpp FFI, token budgets, prompt cache
-│  ├─ asr/            # whisper-rs, batch/stream
-│  ├─ tts/            # piper-rs, voice cache
-│  ├─ audio/          # profiles.yaml, pipewire-facade (CLI)
-│  ├─ memory/         # retrieval policies (short/working/long) + TTL/pin
-│  ├─ commentary/     # live hooks (vscode/obsidian), Δ-Schwelle
-│  ├─ bridge/         # geojson export, jetstream publish (WG)
-│  ├─ observability/  # tracing, prometheus, **budget guards**
-│  ├─ security/       # rage(age), key mgmt, audit-sign
-│  ├─ adapters/       # matrix/signal/telegram (feature-gated, wasm)
-│  └─ cli/            # clap ops
+│  ├─ core/           ✅ axum API, policies, auth, HTTP-Endpoints
+│  ├─ indexd/         ✅ In-Memory-Index (🔮 → SQLite + VectorStore P2)
+│  ├─ memory/         ✅ SQLite KV-Store, TTL, Pin/Unpin
+│  ├─ policy/         ✅ Policy-Datenstrukturen
+│  ├─ policy_api/     ✅ Policy-API-Layer (optional heimlern)
+│  ├─ embeddings/     ✅ Basis-Struktur
+│  ├─ cli/            ✅ clap ops (Basis-Kommandos)
+│  │
+│  ├─ event/          🔮 async-nats client, subjects, codecs (P3)
+│  ├─ llm/            🔮 llama.cpp FFI, token budgets, prompt cache (P1)
+│  ├─ asr/            🔮 whisper-rs, batch/stream (P1)
+│  ├─ tts/            🔮 piper-rs, voice cache (P1)
+│  ├─ audio/          🔮 profiles.yaml, pipewire-facade (CLI) (P2)
+│  ├─ commentary/     🔮 live hooks (vscode/obsidian), Δ-Schwelle (P2)
+│  ├─ bridge/         🔮 geojson export, jetstream publish (WG) (P3)
+│  ├─ observability/  🔮 erweiterte Metriken, GPU-Tracking, budget guards (P2)
+│  ├─ security/       🔮 rage(age), key mgmt, audit-sign (P1-P2)
+│  └─ adapters/       🔮 matrix/signal/telegram (feature-gated, wasm) (P2)
 └─ plugins/
-   ├─ obsidian/       # TS: UI/FS-Brücke, Logik in Rust
-   └─ vscode/         # TS: PR-Panel, Inline-Hints
+   ├─ obsidian/       🔮 TS: UI/FS-Brücke, Logik in Rust (P3)
+   └─ vscode/         🔮 TS: PR-Panel, Inline-Hints (P3)
 ```
+
+**Legende:**
+- ✅ **Implementiert** – Code existiert, Tests laufen
+- 🔮 **Geplant** – Spezifiziert, aber noch nicht implementiert (P1/P2/P3 = Priorität)
 
 ---
 

@@ -144,3 +144,30 @@ Dieses Dokument listet gefundene Abweichungen zwischen der Architektur-Dokumenta
 3. Ein kleines, messbares Szenario definieren:
    - „Wenn heimlern aktiv ist, wird X über Bandits entschieden, sonst über statische Policy.“
    - Dokumentation mit diesem realen, nachvollziehbaren Beispiel ergänzen.
+
+---
+
+## Aktualisierungs-Historie
+
+**2025-12-03:** Dokumentation aktualisiert zur Klärung Ist-Stand vs. Roadmap
+
+Die folgenden Maßnahmen wurden umgesetzt:
+
+1. **Neues Dokument erstellt:** [`docs/ist-stand-vs-roadmap.md`](./ist-stand-vs-roadmap.md)
+   - Vollständige Übersicht über implementierte Features (✅) und geplante Erweiterungen (🔮)
+   - Priorisierung: P1 (kurzfristig), P2 (mittelfristig), P3 (langfristig)
+   - Detaillierte Status-Tabelle für alle Hauptkomponenten
+
+2. **Architektur-Dokumente aktualisiert:**
+   - `hauski-skizze.md`: Hinweis am Anfang hinzugefügt, dass es sich um eine Vision handelt
+   - `hauski-stack.md`: Status-Marker (✅/🔮) für alle Komponenten ergänzt
+   - Modul-Übersicht in beiden Dokumenten mit klarer Trennung Ist/Roadmap
+
+3. **Status-Übersicht:**
+   - **Indexd:** In-Memory-Implementierung dokumentiert, Vektor-/Persistenz-Features als P2 geplant
+   - **LLM/ASR/TTS/Audio:** Explizit als "nicht implementiert, geplant P1" gekennzeichnet
+   - **Plugins & Cloud-Fallback:** Status "leere Platzhalter" dokumentiert, als P2 geplant
+   - **Heimlern:** Als "optionales Feature in policy_api" dokumentiert, Integration in core als P2 geplant
+
+Diese Änderungen erfüllen die in diesem Dokument unter "Empfohlene Maßnahmen" (jeweils Punkt 1)
+beschriebenen kurzfristigen Schritte: klare Unterscheidung zwischen aktuellem Stand und Zielbild.

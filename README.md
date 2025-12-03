@@ -5,12 +5,24 @@
 
 HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-GPU.
 
-**Hauptmerkmale:**
+> **📋 Implementierungsstatus:** Nicht alle Features sind bereits implementiert.
+> Siehe [`docs/ist-stand-vs-roadmap.md`](docs/ist-stand-vs-roadmap.md) für eine vollständige
+> Übersicht über den aktuellen Stand (✅) und geplante Erweiterungen (🔮).
+
+**Hauptmerkmale (aktuell implementiert):**
 - **Rust-basiert**: Der Kern des Orchestrators ist in Rust implementiert und nutzt `axum` und `tokio` für hohe Performance und Sicherheit.
 - **Offline-First**: Entwickelt für den lokalen Betrieb ohne ständige Internetverbindung.
-- **GPU-Unterstützung**: Optimiert für NVIDIA-GPUs zur Beschleunigung von KI-Inferenz-Aufgaben.
-- **Vektorsuche**: Integrierte Vektorsuche mit `tantivy` und `SQLite` zur effizienten Verarbeitung von Wissen.
+- **In-Memory-Indexierung**: Substring-basierte Suche mit Namespace-Support (Vektorsuche geplant für P2).
+- **Memory-System**: SQLite-basierter Key-Value-Store mit TTL und Pin/Unpin-Mechanismus.
 - **Policy-Engine**: Ein regelbasiertes System zur Steuerung von Routing, Speicher und Systemgrenzen.
+- **Egress-Guard**: Whitelist-basierte Kontrolle ausgehender HTTP-Requests.
+- **Observability**: Prometheus-Metriken für HTTP, Memory und Index-Latenz.
+
+**Geplante Features (Roadmap):**
+- **GPU-Unterstützung**: Optimiert für NVIDIA-GPUs zur Beschleunigung von KI-Inferenz-Aufgaben (P1-P2).
+- **Vektorsuche**: Integration von `tantivy+hnsw` oder Qdrant für semantische Suche (P2).
+- **LLM/ASR/TTS**: Lokale Inference mit llama.cpp, whisper-rs, piper-rs (P1).
+- **Plugins & Cloud-Fallback**: Erweiterbare Plugin-Architektur und Cloud-Routing (P2).
 
 ### Lokaler Chat (llama.cpp Upstream)
 
@@ -521,8 +533,10 @@ Für eine dauerhafte Installation kann `hauski` als `systemd`-Dienst konfigurier
 ---
 
 ## Weiterführende Dokumente
-- [`hauski-skizze.md`](hauski-skizze.md) – Vision, Funktionsumfang, Performance-Budgets, Security-Ansatz.
-- [`hauski-stack.md`](hauski-stack.md) – Technologiewahl, Tooling, CI-Strategie und Testpyramide.
+- [`docs/ist-stand-vs-roadmap.md`](docs/ist-stand-vs-roadmap.md) – **Implementierungsstatus**: Übersicht über alle Features mit klarer Trennung zwischen Ist-Stand (✅) und Roadmap (🔮).
+- [`hauski-skizze.md`](hauski-skizze.md) – Vision, Funktionsumfang, Performance-Budgets, Security-Ansatz (Roadmap-fokussiert).
+- [`hauski-stack.md`](hauski-stack.md) – Technologiewahl, Tooling, CI-Strategie und Testpyramide (inkl. Status-Marker).
+- [`docs/inconsistencies.md`](docs/inconsistencies.md) – Dokumentierte Abweichungen zwischen Architektur-Dokumenten und aktueller Implementierung.
 - [`docs/vision/multi-agent-rag.md`](docs/vision/multi-agent-rag.md) – Orchestrierung der spezialisierten Agenten inkl. Contracts.
   Einstieg über `just agents.sync` (Template spiegeln) und `just agents.run` (Dry-Run).
 
