@@ -40,8 +40,8 @@ mod egress;
 pub mod error;
 mod memory_api;
 pub use config::{
-    load_flags, load_limits, load_models, load_routing, FeatureFlags, Limits, ModelEntry,
-    ModelsFile, RoutingDecision, RoutingPolicy, RoutingRule,
+    load_flags, load_limits, load_models, load_routing, Asr, FeatureFlags, Latency, Limits,
+    ModelEntry, ModelsFile, RoutingDecision, RoutingPolicy, RoutingRule, Thermal,
 };
 pub use egress::{
     AllowlistedClient, EgressGuard, EgressGuardError, GuardError, GuardedRequestError,
@@ -697,17 +697,58 @@ fn cloud_routes() -> Router<AppState> {
         .route("/cloud/{*path}", any(not_implemented_cloud))
 }
 
-async fn not_implemented_plugins() -> (StatusCode, &'static str) {
+#[derive(serde::Serialize)]
+struct NotImplementedResponse {
+    status: &'static str,
+    hint: &'static str,
+    feature_id: &'static str,
+}
+
+async fn not_implemented_plugins(
+    State(state): State<AppState>,
+    req: Request<Body>,
+) -> (StatusCode, Json<NotImplementedResponse>) {
+    let method = req.method().clone();
+    let uri = req.uri().clone();
+    tracing::warn!(%method, %uri, "access to unimplemented feature: plugins");
+    state.record_http_observation(
+        method,
+        "/plugins",
+        StatusCode::NOT_IMPLEMENTED,
+        Instant::now(),
+    );
+
     (
         StatusCode::NOT_IMPLEMENTED,
-        "Plugins are not yet implemented (see docs/inconsistencies.md)",
+        Json(NotImplementedResponse {
+            status: "not_implemented",
+            hint: "Feature not implemented yet – see docs/inconsistencies.md#plugins",
+            feature_id: "plugins",
+        }),
     )
 }
 
-async fn not_implemented_cloud() -> (StatusCode, &'static str) {
+async fn not_implemented_cloud(
+    State(state): State<AppState>,
+    req: Request<Body>,
+) -> (StatusCode, Json<NotImplementedResponse>) {
+    let method = req.method().clone();
+    let uri = req.uri().clone();
+    tracing::warn!(%method, %uri, "access to unimplemented feature: cloud");
+    state.record_http_observation(
+        method,
+        "/cloud",
+        StatusCode::NOT_IMPLEMENTED,
+        Instant::now(),
+    );
+
     (
         StatusCode::NOT_IMPLEMENTED,
-        "Cloud fallback is not yet implemented (see docs/inconsistencies.md)",
+        Json(NotImplementedResponse {
+            status: "not_implemented",
+            hint: "Feature not implemented yet – see docs/inconsistencies.md#cloud",
+            feature_id: "cloud",
+        }),
     )
 }
 
@@ -1351,10 +1392,13 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
         let body = res.into_body().collect().await.unwrap().to_bytes();
-        assert_eq!(
-            body,
-            "Plugins are not yet implemented (see docs/inconsistencies.md)"
-        );
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "not_implemented");
+        assert_eq!(json["feature_id"], "plugins");
+        assert!(json["hint"]
+            .as_str()
+            .unwrap()
+            .contains("docs/inconsistencies.md#plugins"));
 
         let res = app
             .oneshot(
@@ -1378,10 +1422,13 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
         let body = res.into_body().collect().await.unwrap().to_bytes();
-        assert_eq!(
-            body,
-            "Cloud fallback is not yet implemented (see docs/inconsistencies.md)"
-        );
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "not_implemented");
+        assert_eq!(json["feature_id"], "cloud");
+        assert!(json["hint"]
+            .as_str()
+            .unwrap()
+            .contains("docs/inconsistencies.md#cloud"));
 
         let res = app
             .oneshot(Request::post("/cloud/sync").body(Body::empty()).unwrap())
