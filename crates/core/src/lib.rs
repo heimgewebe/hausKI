@@ -697,6 +697,9 @@ fn cloud_routes() -> Router<AppState> {
         .route("/cloud/{*path}", any(not_implemented_cloud))
 }
 
+const PLUGINS_PATH_TEMPLATE: &str = "/plugins";
+const CLOUD_PATH_TEMPLATE: &str = "/cloud";
+
 #[derive(serde::Serialize)]
 struct NotImplementedResponse {
     status: &'static str,
@@ -710,10 +713,10 @@ async fn not_implemented_plugins(
 ) -> (StatusCode, Json<NotImplementedResponse>) {
     let method = req.method().clone();
     let uri = req.uri().clone();
-    tracing::warn!(%method, %uri, "access to unimplemented feature: plugins");
+    tracing::info!(%method, %uri, "access to unimplemented feature: plugins");
     state.record_http_observation(
         method,
-        "/plugins",
+        PLUGINS_PATH_TEMPLATE,
         StatusCode::NOT_IMPLEMENTED,
         Instant::now(),
     );
@@ -734,10 +737,10 @@ async fn not_implemented_cloud(
 ) -> (StatusCode, Json<NotImplementedResponse>) {
     let method = req.method().clone();
     let uri = req.uri().clone();
-    tracing::warn!(%method, %uri, "access to unimplemented feature: cloud");
+    tracing::info!(%method, %uri, "access to unimplemented feature: cloud");
     state.record_http_observation(
         method,
-        "/cloud",
+        CLOUD_PATH_TEMPLATE,
         StatusCode::NOT_IMPLEMENTED,
         Instant::now(),
     );
