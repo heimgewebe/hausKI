@@ -710,7 +710,7 @@ async fn not_implemented_plugins(
 ) -> (StatusCode, Json<NotImplementedResponse>) {
     let method = req.method().clone();
     let uri = req.uri().clone();
-    tracing::warn!(%method, %uri, "access to unimplemented feature: plugins");
+    tracing::info!(%method, %uri, "access to unimplemented feature: plugins");
     state.record_http_observation(
         method,
         "/plugins",
@@ -734,7 +734,7 @@ async fn not_implemented_cloud(
 ) -> (StatusCode, Json<NotImplementedResponse>) {
     let method = req.method().clone();
     let uri = req.uri().clone();
-    tracing::warn!(%method, %uri, "access to unimplemented feature: cloud");
+    tracing::info!(%method, %uri, "access to unimplemented feature: cloud");
     state.record_http_observation(
         method,
         "/cloud",
