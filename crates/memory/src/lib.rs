@@ -411,7 +411,10 @@ mod tests {
             .unwrap();
 
         let item = store.get("k".into()).await.unwrap().expect("item missing");
-        assert!(item.pinned, "pinned flag should remain true when not provided");
+        assert!(
+            item.pinned,
+            "pinned flag should remain true when not provided"
+        );
         assert_eq!(item.value, b"v2");
     }
 
@@ -432,7 +435,10 @@ mod tests {
             .unwrap();
 
         let item = store.get("k".into()).await.unwrap().expect("item missing");
-        assert!(!item.pinned, "pinned flag should update when explicitly set to false");
+        assert!(
+            !item.pinned,
+            "pinned flag should update when explicitly set to false"
+        );
         assert_eq!(item.value, b"v2");
     }
 }
