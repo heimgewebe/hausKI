@@ -171,18 +171,25 @@ impl MemoryStore {
 
         task::spawn_blocking(move || {
             let now = Utc::now().to_rfc3339();
-            let pinned_i = i32::from(pinned.unwrap_or(false));
             let conn = Connection::open(&db_path)?;
 
-            // Bewahre created_ts, wenn vorhanden; sonst jetzt
-            let created: Option<String> = conn
+            // Bestehende Metadaten (created_ts, pinned) beibehalten, sofern vorhanden.
+            let existing: Option<(String, Option<i64>)> = conn
                 .query_row(
-                    "SELECT created_ts FROM memory_items WHERE key=?1",
+                    "SELECT created_ts, pinned FROM memory_items WHERE key=?1",
                     params![key],
-                    |r| r.get(0),
+                    |r| Ok((r.get(0)?, r.get(1)?)),
                 )
                 .optional()?;
-            let created_ts = created.unwrap_or_else(|| now.clone());
+
+            let (created_ts, pinned_flag) = match existing {
+                Some((created_ts, pinned_i_opt)) => {
+                    let current_pinned = pinned_i_opt.unwrap_or(0) != 0;
+                    (created_ts, pinned.unwrap_or(current_pinned))
+                }
+                None => (now.clone(), pinned.unwrap_or(false)),
+            };
+            let pinned_i = i32::from(pinned_flag);
 
             conn.execute(
                 r"INSERT INTO memory_items(key,value,ttl_sec,pinned,created_ts,updated_ts)
@@ -385,5 +392,53 @@ mod tests {
         tokio::time::sleep(Duration::from_secs(2)).await;
         let got = store.get("k".into()).await.unwrap();
         assert!(got.is_none(), "expected TTL expiry");
+    }
+
+    #[tokio::test]
+    async fn set_keeps_existing_pinned_status_when_not_provided() {
+        let (store, _tmp) = test_store(60);
+
+        // Initial write sets pinned=true
+        store
+            .set("k".into(), "v".as_bytes().to_vec(), None, Some(true))
+            .await
+            .unwrap();
+
+        // Update without pinned flag should keep pinned=true
+        store
+            .set("k".into(), "v2".as_bytes().to_vec(), None, None)
+            .await
+            .unwrap();
+
+        let item = store.get("k".into()).await.unwrap().expect("item missing");
+        assert!(
+            item.pinned,
+            "pinned flag should remain true when not provided"
+        );
+        assert_eq!(item.value, b"v2");
+    }
+
+    #[tokio::test]
+    async fn set_can_unpin_when_flag_is_false() {
+        let (store, _tmp) = test_store(60);
+
+        // Start pinned
+        store
+            .set("k".into(), "v".as_bytes().to_vec(), None, Some(true))
+            .await
+            .unwrap();
+
+        // Explicit false should unpin
+        store
+            .set("k".into(), "v2".as_bytes().to_vec(), None, Some(false))
+            .await
+            .unwrap();
+
+        let item = store.get("k".into()).await.unwrap().expect("item missing");
+        assert!(
+            !item.pinned,
+            "pinned flag should update when explicitly set to false"
+        );
+        assert_eq!(item.value, b"v2");
     }
 }
