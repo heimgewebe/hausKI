@@ -9,12 +9,13 @@ agent-kit/.uv/
 agent-kit/.pytest_cache/
 agent-kit/.mypy_cache/
 
-# Python caches
+# Python caches & packaging
 __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
 .python-version
+*.egg-info/
 
 # Logs and misc
 .env
@@ -60,3 +61,4 @@ observability/k6/summary.json
 sichter-reports
 artifacts/
 metrics.json
+
