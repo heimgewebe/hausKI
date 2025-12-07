@@ -1,0 +1,87 @@
+# ci_failure_triage – Prototyp für „CI-Fehler in Repo X → was tun?“
+#
+# Idee:
+# - Dieses Playbook wird typischerweise von einem CI-Job gestartet,
+#   nachdem bereits ein Fehler aufgetreten ist (z. B. roter Guard/Smoke).
+# - Es sammelt, soweit möglich, Metriken im metrics.snapshot-Format
+#   (tmp/metrics.json), reichert sie mit CI-Kontext an und ruft dann
+#   `hauski assist`, um einen strukturierten Handlungsvorschlag zu erzeugen.
+#
+# Schnittstellen:
+# - Erwartet (wenn vorhanden) tmp/metrics.json im Schema metrics.snapshot.
+# - Nutzt WGX (wgx oder ./scripts/wgx), um fehlende Metriken zu erzeugen.
+# - Reicht Kontext via ENV an hauski assist durch (REPO, SHA, CI_URL).
+#
+# Achtung:
+# - Dies ist bewusst ein Prototyp und trifft noch keine harten Entscheidungen
+#   (kein automatisches Fix/Commit), sondern liefert Empfehlungen.
+
+version: 1
+name: ci_failure_triage
+
+steps:
+  - id: ensure_tmp_dir
+    run: |
+      mkdir -p tmp
+
+  - id: ensure_metrics_snapshot
+    run: |
+      set -euo pipefail
+
+      # Falls bereits Metriken existieren (z. B. aus guard/smoke), wiederverwenden.
+      if [[ -f tmp/metrics.json ]]; then
+        echo "Found existing tmp/metrics.json – reusing metrics snapshot."
+        exit 0
+      fi
+
+      # Fallback: versuche, über WGX ein Metrics-Snapshot zu erzeugen.
+      if [[ -x ./scripts/wgx ]]; then
+        WGX=./scripts/wgx
+      else
+        if command -v wgx >/dev/null 2>&1; then
+          WGX=wgx
+        else
+          echo "No wgx found, skipping metrics snapshot generation."
+          exit 0
+        fi
+      fi
+
+      echo "No tmp/metrics.json present – trying WGX metrics export."
+      # Die genaue Subcommand-Struktur kann je nach WGX-Profile variieren.
+      # Wir lehnen uns an bestehende Muster aus code_assist.yml an:
+      #   wgx lint --export tmp/metrics.json
+      if ! $WGX lint --export tmp/metrics.json; then
+        echo "WGX lint --export failed – continuing without metrics snapshot."
+        rm -f tmp/metrics.json || true
+      fi
+
+  - id: print_context
+    run: |
+      echo "=== CI Failure Context ==="
+      echo "REPO: ${CI_REPO:-unknown}"
+      echo "SHA: ${CI_SHA:-unknown}"
+      echo "CI_URL: ${CI_URL:-unknown}"
+      if [[ -f tmp/metrics.json ]]; then
+        echo "metrics.json: present"
+      else
+        echo "metrics.json: not present"
+      fi
+
+  - id: hauski_ci_failure_triage
+    run: |
+      set -euo pipefail
+
+      if ! command -v hauski >/dev/null 2>&1; then
+        echo "hauski CLI not found on PATH – cannot run ci_failure_triage assist."
+        exit 1
+      fi
+
+      # Übergibt CI-Kontext und (falls vorhanden) Metriken an hausKI.
+      # Die konkrete Interpretation (Policy, Entscheidungslogik) liegt im
+      # hausKI-Playbook "ci_failure" und kann dort iterativ verfeinert werden.
+      hauski assist \
+        --playbook ci_failure \
+        ${CI_REPO:+--repo "$CI_REPO"} \
+        ${CI_SHA:+--sha "$CI_SHA"} \
+        ${CI_URL:+--ci-url "$CI_URL"} \
+        ${METRICS_PATH:-$( [[ -f tmp/metrics.json ]] && echo "--metrics tmp/metrics.json" || echo "" )}
