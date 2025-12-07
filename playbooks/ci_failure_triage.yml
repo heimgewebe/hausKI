@@ -12,9 +12,17 @@
 # - Nutzt WGX (wgx oder ./scripts/wgx), um fehlende Metriken zu erzeugen.
 # - Reicht Kontext via ENV an hauski assist durch (REPO, SHA, CI_URL).
 #
+# Umgebungsvariablen:
+# - CI_REPO: Repository (z. B. "heimgewebe/hausKI"), kann fehlen → "unknown"
+# - CI_SHA: Commit-SHA (z. B. aus $GITHUB_SHA), kann fehlen → "unknown"
+# - CI_URL: URL zum CI-Run (z. B. $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)
+# - METRICS_PATH: Optionaler expliziter Pfad zu metrics.json, Fallback: tmp/metrics.json
+#
 # Achtung:
 # - Dies ist bewusst ein Prototyp und trifft noch keine harten Entscheidungen
 #   (kein automatisches Fix/Commit), sondern liefert Empfehlungen.
+# - hauski ist optional: Wenn nicht vorhanden oder Assist fehlschlägt, wird
+#   nur eine Warnung ausgegeben, aber der Job schlägt nicht fehl.
 
 version: 1
 name: ci_failure_triage
@@ -72,16 +80,27 @@ steps:
       set -euo pipefail
 
       if ! command -v hauski >/dev/null 2>&1; then
-        echo "hauski CLI not found on PATH – cannot run ci_failure_triage assist."
-        exit 1
+        echo "WARNING: hauski CLI not found on PATH – skipping ci_failure_triage assist."
+        exit 0
+      fi
+
+      # Metrik-Argument vorbereiten: Priorisiere METRICS_PATH, Fallback tmp/metrics.json
+      metrics_arg=()
+      if [[ -n "${METRICS_PATH:-}" ]]; then
+        metrics_arg=(--metrics "$METRICS_PATH")
+      elif [[ -f tmp/metrics.json ]]; then
+        metrics_arg=(--metrics tmp/metrics.json)
       fi
 
       # Übergibt CI-Kontext und (falls vorhanden) Metriken an hausKI.
       # Die konkrete Interpretation (Policy, Entscheidungslogik) liegt im
       # hausKI-Playbook "ci_failure" und kann dort iterativ verfeinert werden.
-      hauski assist \
+      if ! hauski assist \
         --playbook ci_failure \
         ${CI_REPO:+--repo "$CI_REPO"} \
         ${CI_SHA:+--sha "$CI_SHA"} \
         ${CI_URL:+--ci-url "$CI_URL"} \
-        ${METRICS_PATH:-$( [[ -f tmp/metrics.json ]] && echo "--metrics tmp/metrics.json" || echo "" )}
+        "${metrics_arg[@]}"; then
+        echo "WARNING: hauski assist failed (ci_failure) – continuing without triage result."
+        exit 0
+      fi
