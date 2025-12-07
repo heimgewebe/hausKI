@@ -11,12 +11,15 @@ Ziel:
 
 Die YAML-Quelle des Playbooks liegt unter `playbooks/ci-failure-main.yaml`.
 
+**Status:** Dies ist ein dokumentarischer Prototyp. Die Playbook-Struktur dient zunächst als Vorlage und wird später von hausKI interpretierbar gemacht.
+
 ---
 
 ## 1. Trigger-Bedingung
 
-Das Playbook wird aktiv, wenn ein Event eingeht, das in etwa so aussieht
-(vereinfachtes Beispiel im Stil von `event.line`):
+Das Playbook wird aktiv, wenn ein Event eingeht, das in etwa so aussieht.
+
+**Hinweis:** Dies ist ein vereinfachtes Beispiel. Die tatsächliche Struktur richtet sich nach dem `event.line`-Contract aus dem Metarepo.
 
 ```json
 {
