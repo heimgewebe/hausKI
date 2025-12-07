@@ -1,0 +1,60 @@
+# Prototypisches hausKI-Playbook für CI-Fehler auf `main`.
+# Dieses Format ist absichtlich einfach gehalten und soll später
+# an einen formalen Contract (z. B. hauski.playbook.schema.json) angebunden werden.
+
+id: ci-failure-main
+description: >
+  Reaktion auf harte CI-Fehler auf dem Branch `main` in einem Heimgewebe-Repo.
+
+triggers:
+  - kind: ci.result
+    when:
+      status: failure
+      branch: main
+
+steps:
+  # 1. WGX Guard laufen lassen
+  - id: run-wgx-guard
+    kind: command
+    description: >
+      Führt einen standardisierten WGX-Guard-Lauf für das betroffene Repo auf `main` aus.
+    run:
+      command: "wgx guard --repo {repo} --branch main"
+      env:
+        # Optional: Platzhalter für spätere Tracing-/Context-Infos
+        HWG_EVENT_ID: "{event_id}"
+        HWG_CI_RUN_URL: "{run_url}"
+
+  # 2. Sichter-Quick-Review anstoßen
+  - id: request-sichter-quick
+    kind: github_comment
+    description: >
+      Fordert einen schnellen KI-Review durch sichter an, um den Fehler einzuordnen.
+    github:
+      target: "ci-run-or-pr"
+      body: |
+        @heimgewebe/sichter /quick
+
+  # 3. Eintrag in chronik schreiben
+  - id: log-to-chronik
+    kind: emit_event
+    description: >
+      Schreibt einen konsolidierten CI-Fehler-Eintrag in chronik, damit
+      Langzeitmuster erkannt werden können.
+    event:
+      kind: ci.failure.logged
+      labels:
+        repo: "{repo}"
+        branch: "{branch}"
+        provider: "{provider}"
+        workflow: "{workflow}"
+      meta:
+        run_url: "{run_url}"
+        original_event_id: "{event_id}"
+
+metadata:
+  version: 1
+  created_by: "hausKI-playbook-prototype"
+  notes:
+    - "Dieses Playbook ist ein erster Prototyp und kann später durch eine formale Policy-Engine ersetzt oder erweitert werden."
+    - "Platzhalter wie {repo} oder {run_url} sollen aus dem eingehenden Event (`event.line`) befüllt werden."
