@@ -92,15 +92,19 @@ steps:
         metrics_arg=(--metrics tmp/metrics.json)
       fi
 
+      # CI-Kontext-Argumente vorbereiten
+      ci_args=()
+      [[ -n "${CI_REPO:-}" ]] && ci_args+=(--repo "$CI_REPO")
+      [[ -n "${CI_SHA:-}" ]] && ci_args+=(--sha "$CI_SHA")
+      [[ -n "${CI_URL:-}" ]] && ci_args+=(--ci-url "$CI_URL")
+
       # Übergibt CI-Kontext und (falls vorhanden) Metriken an hausKI.
       # Die konkrete Interpretation (Policy, Entscheidungslogik) liegt im
       # hausKI-Playbook "ci_failure" und kann dort iterativ verfeinert werden.
       if ! hauski assist \
         --playbook ci_failure \
-        ${CI_REPO:+--repo "$CI_REPO"} \
-        ${CI_SHA:+--sha "$CI_SHA"} \
-        ${CI_URL:+--ci-url "$CI_URL"} \
-        "${metrics_arg[@]}"; then
+        "${ci_args[@]+"${ci_args[@]}"}" \
+        "${metrics_arg[@]+"${metrics_arg[@]}"}"; then
         echo "WARNING: hauski assist failed (ci_failure) – continuing without triage result."
         exit 0
       fi
