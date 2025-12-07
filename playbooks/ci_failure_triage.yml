@@ -100,7 +100,7 @@ steps:
         ${CI_REPO:+--repo "$CI_REPO"} \
         ${CI_SHA:+--sha "$CI_SHA"} \
         ${CI_URL:+--ci-url "$CI_URL"} \
-        "${metrics_arg[@]+"${metrics_arg[@]}"}"; then
+        "${metrics_arg[@]}"; then
         echo "WARNING: hauski assist failed (ci_failure) – continuing without triage result."
         exit 0
       fi
