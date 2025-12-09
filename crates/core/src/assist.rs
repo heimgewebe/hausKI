@@ -152,13 +152,12 @@ fn extract_citations_from_value(v: &serde_json::Value) -> Vec<AssistCitation> {
 }
 
 /// Holt Top-K Treffer aus `/index/search` (wenn erreichbar). Fallback: leer.
-async fn fetch_topk_citations(question: &str) -> Vec<AssistCitation> {
+async fn fetch_topk_citations(question: &str, client: &reqwest::Client) -> Vec<AssistCitation> {
     let base = env::var("HAUSKI_INTERNAL_BASE")
         .ok()
         .unwrap_or_else(|| "http://127.0.0.1:8080".to_string());
     let url = format!("{}/index/search", base.trim_end_matches('/'));
 
-    let client = reqwest::Client::new();
     let body = IndexSearchRequest {
         q: question,
         namespace: Some("default"),
@@ -200,13 +199,14 @@ pub async fn assist_handler(
 ) -> (StatusCode, Json<AssistResponse>) {
     let started = Instant::now();
     let mode = route_mode(&req.question, &req.mode);
+    let http_client = state.http_client();
 
     // TODO(Phase 2): Für "code" Tooling-Hooks ergänzen.
     let answer = format!("Router wählte {mode}. (MVP-Stub)");
 
     // Knowledge-Modus: versuche Top-K aus /index/search; bei Fehler → leere Liste (MVP-Fallback)
     let citations = if mode == "knowledge" {
-        fetch_topk_citations(&req.question).await
+        fetch_topk_citations(&req.question, &http_client).await
     } else {
         Vec::new()
     };
