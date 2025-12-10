@@ -1,6 +1,7 @@
 ---
 name: wgx-smoke
-
+permissions:
+  contents: read
 "on":
   workflow_dispatch:
   push:
