@@ -1,13 +1,16 @@
-name: wgx-smoke (disabled)
-permissions: {}
-on:
-  # Only manually startable to keep the file valid,
-  # but no longer appears "red" in normal CI.
-  workflow_dispatch: {}
+---
+name: wgx-smoke
+permissions:
+  contents: read
+"on":
+  workflow_dispatch:
+  push:
+    paths:
+      - ".wgx/**"
+      - "docs/wgx-konzept.md"
 
 jobs:
-  noop:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Report disabled status
-        run: echo "wgx-smoke workflow is intentionally disabled (noop)."
+  smoke:
+    # auch hier: statt eigener CI-Logik nur noch Forwarder auf das
+    # kanonische wgx-Workflow-Repo.
+    uses: heimgewebe/wgx/.github/workflows/wgx-smoke.yml@main
