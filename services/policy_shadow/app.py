@@ -19,7 +19,8 @@ EVENT_BASE_ENV = "HAUSKI_DATA"
 
 
 def _event_dir() -> Path:
-    base = Path(os.getenv(EVENT_BASE_ENV, Path.home() / ".hauski"))
+    base_env = os.getenv(EVENT_BASE_ENV)
+    base = Path(base_env) if base_env else Path.home() / ".hauski"
     events_dir = base / "events"
     events_dir.mkdir(parents=True, exist_ok=True)
     return events_dir
