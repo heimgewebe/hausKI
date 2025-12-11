@@ -3,12 +3,12 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use utoipa::ToSchema;
 
-use crate::{tools, AppState};
+use crate::AppState;
 use axum::extract::State;
 use axum::http::Method;
 
 use chrono::Utc;
-use std::{collections::BTreeMap, env, fs, io::Write, path::Path, sync::Arc};
+use std::{collections::BTreeMap, env, fs, io::Write, path::Path};
 use ulid::Ulid;
 
 /// Optional: Pfad für JSONL-Events. Wenn nicht gesetzt, werden keine Events geschrieben.
@@ -200,11 +200,7 @@ pub async fn assist_handler(
     let started = Instant::now();
     let mode = route_mode(&req.question, &req.mode);
     let http_client = state.http_client();
-
-    // Tooling-Registry initialisieren
-    let mut tool_registry = tools::ToolRegistry::new();
-    tool_registry.register(Arc::new(tools::EchoTool));
-    tool_registry.register(Arc::new(tools::CodeAnalysisTool));
+    let tool_registry = state.tools();
 
     // Falls "code", führe Analyse-Tool aus. Sonst Knowledge oder Standard-Stub.
     let answer = if mode == "code" {
@@ -294,22 +290,25 @@ mod tests {
     }
 }
 
-    #[tokio::test]
-    async fn assist_handler_uses_tool_for_code_mode() {
-        // Setup mock state
-        let limits = crate::Limits::default();
-        let models = crate::ModelsFile::default();
-        let routing = crate::RoutingPolicy::default();
-        let flags = crate::FeatureFlags::default();
-        let chat_cfg = std::sync::Arc::new(crate::chat::ChatCfg::new(None, None));
-        let state = AppState::new(limits, models, routing, flags, chat_cfg, false);
+#[tokio::test]
+async fn assist_handler_uses_tool_for_code_mode() {
+    // Setup mock state
+    let limits = crate::Limits::default();
+    let models = crate::ModelsFile::default();
+    let routing = crate::RoutingPolicy::default();
+    let flags = crate::FeatureFlags::default();
+    let chat_cfg = std::sync::Arc::new(crate::chat::ChatCfg::new(None, None));
+    let state = AppState::new(limits, models, routing, flags, chat_cfg, false);
 
-        let req = AssistRequest {
-            question: "some code question".to_string(),
-            mode: Some("code".to_string()),
-        };
+    let req = AssistRequest {
+        question: "some code question".to_string(),
+        mode: Some("code".to_string()),
+    };
 
-        let (_status, Json(resp)) = assist_handler(State(state), Json(req)).await;
+    let (_status, Json(resp)) = assist_handler(State(state), Json(req)).await;
 
-        assert_eq!(resp.answer, "Code analysis tool is a stub in this MVP. Future: run linter/parser.");
-    }
+    assert_eq!(
+        resp.answer,
+        "Code analysis tool is a stub in this MVP. Future: run linter/parser."
+    );
+}
