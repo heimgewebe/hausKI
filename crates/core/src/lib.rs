@@ -39,6 +39,7 @@ mod config;
 mod egress;
 pub mod error;
 mod memory_api;
+mod plugins;
 pub use config::{
     load_flags, load_limits, load_models, load_routing, Asr, FeatureFlags, Latency, Limits,
     ModelEntry, ModelsFile, RoutingDecision, RoutingPolicy, RoutingRule, Thermal,
@@ -109,6 +110,7 @@ struct AppStateInner {
     routing: RoutingPolicy,
     flags: FeatureFlags,
     chat_cfg: Arc<chat::ChatCfg>,
+    plugins: plugins::PluginRegistry,
     // These fields hold the metric families alive for the prometheus registry.
     // They are cloned into closures but not directly read after construction.
     #[allow(dead_code)]
@@ -212,12 +214,15 @@ impl AppState {
                 reqwest::Client::new()
             });
 
+        let plugins = plugins::PluginRegistry::new();
+
         Self(Arc::new(AppStateInner {
             limits,
             models,
             routing,
             flags,
             chat_cfg,
+            plugins,
             http_requests,
             http_latency,
             metrics_recorder,
@@ -248,6 +253,10 @@ impl AppState {
 
     pub fn chat_cfg(&self) -> Arc<chat::ChatCfg> {
         self.0.chat_cfg.clone()
+    }
+
+    pub fn plugins(&self) -> plugins::PluginRegistry {
+        self.0.plugins.clone()
     }
 
     pub fn index(&self) -> IndexState {
@@ -683,11 +692,31 @@ fn config_routes() -> Router<AppState> {
         .route("/config/routing", get(get_routing))
 }
 
-// TODO: Implement plugin routes. Currently returns 501 placeholders.
 fn plugin_routes() -> Router<AppState> {
     Router::<AppState>::new()
-        .route("/plugins", any(not_implemented_plugins))
-        .route("/plugins/{*path}", any(not_implemented_plugins))
+        .route("/plugins", get(list_plugins))
+        .route("/plugins/{id}", get(get_plugin_details))
+}
+
+async fn list_plugins(State(state): State<AppState>) -> Json<Vec<plugins::Plugin>> {
+    let started = Instant::now();
+    let plugins = state.plugins().list();
+    state.record_http_observation(Method::GET, "/plugins", StatusCode::OK, started);
+    Json(plugins)
+}
+
+async fn get_plugin_details(
+    State(state): State<AppState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Json<plugins::Plugin>, StatusCode> {
+    let started = Instant::now();
+    if let Some(plugin) = state.plugins().get(&id) {
+        state.record_http_observation(Method::GET, "/plugins/{id}", StatusCode::OK, started);
+        Ok(Json(plugin))
+    } else {
+        state.record_http_observation(Method::GET, "/plugins/{id}", StatusCode::NOT_FOUND, started);
+        Err(StatusCode::NOT_FOUND)
+    }
 }
 
 // TODO: Implement cloud routes. Currently returns 501 placeholders.
@@ -704,29 +733,6 @@ struct NotImplementedResponse {
     feature_id: &'static str,
 }
 
-async fn not_implemented_plugins(
-    State(state): State<AppState>,
-    req: Request<Body>,
-) -> (StatusCode, Json<NotImplementedResponse>) {
-    let method = req.method().clone();
-    let uri = req.uri().clone();
-    tracing::warn!(%method, %uri, "access to unimplemented feature: plugins");
-    state.record_http_observation(
-        method,
-        "/plugins",
-        StatusCode::NOT_IMPLEMENTED,
-        Instant::now(),
-    );
-
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(NotImplementedResponse {
-            status: "not_implemented",
-            hint: "Feature not implemented yet – see docs/inconsistencies.md#plugins",
-            feature_id: "plugins",
-        }),
-    )
-}
 
 async fn not_implemented_cloud(
     State(state): State<AppState>,
@@ -1382,33 +1388,30 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn plugin_routes_return_501() {
+    async fn plugin_routes_return_ok() {
         let app = demo_app(false);
 
+        // Test listing plugins (initially empty)
         let res = app
             .clone()
             .oneshot(Request::get("/plugins").body(Body::empty()).unwrap())
             .await
             .unwrap();
-        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(res.status(), StatusCode::OK);
         let body = res.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(json["status"], "not_implemented");
-        assert_eq!(json["feature_id"], "plugins");
-        assert!(json["hint"]
-            .as_str()
-            .unwrap()
-            .contains("docs/inconsistencies.md#plugins"));
+        let plugins: Vec<plugins::Plugin> = serde_json::from_slice(&body).unwrap();
+        assert!(plugins.is_empty(), "expected empty plugin list by default");
 
+        // Test getting a non-existent plugin
         let res = app
             .oneshot(
-                Request::get("/plugins/foo/bar")
+                Request::get("/plugins/non-existent-id")
                     .body(Body::empty())
                     .unwrap(),
             )
             .await
             .unwrap();
-        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
