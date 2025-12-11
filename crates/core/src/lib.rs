@@ -35,6 +35,7 @@ mod ask;
 mod assist;
 mod chat;
 mod chat_upstream;
+mod cloud;
 mod config;
 mod egress;
 pub mod error;
@@ -690,18 +691,15 @@ fn plugin_routes() -> Router<AppState> {
         .route("/plugins/{*path}", any(not_implemented_plugins))
 }
 
-// TODO: Implement cloud routes. Currently returns 501 placeholders.
 fn cloud_routes() -> Router<AppState> {
-    Router::<AppState>::new()
-        .route("/cloud", any(not_implemented_cloud))
-        .route("/cloud/{*path}", any(not_implemented_cloud))
+    Router::<AppState>::new().nest("/cloud", cloud::routes())
 }
 
 #[derive(serde::Serialize)]
-struct NotImplementedResponse {
-    status: &'static str,
-    hint: &'static str,
-    feature_id: &'static str,
+pub struct NotImplementedResponse {
+    pub status: &'static str,
+    pub hint: &'static str,
+    pub feature_id: &'static str,
 }
 
 async fn not_implemented_plugins(
@@ -724,30 +722,6 @@ async fn not_implemented_plugins(
             status: "not_implemented",
             hint: "Feature not implemented yet – see docs/inconsistencies.md#plugins",
             feature_id: "plugins",
-        }),
-    )
-}
-
-async fn not_implemented_cloud(
-    State(state): State<AppState>,
-    req: Request<Body>,
-) -> (StatusCode, Json<NotImplementedResponse>) {
-    let method = req.method().clone();
-    let uri = req.uri().clone();
-    tracing::warn!(%method, %uri, "access to unimplemented feature: cloud");
-    state.record_http_observation(
-        method,
-        "/cloud",
-        StatusCode::NOT_IMPLEMENTED,
-        Instant::now(),
-    );
-
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(NotImplementedResponse {
-            status: "not_implemented",
-            hint: "Feature not implemented yet – see docs/inconsistencies.md#cloud",
-            feature_id: "cloud",
         }),
     )
 }
@@ -1435,5 +1409,24 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+    }
+
+    #[tokio::test]
+    async fn cloud_fallback_returns_501() {
+        let app = demo_app(false);
+
+        let res = app
+            .oneshot(
+                Request::post("/cloud/fallback")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "not_implemented");
+        assert_eq!(json["feature_id"], "cloud_fallback");
     }
 }
