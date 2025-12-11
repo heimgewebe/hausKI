@@ -39,6 +39,7 @@ mod config;
 mod egress;
 pub mod error;
 mod memory_api;
+pub mod tools;
 pub use config::{
     load_flags, load_limits, load_models, load_routing, Asr, FeatureFlags, Latency, Limits,
     ModelEntry, ModelsFile, RoutingDecision, RoutingPolicy, RoutingRule, Thermal,

@@ -3,12 +3,12 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use utoipa::ToSchema;
 
-use crate::AppState;
+use crate::{tools, AppState};
 use axum::extract::State;
 use axum::http::Method;
 
 use chrono::Utc;
-use std::{collections::BTreeMap, env, fs, io::Write, path::Path};
+use std::{collections::BTreeMap, env, fs, io::Write, path::Path, sync::Arc};
 use ulid::Ulid;
 
 /// Optional: Pfad für JSONL-Events. Wenn nicht gesetzt, werden keine Events geschrieben.
@@ -201,8 +201,23 @@ pub async fn assist_handler(
     let mode = route_mode(&req.question, &req.mode);
     let http_client = state.http_client();
 
-    // TODO(Phase 2): Für "code" Tooling-Hooks ergänzen.
-    let answer = format!("Router wählte {mode}. (MVP-Stub)");
+    // Tooling-Registry initialisieren
+    let mut tool_registry = tools::ToolRegistry::new();
+    tool_registry.register(Arc::new(tools::EchoTool));
+    tool_registry.register(Arc::new(tools::CodeAnalysisTool));
+
+    // Falls "code", führe Analyse-Tool aus. Sonst Knowledge oder Standard-Stub.
+    let answer = if mode == "code" {
+        if let Some(tool) = tool_registry.get("code_analysis") {
+            tool.execute(&req.question)
+                .await
+                .unwrap_or_else(|e| format!("Tool error: {}", e))
+        } else {
+            format!("Router wählte {mode}, aber kein Tool gefunden. (MVP-Stub)")
+        }
+    } else {
+        format!("Router wählte {mode}. (MVP-Stub)")
+    };
 
     // Knowledge-Modus: versuche Top-K aus /index/search; bei Fehler → leere Liste (MVP-Fallback)
     let citations = if mode == "knowledge" {
@@ -278,3 +293,23 @@ mod tests {
         assert_eq!(route_mode(q, &Some("knowledge".into())), "knowledge");
     }
 }
+
+    #[tokio::test]
+    async fn assist_handler_uses_tool_for_code_mode() {
+        // Setup mock state
+        let limits = crate::Limits::default();
+        let models = crate::ModelsFile::default();
+        let routing = crate::RoutingPolicy::default();
+        let flags = crate::FeatureFlags::default();
+        let chat_cfg = std::sync::Arc::new(crate::chat::ChatCfg::new(None, None));
+        let state = AppState::new(limits, models, routing, flags, chat_cfg, false);
+
+        let req = AssistRequest {
+            question: "some code question".to_string(),
+            mode: Some("code".to_string()),
+        };
+
+        let (_status, Json(resp)) = assist_handler(State(state), Json(req)).await;
+
+        assert_eq!(resp.answer, "Code analysis tool is a stub in this MVP. Future: run linter/parser.");
+    }
