@@ -4,11 +4,15 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use std::time::Instant;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+    time::Instant,
+};
 
 use crate::AppState;
+
+const PLUGIN_BY_ID_PATH: &str = "/plugins/{id}";
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Plugin {
@@ -83,7 +87,7 @@ pub async fn get_plugin_handler(
     if let Some(plugin) = state.plugins().get(&id) {
         state.record_http_observation(
             axum::http::Method::GET,
-            "/plugins/{id}",
+            PLUGIN_BY_ID_PATH,
             StatusCode::OK,
             started,
         );
@@ -91,7 +95,7 @@ pub async fn get_plugin_handler(
     } else {
         state.record_http_observation(
             axum::http::Method::GET,
-            "/plugins/{id}",
+            PLUGIN_BY_ID_PATH,
             StatusCode::NOT_FOUND,
             started,
         );
