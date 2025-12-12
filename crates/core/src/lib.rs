@@ -115,7 +115,6 @@ struct AppStateInner {
     routing: RoutingPolicy,
     flags: FeatureFlags,
     chat_cfg: Arc<chat::ChatCfg>,
-    plugins: plugins::PluginRegistry,
     // These fields hold the metric families alive for the prometheus registry.
     // They are cloned into closures but not directly read after construction.
     #[allow(dead_code)]
@@ -223,7 +222,6 @@ impl AppState {
                 reqwest::Client::new()
             });
 
-        let plugins = plugins::PluginRegistry::new();
         // Initialize tool registry with built-in tools
         let mut tool_registry = tools::ToolRegistry::new();
         tool_registry.register(Arc::new(tools::EchoTool));
@@ -237,7 +235,6 @@ impl AppState {
             routing,
             flags,
             chat_cfg,
-            plugins,
             http_requests,
             http_latency,
             metrics_recorder,
@@ -270,10 +267,6 @@ impl AppState {
 
     pub fn chat_cfg(&self) -> Arc<chat::ChatCfg> {
         self.0.chat_cfg.clone()
-    }
-
-    pub fn plugins(&self) -> plugins::PluginRegistry {
-        self.0.plugins.clone()
     }
 
     pub fn index(&self) -> IndexState {
@@ -719,29 +712,8 @@ fn config_routes() -> Router<AppState> {
 
 fn plugin_routes() -> Router<AppState> {
     Router::<AppState>::new()
-        .route("/plugins", get(list_plugins))
-        .route("/plugins/{id}", get(get_plugin_details))
-}
-
-async fn list_plugins(State(state): State<AppState>) -> Json<Vec<plugins::Plugin>> {
-    let started = Instant::now();
-    let plugins = state.plugins().list();
-    state.record_http_observation(Method::GET, "/plugins", StatusCode::OK, started);
-    Json(plugins)
-}
-
-async fn get_plugin_details(
-    State(state): State<AppState>,
-    axum::extract::Path(id): axum::extract::Path<String>,
-) -> Result<Json<plugins::Plugin>, StatusCode> {
-    let started = Instant::now();
-    if let Some(plugin) = state.plugins().get(&id) {
-        state.record_http_observation(Method::GET, "/plugins/{id}", StatusCode::OK, started);
-        Ok(Json(plugin))
-    } else {
-        state.record_http_observation(Method::GET, "/plugins/{id}", StatusCode::NOT_FOUND, started);
-        Err(StatusCode::NOT_FOUND)
-    }
+        .route("/plugins", get(plugins::list_plugins_handler))
+        .route("/plugins/{id}", get(plugins::get_plugin_handler))
 }
 
 fn cloud_routes() -> Router<AppState> {
@@ -754,8 +726,6 @@ pub struct NotImplementedResponse {
     pub hint: &'static str,
     pub feature_id: &'static str,
 }
-
-
 
 type CorsState = Arc<HeaderValue>;
 
