@@ -40,7 +40,7 @@ mod config;
 mod egress;
 pub mod error;
 mod memory_api;
-pub mod plugins;
+mod plugins;
 pub mod tools;
 pub use config::{
     load_flags, load_limits, load_models, load_routing, Asr, FeatureFlags, Latency, Limits,
@@ -710,7 +710,6 @@ fn config_routes() -> Router<AppState> {
         .route("/config/routing", get(get_routing))
 }
 
-// TODO: Implement plugin routes. Currently returns 501 placeholders.
 fn plugin_routes() -> Router<AppState> {
     Router::<AppState>::new()
         .route("/plugins", get(plugins::list_plugins_handler))
@@ -727,8 +726,6 @@ pub struct NotImplementedResponse {
     pub hint: &'static str,
     pub feature_id: &'static str,
 }
-
-
 
 type CorsState = Arc<HeaderValue>;
 
@@ -1360,10 +1357,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn plugin_routes_work() {
+    async fn plugin_routes_return_ok() {
         let app = demo_app(false);
 
-        // Test listing plugins
+        // Test listing plugins (initially empty)
         let res = app
             .clone()
             .oneshot(Request::get("/plugins").body(Body::empty()).unwrap())
@@ -1372,11 +1369,15 @@ mod tests {
         assert_eq!(res.status(), StatusCode::OK);
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let plugins: Vec<plugins::Plugin> = serde_json::from_slice(&body).unwrap();
-        assert_eq!(plugins.len(), 0);
+        assert!(plugins.is_empty(), "expected empty plugin list by default");
 
-        // Test getting a specific plugin (not found)
+        // Test getting a non-existent plugin
         let res = app
-            .oneshot(Request::get("/plugins/foo").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::get("/plugins/non-existent-id")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::NOT_FOUND);

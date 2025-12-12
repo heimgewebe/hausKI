@@ -41,8 +41,12 @@ jobs:
 
       - name: Validate toolchain input
         run: |
-          if [[ -z "${{ env.RUST_TOOLCHAIN }}" ]]; then
-            echo "ERROR: RUST_TOOLCHAIN ist leer. Bitte stable oder explizite Version setzen."
+          if [[ -z "$toolchain" ]]; then
+            echo "'toolchain' is a required input" >&2
+            exit 1
+          fi
+          if [[ -z "$RUST_TOOLCHAIN" ]]; then
+            echo "'RUST_TOOLCHAIN' is a required input" >&2
             exit 1
           fi
 
