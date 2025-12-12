@@ -39,6 +39,7 @@ mod config;
 mod egress;
 pub mod error;
 mod memory_api;
+pub mod plugins;
 pub mod tools;
 pub use config::{
     load_flags, load_limits, load_models, load_routing, Asr, FeatureFlags, Latency, Limits,
@@ -60,7 +61,8 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
         health, healthz, ready,
         ask::ask_handler, chat::chat_handler,
         memory_api::memory_get_handler, memory_api::memory_set_handler, memory_api::memory_evict_handler,
-        assist::assist_handler
+        assist::assist_handler,
+        plugins::list_plugins_handler, plugins::get_plugin_handler
     ),
     components(
         schemas(
@@ -74,11 +76,13 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
             memory_api::MemorySetRequest, memory_api::MemorySetResponse,
             memory_api::MemoryEvictRequest, memory_api::MemoryEvictResponse,
             assist::AssistRequest,
-            assist::AssistResponse
+            assist::AssistResponse,
+            plugins::Plugin
         )
     ),
     tags(
-        (name = "core", description = "Core service endpoints")
+        (name = "core", description = "Core service endpoints"),
+        (name = "plugins", description = "Plugin management endpoints")
     )
 )]
 pub struct ApiDoc;
@@ -132,6 +136,8 @@ struct AppStateInner {
     ready: AtomicBool,
     /// Tool registry for assist code mode.
     tools: Arc<tools::ToolRegistry>,
+    /// Registry for managed plugins.
+    plugins: Arc<plugins::PluginRegistry>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -220,6 +226,8 @@ impl AppState {
         tool_registry.register(Arc::new(tools::EchoTool));
         tool_registry.register(Arc::new(tools::CodeAnalysisTool));
 
+        let plugin_registry = plugins::PluginRegistry::new();
+
         Self(Arc::new(AppStateInner {
             limits,
             models,
@@ -236,6 +244,7 @@ impl AppState {
             expose_config,
             ready: AtomicBool::new(false),
             tools: Arc::new(tool_registry),
+            plugins: Arc::new(plugin_registry),
         }))
     }
 
@@ -307,6 +316,10 @@ impl AppState {
 
     pub fn tools(&self) -> Arc<tools::ToolRegistry> {
         self.0.tools.clone()
+    }
+
+    pub fn plugins(&self) -> Arc<plugins::PluginRegistry> {
+        self.0.plugins.clone()
     }
 }
 
@@ -699,8 +712,8 @@ fn config_routes() -> Router<AppState> {
 // TODO: Implement plugin routes. Currently returns 501 placeholders.
 fn plugin_routes() -> Router<AppState> {
     Router::<AppState>::new()
-        .route("/plugins", any(not_implemented_plugins))
-        .route("/plugins/{*path}", any(not_implemented_plugins))
+        .route("/plugins", get(plugins::list_plugins_handler))
+        .route("/plugins/{id}", get(plugins::get_plugin_handler))
 }
 
 // TODO: Implement cloud routes. Currently returns 501 placeholders.
@@ -715,30 +728,6 @@ struct NotImplementedResponse {
     status: &'static str,
     hint: &'static str,
     feature_id: &'static str,
-}
-
-async fn not_implemented_plugins(
-    State(state): State<AppState>,
-    req: Request<Body>,
-) -> (StatusCode, Json<NotImplementedResponse>) {
-    let method = req.method().clone();
-    let uri = req.uri().clone();
-    tracing::warn!(%method, %uri, "access to unimplemented feature: plugins");
-    state.record_http_observation(
-        method,
-        "/plugins",
-        StatusCode::NOT_IMPLEMENTED,
-        Instant::now(),
-    );
-
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(NotImplementedResponse {
-            status: "not_implemented",
-            hint: "Feature not implemented yet – see docs/inconsistencies.md#plugins",
-            feature_id: "plugins",
-        }),
-    )
 }
 
 async fn not_implemented_cloud(
@@ -1395,33 +1384,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn plugin_routes_return_501() {
+    async fn plugin_routes_work() {
         let app = demo_app(false);
 
+        // Test listing plugins
         let res = app
             .clone()
             .oneshot(Request::get("/plugins").body(Body::empty()).unwrap())
             .await
             .unwrap();
-        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(res.status(), StatusCode::OK);
         let body = res.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(json["status"], "not_implemented");
-        assert_eq!(json["feature_id"], "plugins");
-        assert!(json["hint"]
-            .as_str()
-            .unwrap()
-            .contains("docs/inconsistencies.md#plugins"));
+        let plugins: Vec<plugins::Plugin> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(plugins.len(), 0);
 
+        // Test getting a specific plugin (not found)
         let res = app
-            .oneshot(
-                Request::get("/plugins/foo/bar")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
+            .oneshot(Request::get("/plugins/foo").body(Body::empty()).unwrap())
             .await
             .unwrap();
-        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
