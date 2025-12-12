@@ -39,6 +39,7 @@ mod config;
 mod egress;
 pub mod error;
 mod memory_api;
+pub mod tools;
 pub use config::{
     load_flags, load_limits, load_models, load_routing, Asr, FeatureFlags, Latency, Limits,
     ModelEntry, ModelsFile, RoutingDecision, RoutingPolicy, RoutingRule, Thermal,
@@ -129,6 +130,8 @@ struct AppStateInner {
     /// Only set to `true` if you understand the security implications.
     expose_config: bool,
     ready: AtomicBool,
+    /// Tool registry for assist code mode.
+    tools: Arc<tools::ToolRegistry>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -212,6 +215,11 @@ impl AppState {
                 reqwest::Client::new()
             });
 
+        // Initialize tool registry with built-in tools
+        let mut tool_registry = tools::ToolRegistry::new();
+        tool_registry.register(Arc::new(tools::EchoTool));
+        tool_registry.register(Arc::new(tools::CodeAnalysisTool));
+
         Self(Arc::new(AppStateInner {
             limits,
             models,
@@ -227,6 +235,7 @@ impl AppState {
             http_client,
             expose_config,
             ready: AtomicBool::new(false),
+            tools: Arc::new(tool_registry),
         }))
     }
 
@@ -294,6 +303,10 @@ impl AppState {
 
     pub fn http_client(&self) -> reqwest::Client {
         self.0.http_client.clone()
+    }
+
+    pub fn tools(&self) -> Arc<tools::ToolRegistry> {
+        self.0.tools.clone()
     }
 }
 
