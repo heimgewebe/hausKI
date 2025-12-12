@@ -187,4 +187,5 @@ jobs:
     uses: heimgewebe/contracts/.github/workflows/contracts-ajv-reusable.yml@contracts-v1
     secrets: inherit
     with:
+      toolchain: stable
       fixtures_glob: ${{ vars.FIXTURES_GLOB || 'fixtures/**/*.jsonl' }}
