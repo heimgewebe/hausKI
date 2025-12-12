@@ -20,10 +20,7 @@ pub fn routes() -> Router<AppState> {
 
 // Roadmap P2: /cloud/fallback Endpoint with Policy-based Routing
 // See docs/ist-stand-vs-roadmap.md
-async fn fallback_handler(
-    State(state): State<AppState>,
-    req: Request<Body>,
-) -> impl IntoResponse {
+async fn fallback_handler(State(state): State<AppState>, req: Request<Body>) -> impl IntoResponse {
     let method = req.method().clone();
     let uri = req.uri().clone();
     tracing::warn!(%method, %uri, "access to unimplemented feature: cloud fallback");
@@ -51,10 +48,7 @@ async fn fallback_handler(
 }
 
 // Roadmap P2: /cloud/sync for synchronization
-async fn sync_handler(
-    State(state): State<AppState>,
-    req: Request<Body>,
-) -> impl IntoResponse {
+async fn sync_handler(State(state): State<AppState>, req: Request<Body>) -> impl IntoResponse {
     let method = req.method().clone();
     let uri = req.uri().clone();
     tracing::warn!(%method, %uri, "access to unimplemented feature: cloud sync");

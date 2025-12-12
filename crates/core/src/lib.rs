@@ -6,7 +6,7 @@ use axum::{
     http::{header, HeaderValue, Method, Request, StatusCode},
     middleware::{from_fn_with_state, Next},
     response::{IntoResponse, Response},
-    routing::{any, get, post},
+    routing::{get, post},
     Json, Router,
 };
 use hauski_indexd::{router as index_router, IndexState};
@@ -728,29 +728,7 @@ pub struct NotImplementedResponse {
     pub feature_id: &'static str,
 }
 
-async fn not_implemented_cloud(
-    State(state): State<AppState>,
-    req: Request<Body>,
-) -> (StatusCode, Json<NotImplementedResponse>) {
-    let method = req.method().clone();
-    let uri = req.uri().clone();
-    tracing::warn!(%method, %uri, "access to unimplemented feature: cloud");
-    state.record_http_observation(
-        method,
-        "/cloud",
-        StatusCode::NOT_IMPLEMENTED,
-        Instant::now(),
-    );
 
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(NotImplementedResponse {
-            status: "not_implemented",
-            hint: "Feature not implemented yet – see docs/inconsistencies.md#cloud",
-            feature_id: "cloud",
-        }),
-    )
-}
 
 type CorsState = Arc<HeaderValue>;
 
