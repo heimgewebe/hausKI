@@ -17,10 +17,8 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # Provide toolchain variable from input or fallback to stable.
-  # Using vars.RUST_TOOLCHAIN allows overriding the toolchain via repository variables,
-  # otherwise defaulting to stable. This avoids issues with undefined inputs in PR triggers.
-  toolchain: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
+  # Single source of truth: always resolve a Rust toolchain (defaults to stable).
+  # vars.RUST_TOOLCHAIN allows overriding via repository variables.
   RUST_TOOLCHAIN: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
 
 jobs:
@@ -41,14 +39,15 @@ jobs:
 
       - name: Validate toolchain input
         run: |
-          if [[ -z "$toolchain" ]]; then
-            echo "'toolchain' is a required input" >&2
+          if [[ -z "${{ env.RUST_TOOLCHAIN }}" ]]; then
+            echo "ERROR: RUST_TOOLCHAIN ist leer. Bitte stable oder explizite Version setzen." >&2
             exit 1
           fi
-          if [[ -z "$RUST_TOOLCHAIN" ]]; then
-            echo "'RUST_TOOLCHAIN' is a required input" >&2
-            exit 1
-          fi
+          echo "Resolved RUST_TOOLCHAIN=${{ env.RUST_TOOLCHAIN }}"
+
+      - name: Debug env (toolchain-related)
+        run: |
+          env | sort | grep -i toolchain || true
 
       - name: Use Rust toolchain
         uses: dtolnay/rust-toolchain@stable
