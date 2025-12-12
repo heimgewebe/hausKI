@@ -730,7 +730,6 @@ struct NotImplementedResponse {
     feature_id: &'static str,
 }
 
-
 async fn not_implemented_cloud(
     State(state): State<AppState>,
     req: Request<Body>,
@@ -1401,11 +1400,7 @@ mod tests {
 
         // Test getting a specific plugin (not found)
         let res = app
-            .oneshot(
-                Request::get("/plugins/foo")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
+            .oneshot(Request::get("/plugins/foo").body(Body::empty()).unwrap())
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
