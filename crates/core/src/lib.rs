@@ -6,7 +6,7 @@ use axum::{
     http::{header, HeaderValue, Method, Request, StatusCode},
     middleware::{from_fn_with_state, Next},
     response::{IntoResponse, Response},
-    routing::{any, get, post},
+    routing::{get, post},
     Json, Router,
 };
 use hauski_indexd::{router as index_router, IndexState};
@@ -35,6 +35,7 @@ mod ask;
 mod assist;
 mod chat;
 mod chat_upstream;
+mod cloud;
 mod config;
 mod egress;
 pub mod error;
@@ -61,7 +62,8 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
         health, healthz, ready,
         ask::ask_handler, chat::chat_handler,
         memory_api::memory_get_handler, memory_api::memory_set_handler, memory_api::memory_evict_handler,
-        assist::assist_handler
+        assist::assist_handler,
+        plugins::list_plugins_handler, plugins::get_plugin_handler
     ),
     components(
         schemas(
@@ -75,11 +77,13 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
             memory_api::MemorySetRequest, memory_api::MemorySetResponse,
             memory_api::MemoryEvictRequest, memory_api::MemoryEvictResponse,
             assist::AssistRequest,
-            assist::AssistResponse
+            assist::AssistResponse,
+            plugins::Plugin
         )
     ),
     tags(
-        (name = "core", description = "Core service endpoints")
+        (name = "core", description = "Core service endpoints"),
+        (name = "plugins", description = "Plugin management endpoints")
     )
 )]
 pub struct ApiDoc;
@@ -134,6 +138,8 @@ struct AppStateInner {
     ready: AtomicBool,
     /// Tool registry for assist code mode.
     tools: Arc<tools::ToolRegistry>,
+    /// Registry for managed plugins.
+    plugins: Arc<plugins::PluginRegistry>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -223,6 +229,8 @@ impl AppState {
         tool_registry.register(Arc::new(tools::EchoTool));
         tool_registry.register(Arc::new(tools::CodeAnalysisTool));
 
+        let plugin_registry = plugins::PluginRegistry::new();
+
         Self(Arc::new(AppStateInner {
             limits,
             models,
@@ -240,6 +248,7 @@ impl AppState {
             expose_config,
             ready: AtomicBool::new(false),
             tools: Arc::new(tool_registry),
+            plugins: Arc::new(plugin_registry),
         }))
     }
 
@@ -315,6 +324,10 @@ impl AppState {
 
     pub fn tools(&self) -> Arc<tools::ToolRegistry> {
         self.0.tools.clone()
+    }
+
+    pub fn plugins(&self) -> Arc<plugins::PluginRegistry> {
+        self.0.plugins.clone()
     }
 }
 
@@ -731,44 +744,18 @@ async fn get_plugin_details(
     }
 }
 
-// TODO: Implement cloud routes. Currently returns 501 placeholders.
 fn cloud_routes() -> Router<AppState> {
-    Router::<AppState>::new()
-        .route("/cloud", any(not_implemented_cloud))
-        .route("/cloud/{*path}", any(not_implemented_cloud))
+    Router::<AppState>::new().nest("/cloud", cloud::routes())
 }
 
 #[derive(serde::Serialize)]
-struct NotImplementedResponse {
-    status: &'static str,
-    hint: &'static str,
-    feature_id: &'static str,
+pub struct NotImplementedResponse {
+    pub status: &'static str,
+    pub hint: &'static str,
+    pub feature_id: &'static str,
 }
 
 
-async fn not_implemented_cloud(
-    State(state): State<AppState>,
-    req: Request<Body>,
-) -> (StatusCode, Json<NotImplementedResponse>) {
-    let method = req.method().clone();
-    let uri = req.uri().clone();
-    tracing::warn!(%method, %uri, "access to unimplemented feature: cloud");
-    state.record_http_observation(
-        method,
-        "/cloud",
-        StatusCode::NOT_IMPLEMENTED,
-        Instant::now(),
-    );
-
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(NotImplementedResponse {
-            status: "not_implemented",
-            hint: "Feature not implemented yet – see docs/inconsistencies.md#cloud",
-            feature_id: "cloud",
-        }),
-    )
-}
 
 type CorsState = Arc<HeaderValue>;
 
@@ -1450,5 +1437,24 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+    }
+
+    #[tokio::test]
+    async fn cloud_fallback_returns_501() {
+        let app = demo_app(false);
+
+        let res = app
+            .oneshot(
+                Request::post("/cloud/fallback")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "not_implemented");
+        assert_eq!(json["feature_id"], "cloud_fallback");
     }
 }

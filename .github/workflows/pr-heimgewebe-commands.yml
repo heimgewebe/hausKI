@@ -15,3 +15,5 @@ jobs:
     if: github.event.issue.pull_request != null
     uses: heimgewebe/metarepo/.github/workflows/heimgewebe-command-dispatch.yml@main
     secrets: inherit
+    with:
+      toolchain: stable
