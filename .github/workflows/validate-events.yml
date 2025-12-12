@@ -27,6 +27,7 @@ jobs:
           - data/events.jsonl
           - logs/events.jsonl
     with:
+      toolchain: stable
       jsonl_path: ${{ matrix.file }}
       schema_url: https://raw.githubusercontent.com/heimgewebe/metarepo/contracts-v1/contracts/event.line.schema.json
       strict: false
