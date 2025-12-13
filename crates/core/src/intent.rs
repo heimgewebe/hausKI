@@ -5,20 +5,15 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum IntentType {
     Coding,
     Writing,
     CiTriage,
     ContractsWork,
+    #[default]
     Unknown,
-}
-
-impl Default for IntentType {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -42,6 +37,12 @@ pub struct IntentContext {
     pub changed_paths: Vec<String>,
     pub workflow_name: Option<String>,
     pub pr_comments: Vec<String>,
+}
+
+impl Default for Intent {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Intent {

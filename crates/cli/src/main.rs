@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
-use std::{env, net::SocketAddr, path::PathBuf};
+use std::{env, net::SocketAddr, path::{Path, PathBuf}};
 use tokio::{net::TcpListener, runtime::Builder as RuntimeBuilder, signal};
 use tracing::{info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -172,7 +172,8 @@ fn run_intent(output_path: Option<String>, format: String) -> Result<()> {
     };
 
     if let Some(path) = output_path {
-        std::fs::create_dir_all(PathBuf::from(&path).parent().unwrap_or(PathBuf::from(".").as_ref()))?;
+        let parent = Path::new(&path).parent().unwrap_or_else(|| Path::new("."));
+        std::fs::create_dir_all(parent)?;
         std::fs::write(&path, output_str).context("Failed to write output file")?;
         info!("Intent written to {}", path);
     } else {
