@@ -628,6 +628,7 @@ dependencies = [
  "clap",
  "hauski-core",
  "serde",
+ "serde_json",
  "serde_yaml",
  "shellexpand",
  "tokio",

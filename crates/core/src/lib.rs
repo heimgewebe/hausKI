@@ -39,6 +39,7 @@ mod cloud;
 mod config;
 mod egress;
 pub mod error;
+pub mod intent;
 mod memory_api;
 mod plugins;
 pub mod tools;
