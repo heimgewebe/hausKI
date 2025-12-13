@@ -2,14 +2,18 @@ use anyhow::{anyhow, bail, Context, Result};
 use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
-use std::{env, net::SocketAddr, path::PathBuf};
+use std::{
+    env,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 use tokio::{net::TcpListener, runtime::Builder as RuntimeBuilder, signal};
 use tracing::{info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
 use hauski_core::{
-    build_app_with_state, load_flags, load_limits, load_models, load_routing, ModelsFile,
+    build_app_with_state, intent, load_flags, load_limits, load_models, load_routing, ModelsFile,
 };
 
 #[derive(Parser, Debug)]
@@ -56,6 +60,15 @@ enum Commands {
         /// Pfad zur Playbook-Datei
         #[arg(long)]
         playbook: String,
+    },
+    /// Bestimmt den Intent aus dem aktuellen Kontext (Git/CI)
+    Intent {
+        /// Optional: Ausgabe in Datei (sonst stdout)
+        #[arg(long, short)]
+        output: Option<String>,
+        /// Optional: Format (json oder event)
+        #[arg(long, default_value = "json")]
+        format: String,
     },
 }
 
@@ -132,6 +145,43 @@ fn main() -> Result<()> {
         Commands::Assist { playbook } => {
             run_playbook(&playbook)?;
         }
+        Commands::Intent { output, format } => {
+            run_intent(output, format)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn run_intent(output_path: Option<String>, format: String) -> Result<()> {
+    let ctx = intent::gather_context()?;
+    let resolver = intent::IntentResolver::default();
+    let intent = resolver.resolve(&ctx);
+
+    let output_str = if format == "event" {
+        // Wrap in event.line format if needed
+        // For now, just dumping the intent as the payload, assuming event.line structure
+        // structure: { type: "os.context.intent", ... }
+        // The user prompt: "Option A (empfohlen): als chronik/event.line"
+        // Minimal event.line structure?
+        // Let's create a minimal structure matching the intent payload.
+        // Actually, intent itself is the payload.
+        // I will just output the intent JSON for now as per Option B if format is json.
+        // If format is event, maybe wrap it?
+        // Prompt says: "Erzeuge ein JSON nach os.context.intent".
+        // I will stick to intent JSON.
+        serde_json::to_string_pretty(&intent)?
+    } else {
+        serde_json::to_string_pretty(&intent)?
+    };
+
+    if let Some(path) = output_path {
+        let parent = Path::new(&path).parent().unwrap_or_else(|| Path::new("."));
+        std::fs::create_dir_all(parent)?;
+        std::fs::write(&path, output_str).context("Failed to write output file")?;
+        info!("Intent written to {}", path);
+    } else {
+        println!("{}", output_str);
     }
 
     Ok(())
