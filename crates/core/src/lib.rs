@@ -557,17 +557,16 @@ pub fn build_app_with_state(
         let swagger = SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi());
 
         app = app.merge(config_routes()).merge(swagger);
-
-        // Conditionally add memory routes if the subsystem is up.
-        if memory_initialized {
-            app = app.merge(memory_routes());
-        }
     }
 
     if state.safe_mode() {
         tracing::info!("SAFE-MODE active: plugins and cloud routes disabled");
     } else {
         app = app.merge(plugin_routes()).merge(cloud_routes());
+    }
+
+    if memory_initialized {
+        app = app.merge(memory_routes());
     }
 
     let timeout_layer = if timeout_ms > 0 {
