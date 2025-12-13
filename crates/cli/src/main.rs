@@ -2,7 +2,11 @@ use anyhow::{anyhow, bail, Context, Result};
 use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
-use std::{env, net::SocketAddr, path::{Path, PathBuf}};
+use std::{
+    env,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 use tokio::{net::TcpListener, runtime::Builder as RuntimeBuilder, signal};
 use tracing::{info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

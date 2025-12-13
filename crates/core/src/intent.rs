@@ -109,14 +109,14 @@ impl IntentResolver {
 
         // Analyze comments
         for comment in &ctx.pr_comments {
-             if comment.contains("/quick") || comment.contains("/review") {
+            if comment.contains("/quick") || comment.contains("/review") {
                 *counts.entry(IntentType::CiTriage).or_insert(0) += 5; // Strong signal
                 intent.signals.push(IntentSignal {
                     kind: "issue_comment".to_string(),
                     r#ref: comment.clone(), // truncating might be good
                     weight: 1.0,
                 });
-             }
+            }
         }
 
         // Determine dominant intent
@@ -138,12 +138,12 @@ impl IntentResolver {
                     max_count = *c;
                     best_type = t.clone();
                 } else if *c == max_count {
-                     // Tie breaking
-                     if *t == IntentType::Coding {
-                         best_type = IntentType::Coding;
-                     } else if *t == IntentType::Writing && best_type != IntentType::Coding {
-                         best_type = IntentType::Writing;
-                     }
+                    // Tie breaking
+                    if *t == IntentType::Coding {
+                        best_type = IntentType::Coding;
+                    } else if *t == IntentType::Writing && best_type != IntentType::Coding {
+                        best_type = IntentType::Writing;
+                    }
                 }
             }
             intent.intent = best_type;
@@ -165,9 +165,9 @@ impl IntentResolver {
             };
 
             if ratio > 0.8 {
-                 intent.confidence += 0.15;
+                intent.confidence += 0.15;
             } else if ratio < 0.6 {
-                 intent.confidence -= 0.20;
+                intent.confidence -= 0.20;
             }
         }
 
@@ -197,14 +197,16 @@ impl IntentResolver {
 
         if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
             match ext {
-                "rs" | "py" | "ts" | "yml" | "yaml" | "toml" | "json" => return (Some(IntentType::Coding), 0.8),
+                "rs" | "py" | "ts" | "yml" | "yaml" | "toml" | "json" => {
+                    return (Some(IntentType::Coding), 0.8)
+                }
                 "md" | "txt" => return (Some(IntentType::Writing), 0.8),
                 _ => {}
             }
         }
 
         if path_str.starts_with("docs/") || path_str.to_lowercase().contains("readme") {
-             return (Some(IntentType::Writing), 0.9);
+            return (Some(IntentType::Writing), 0.9);
         }
 
         (None, 0.0)
@@ -230,32 +232,43 @@ pub fn gather_context() -> Result<IntentContext> {
             .output();
 
         if let Ok(output) = output {
-             let stdout = String::from_utf8_lossy(&output.stdout);
-             for line in stdout.lines() {
-                 let line = line.trim();
-                 if !line.is_empty() && !ctx.changed_paths.contains(&line.to_string()) {
-                     ctx.changed_paths.push(line.to_string());
-                 }
-             }
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let line = line.trim();
+                if !line.is_empty() && !ctx.changed_paths.contains(&line.to_string()) {
+                    ctx.changed_paths.push(line.to_string());
+                }
+            }
         }
 
         // 2. Committed changes relative to main (for CI/PR context)
-        // We try origin/main, failing that, just main.
+        // We try origin/main first, then fall back to main if origin/main doesn't exist.
         let output_branch = Command::new("git")
             .args(["diff", "--name-only", "origin/main...HEAD"])
             .output();
 
-        // If origin/main failed, maybe we are detached or origin is not fetched, try just checking HEAD^ if simple commit?
-        // Or just fail gracefully.
+        let fallback_output;
+        let output_to_use = match output_branch {
+            Ok(ref output) if output.status.success() => Some(output),
+            _ => {
+                // Fallback: try main...HEAD if origin/main doesn't exist or failed
+                fallback_output = Command::new("git")
+                    .args(["diff", "--name-only", "main...HEAD"])
+                    .output()
+                    .ok()
+                    .filter(|o| o.status.success());
+                fallback_output.as_ref()
+            }
+        };
 
-        if let Ok(output) = output_branch {
-             let stdout = String::from_utf8_lossy(&output.stdout);
-             for line in stdout.lines() {
-                 let line = line.trim();
-                 if !line.is_empty() && !ctx.changed_paths.contains(&line.to_string()) {
-                     ctx.changed_paths.push(line.to_string());
-                 }
-             }
+        if let Some(output) = output_to_use {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let line = line.trim();
+                if !line.is_empty() && !ctx.changed_paths.contains(&line.to_string()) {
+                    ctx.changed_paths.push(line.to_string());
+                }
+            }
         }
     }
 
@@ -267,11 +280,15 @@ pub fn gather_context() -> Result<IntentContext> {
     // 3. Issue Comments (from event.json if available)
     if let Ok(event_path) = std::env::var("GITHUB_EVENT_PATH") {
         if let Ok(content) = std::fs::read_to_string(&event_path) {
-             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                 if let Some(comment) = json.get("comment").and_then(|c| c.get("body")).and_then(|b| b.as_str()) {
-                     ctx.pr_comments.push(comment.to_string());
-                 }
-             }
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(comment) = json
+                    .get("comment")
+                    .and_then(|c| c.get("body"))
+                    .and_then(|b| b.as_str())
+                {
+                    ctx.pr_comments.push(comment.to_string());
+                }
+            }
         }
     }
 
