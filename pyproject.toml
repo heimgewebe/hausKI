@@ -21,7 +21,7 @@ required-version = ">=0.7.0"
 dev = [
   "fastapi>=0.115",
   "pydantic>=2.9",
-  "ruff==0.14.8",
+  "ruff==0.14.9",
   "pre-commit>=3.8",
   "mkdocs>=1.6",
   "mkdocs-material>=9.5",
