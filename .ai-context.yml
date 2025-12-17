@@ -5,39 +5,79 @@
 system_context:
   heimgeist: "../metarepo/ai-contexts/heimgeist.ai-context.yml"
 
-ai_context_version: 1.0
+ai_context_version: 1.1
 
 project:
   name: hauski
-  summary: User-facing assistant UI and orchestration hooks.
-  role: frontend_multi_agent
-  primary_language: typescript
+  summary: Execution intelligence layer and AI orchestrator (Rust/CLI/Axum).
+  role: execution_intelligence
+  primary_language: rust
   visibility: internal
+
+heimgewebe:
+  axis:
+    - Events
+    - Semantik
+    - Decisions
+    - Learning
+    - Motorik
+    - UI
+    - Contracts
+  fleet:
+    enabled: true
+  wgx:
+    profile_expected: true
+    guard_smoke_expected: true
+
+interfaces:
+  consumes:
+    - "event.line"
+    - "policies"
+  produces:
+    - "insights.*"
+    - "fleet.health"
+
+contracts:
+  schemas:
+    - path: "contracts/*.schema.json"
+      note: "Validate against canonical contracts."
 
 dependencies:
   internal:
+    - name: metarepo
+      relationship: uses
+      interface: [docs, templates]
     - name: semantah
       relationship: uses
-      interface:
-        - search_apis
+      interface: [search_apis]
     - name: heimlern
       relationship: uses
-      interface:
-        - scores_feedback
+      interface: [scores_feedback]
   external:
-    - name: react
-    - name: vite
+    - name: rust
+    - name: just
+    - name: cargo-deny
 
 architecture:
   entrypoints:
-    - apps/web/src/main.tsx
+    - "crates/cli/src/main.rs"
+    - "crates/core/src/lib.rs"
   key_paths:
-    - path: apps/web/src/agents/
-      purpose: agent wiring
+    - path: "docs/"
+      purpose: "Operator docs / Architecture"
+    - path: "crates/"
+      purpose: "Core logic and subcomponents"
   data_flow:
-    input: user queries
-    processing: route → agents → backends
-    output: answers + traces
+    input: "User CLI args, HTTP requests (/assist), Event bus"
+    processing: "Intent analysis -> Tool selection -> Execution"
+    output: "Action results, Insights events, Traces"
+
+boundaries:
+  not_responsible_for:
+    - "Policy definition (belongs to heimgeist/sichter)"
+    - "Deep learning model training (belongs to heimlern)"
+  dangerous_assumptions:
+    - "Assume unrestricted network access (must respect policies)"
 
 conventions:
   branching: "main, feature/*"
@@ -49,6 +89,10 @@ documentation:
 
 ai_guidance:
   do:
-    - keep agent I/O typed; prefer generated types from contracts
+    - "Keep agent I/O typed; prefer generated types from contracts."
+    - "Start with entrypoints and key_paths."
+    - "Prefer contract-compatible changes."
   dont:
-    - call backends without tracing context
+    - "Call backends without tracing context."
+    - "Invent missing schemas."
+    - "Change repo role without updating ai-context."
