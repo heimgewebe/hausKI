@@ -1,10 +1,15 @@
 # CI Workflows
 
-This directory contains the CI/CD definitions for the HausKI project. To prevent drift and redundancy, workflows are semantically classified into three categories.
+> **Note:** This document is a conceptual map, not an exhaustive list. Please refer to the file listing for the canonical set of workflows.
+>
+> **Source of Truth:** The workflow files themselves are the authoritative source. Each key workflow file is marked with a `# CLASS: <type>` header.
+
+To prevent drift and redundancy, workflows are semantically classified into three categories.
 
 ## 1. Baseline (Always)
 **Must always run.** Minimal, fast, unambiguous.
-*   `ci.yml`: The central CI pipeline. Covers Build, Test (Fast), Lint, and Basic Security. This is the **Primary Source of Truth** for the health of the PR.
+*   `ci.yml`: The central CI pipeline. Covers Build, Fast Tests, and Linting. This is the **Primary Source of Truth** for the mergeability of the PR.
+    *   *Note:* While it includes a conditional `security` job (for `full-ci`), comprehensive security checks are managed by `security.yml`.
 *   `wgx-guard.yml`: Ensures the integrity and configuration of the `wgx` tool.
 *   `ci-tools.yml`: Ensures internal CI tools are built correctly.
 
@@ -25,7 +30,7 @@ This directory contains the CI/CD definitions for the HausKI project. To prevent
 *   `policy-ci.yml`: Validation of policy definitions.
 *   `ai-context-guard.yml`: Protection of the `.ai-context.yml` file.
 *   `validate-*.yml`: Schema validation (Events, Dev-Tooling).
-*   `secret-scan-gitleaks.yml`: Secret scanning.
+*   `secret-scan-gitleaks.yml`: Secret scanning (runs on PRs and pushes).
 *   `release.yml`: Release automation.
 *   `pr-heimgewebe-commands.yml`: ChatOps and PR interactions.
 *   `codex-review.yml`, `review-cycle-check.yml`: Review process logic.

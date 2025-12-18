@@ -1,10 +1,10 @@
 name: CI (smart PR)
 
+# CLASS: baseline
 # ------------------------------------------------------------------------------
-# SEMANTIC CLASSIFICATION: BASELINE
-# Dieser Workflow ist die Baseline. Andere Workflows (z.B. heavy.yml, security.yml)
-# ergänzen ihn, ersetzen ihn nicht.
-# Siehe .github/workflows/README.md für Details.
+# This workflow is the Baseline. Other workflows (e.g., heavy.yml, security.yml)
+# supplement it, they do not replace it.
+# See .github/workflows/README.md for details.
 # ------------------------------------------------------------------------------
 
 on:
