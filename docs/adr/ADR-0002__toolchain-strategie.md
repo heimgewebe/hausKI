@@ -1,4 +1,4 @@
-# ADR-0001: Einheitliche Toolchain-Strategie (Rust, Python, UV)
+# ADR-0002: Einheitliche Toolchain-Strategie (Rust, Python, UV)
 
 **Status:** Accepted
 **Datum:** 2025-10-23

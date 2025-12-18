@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Guard: Ensure docs/adrs/ directory does not exist (consolidated to docs/adr/)
+if [ -d "docs/adrs" ]; then
+    echo "error: directory 'docs/adrs' exists but ADRs are consolidated in 'docs/adr/'."
+    echo "Please move any files to 'docs/adr/' and remove 'docs/adrs/'."
+    exit 1
+fi
+
 # Minimal list of crates that must exist in the vendored directory for offline builds.
 # We check for axum because it is the first dependency Cargo attempts to resolve
 # during workspace builds. If it is missing, Cargo will fail with a confusing
