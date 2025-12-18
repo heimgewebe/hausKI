@@ -45,7 +45,7 @@ nav:
   - ADRs:
       - Übersicht: adr/README.md
       - Ziele & Scope: adr/ADR-0001__ziele-und-scope.md
-      - Toolchain-Strategie: adrs/ADR-0001-toolchain-strategy.md
+      - Toolchain-Strategie: adr/ADR-0002__toolchain-strategie.md
   - Runbooks:
       - Übersicht: runbooks/index.md
       - Lokale Entwicklung: runbooks/local-dev.md

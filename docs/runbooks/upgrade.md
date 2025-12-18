@@ -67,7 +67,7 @@ Status: _draft_ • Owner: Platform • Ziel: sichere, reproduzierbare Upgrades 
    - Vorherige Policy-Datei wiederherstellen
 
 ## 6. Toolchain-Anpassungen
-Gemäß [ADR-0001](../adrs/ADR-0001-toolchain-strategy.md):
+Gemäß [ADR-0002](../adr/ADR-0002__toolchain-strategie.md):
 - `toolchain.versions.yml` anpassen
 - CI-Variablen (RUST_TOOLCHAIN, PYTHON_VERSION, UV_VERSION) ziehen zentral aus Datei
 - DevContainer / `.wgx` synchronisieren
@@ -85,7 +85,7 @@ Gemäß [ADR-0001](../adrs/ADR-0001-toolchain-strategy.md):
 
 ## 9. Referenzen
 - [Incident-Response](./incident-response.md)
-- ADR: [Toolchain-Strategie](../adrs/ADR-0001-toolchain-strategy.md)
+- ADR: [Toolchain-Strategie](../adr/ADR-0002__toolchain-strategie.md)
 - Observability: `../modules/observability.md`
 
 ## 10. Checkliste

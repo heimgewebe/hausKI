@@ -70,7 +70,7 @@ Damit bleiben Offline-Builds reproduzierbar.
 
 ## Verknüpfte Dokumente
 
-- [ADR-0001 Toolchain-Strategie](../adrs/ADR-0001-toolchain-strategy.md) — legt fest, wie Versionen zentral gepflegt werden
+- [ADR-0002 Toolchain-Strategie](../adr/ADR-0002__toolchain-strategie.md) — legt fest, wie Versionen zentral gepflegt werden
 - [Audit-Bericht](../audit-hauski.md) — referenziert die Toolchain-Synchronisierung und CI-Empfehlungen
 - [Runbook: Incident-Response](incident-response.md) — beschreibt, wie bei fehlerhaften Upgrades oder Policy-Verletzungen vorzugehen ist
 

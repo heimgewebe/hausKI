@@ -57,7 +57,7 @@ Die vorliegende Audit-Erweiterung ist mit folgenden Architekturentscheidungen ve
 
 | ADR | Titel | Status | Bezug |
 |-----|--------|---------|--------|
-| [ADR-0001](adrs/ADR-0001-toolchain-strategy.md) | Einheitliche Toolchain-Strategie | `Accepted` | Definiert zentrale Toolchain-Versionen für CI und lokale Entwicklung |
+| [ADR-0002](adr/ADR-0002__toolchain-strategie.md) | Einheitliche Toolchain-Strategie | `Accepted` | Definiert zentrale Toolchain-Versionen für CI und lokale Entwicklung |
 
 Diese Entscheidung dient als Basis für alle weiteren CI- und Container-Anpassungen.
 Künftige ADRs (z. B. für Speicher- und Kommunikationsschichten) sollten diesem Schema folgen.
