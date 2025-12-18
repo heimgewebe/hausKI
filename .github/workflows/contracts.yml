@@ -1,3 +1,4 @@
+# CLASS: meta
 name: contracts
 
 on: [push, pull_request]

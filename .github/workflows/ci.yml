@@ -1,5 +1,12 @@
 name: CI (smart PR)
 
+# CLASS: baseline
+# ------------------------------------------------------------------------------
+# This workflow is the Baseline. Other workflows (e.g., heavy.yml, security.yml)
+# supplement it, they do not replace it.
+# See .github/workflows/README.md for details.
+# ------------------------------------------------------------------------------
+
 on:
   pull_request:
     branches: [ main ]
