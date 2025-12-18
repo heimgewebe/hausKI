@@ -198,7 +198,7 @@ fn run_intent(output_path: Option<String>, format: String) -> Result<()> {
 fn run_playbook(playbook_path: &str) -> Result<()> {
     let content = std::fs::read_to_string(playbook_path)
         .with_context(|| format!("Could not read playbook file: {playbook_path}"))?;
-    let playbook: serde_yml::Value = serde_yml::from_str(&content)
+    let playbook: serde_yaml_ng::Value = serde_yaml_ng::from_str(&content)
         .with_context(|| format!("Could not parse playbook file: {playbook_path}"))?;
 
     if let Some(steps) = playbook.get("steps").and_then(|s| s.as_sequence()) {
@@ -362,7 +362,7 @@ fn validate_config(file: &str) -> Result<()> {
             path.display()
         )
     })?;
-    let config: HauskiConfig = serde_yml::from_str(&content)
+    let config: HauskiConfig = serde_yaml_ng::from_str(&content)
         .context("Konfiguration konnte nicht als YAML geparst werden")?;
 
     let index = config

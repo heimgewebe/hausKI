@@ -80,7 +80,7 @@ fn policy_load_once() -> &'static MemoryPolicy {
         let p = Path::new(&path);
         if p.exists() {
             match fs::read_to_string(p) {
-                Ok(text) => match serde_yml::from_str::<MemoryPolicy>(&text) {
+                Ok(text) => match serde_yaml_ng::from_str::<MemoryPolicy>(&text) {
                     Ok(cfg) => cfg,
                     Err(err) => {
                         tracing::warn!("memory policy parse failed: {err} – using defaults");
