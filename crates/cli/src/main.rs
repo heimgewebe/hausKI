@@ -122,19 +122,27 @@ fn main() -> Result<()> {
                 let file = load_models(&path)?;
                 print_models_table(&file);
             }
-            ModelsCmd::Pull { id } => println!("(stub) models pull {id}"),
+            ModelsCmd::Pull { id } => {
+                eprintln!("Error: Feature not implemented (stub).");
+                println!("(stub) models pull {id}");
+                std::process::exit(1);
+            }
         },
         Commands::Serve { bind } => {
             run_core_server(bind)?;
         }
         Commands::Asr { cmd } => match cmd {
             AsrCmd::Transcribe { input, model, out } => {
+                eprintln!("Error: Feature not implemented (stub).");
                 println!("(stub) asr transcribe {input} --model {model:?} --out {out:?}");
+                std::process::exit(1);
             }
         },
         Commands::Audio { cmd } => match cmd {
             AudioCmd::ProfileSet { profile } => {
+                eprintln!("Error: Feature not implemented (stub).");
                 println!("(stub) audio profile set {profile}");
+                std::process::exit(1);
             }
         },
         Commands::Config { cmd } => match cmd {
@@ -190,7 +198,7 @@ fn run_intent(output_path: Option<String>, format: String) -> Result<()> {
 fn run_playbook(playbook_path: &str) -> Result<()> {
     let content = std::fs::read_to_string(playbook_path)
         .with_context(|| format!("Could not read playbook file: {playbook_path}"))?;
-    let playbook: serde_yaml::Value = serde_yaml::from_str(&content)
+    let playbook: serde_yaml_ng::Value = serde_yaml_ng::from_str(&content)
         .with_context(|| format!("Could not parse playbook file: {playbook_path}"))?;
 
     if let Some(steps) = playbook.get("steps").and_then(|s| s.as_sequence()) {
@@ -354,7 +362,7 @@ fn validate_config(file: &str) -> Result<()> {
             path.display()
         )
     })?;
-    let config: HauskiConfig = serde_yaml::from_str(&content)
+    let config: HauskiConfig = serde_yaml_ng::from_str(&content)
         .context("Konfiguration konnte nicht als YAML geparst werden")?;
 
     let index = config

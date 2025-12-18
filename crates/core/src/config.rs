@@ -117,10 +117,10 @@ pub struct ModelEntry {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(transparent)]
-pub struct RoutingPolicy(pub serde_yaml::Value);
+pub struct RoutingPolicy(pub serde_yaml_ng::Value);
 
-pub type RoutingRule = serde_yaml::Value;
-pub type RoutingDecision = serde_yaml::Value;
+pub type RoutingRule = serde_yaml_ng::Value;
+pub type RoutingDecision = serde_yaml_ng::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields, default)]
@@ -144,7 +144,7 @@ pub fn load_limits<P: AsRef<Path>>(path: P) -> Result<Limits> {
         HauskiError::Config(format!("failed to read limits YAML at {:?}: {}", path, e))
     })?;
 
-    let limits = serde_yaml::from_str(&content).map_err(|e| {
+    let limits = serde_yaml_ng::from_str(&content).map_err(|e| {
         HauskiError::Config(format!("failed to parse limits YAML at {:?}: {}", path, e))
     })?;
 
@@ -157,7 +157,7 @@ pub fn load_models<P: AsRef<Path>>(path: P) -> Result<ModelsFile> {
         HauskiError::Config(format!("failed to read models YAML at {:?}: {}", path, e))
     })?;
 
-    let models = serde_yaml::from_str(&content).map_err(|e| {
+    let models = serde_yaml_ng::from_str(&content).map_err(|e| {
         HauskiError::Config(format!("failed to parse models YAML at {:?}: {}", path, e))
     })?;
 
@@ -170,7 +170,7 @@ pub fn load_routing<P: AsRef<Path>>(path: P) -> Result<RoutingPolicy> {
         HauskiError::Config(format!("failed to read routing YAML at {:?}: {}", path, e))
     })?;
 
-    let routing = serde_yaml::from_str(&content).map_err(|e| {
+    let routing = serde_yaml_ng::from_str(&content).map_err(|e| {
         HauskiError::Config(format!("failed to parse routing YAML at {:?}: {}", path, e))
     })?;
 
@@ -183,7 +183,7 @@ pub fn load_flags<P: AsRef<Path>>(path: P) -> Result<FeatureFlags> {
         HauskiError::Config(format!("failed to read flags YAML at {:?}: {}", path, e))
     })?;
 
-    let mut flags: FeatureFlags = serde_yaml::from_str(&content).map_err(|e| {
+    let mut flags: FeatureFlags = serde_yaml_ng::from_str(&content).map_err(|e| {
         HauskiError::Config(format!("failed to parse flags YAML at {:?}: {}", path, e))
     })?;
 
@@ -290,11 +290,11 @@ mod tests {
             .0
             .as_mapping()
             .expect("routing policy should be a mapping");
-        let default_key = serde_yaml::Value::String("default".into());
-        let allow_key = serde_yaml::Value::String("allow".into());
+        let default_key = serde_yaml_ng::Value::String("default".into());
+        let allow_key = serde_yaml_ng::Value::String("allow".into());
         assert_eq!(
             mapping.get(&default_key),
-            Some(&serde_yaml::Value::String("deny".into()))
+            Some(&serde_yaml_ng::Value::String("deny".into()))
         );
         assert!(!mapping.contains_key(&allow_key));
     }

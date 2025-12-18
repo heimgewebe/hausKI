@@ -34,6 +34,7 @@ Dieses Dokument listet gefundene Abweichungen zwischen der Architektur-Dokumenta
 
 1. Kurzfristig: In der Doku klar zwischen **aktueller Implementierung** und **Zielbild**
    unterscheiden (z. B. Abschnitt „Ist-Stand vs. Roadmap“).
+   *Status: Erledigt (siehe unten "Aktualisierungs-Historie").*
 2. Mittelfristig: Minimal-Version des angekündigten Designs implementieren:
    - `VectorStore`-Trait definieren,
    - ein einfaches SQLite-Backend + Dummy-Vektorbackend anschließen,
@@ -71,6 +72,7 @@ Dieses Dokument listet gefundene Abweichungen zwischen der Architektur-Dokumenta
 
 1. Die nicht existierenden Crates in der Doku klar als **Future Modules** kennzeichnen
    (inkl. Hinweis „noch nicht implementiert“).
+   *Status: Erledigt.*
 2. Optional: Dummy-Crates mit minimalem `lib.rs` anlegen, die nur `todo!("geplant")`
    enthalten – dann passt Workspace-Struktur zu den Skizzen.
 3. Alternativ: Die Module aus der Architekturzeichnung in ein eigenes Kapitel
@@ -86,26 +88,25 @@ Dieses Dokument listet gefundene Abweichungen zwischen der Architektur-Dokumenta
   - Plugins sollen zusätzliche Fähigkeiten bereitstellen,
   - Cloud-Fallback für Fälle, in denen lokale Ressourcen nicht genügen.
 
-**Code (`crates/core/src/lib.rs`)**
+**Code (`crates/core/src/lib.rs`, `crates/core/src/plugins.rs`, `crates/core/src/cloud.rs`)**
 
-- `plugin_routes()` und `cloud_routes()` sind Platzhalter:
-  - Sie liefern leere `Router`-Instanzen zurück.
-  - Kommentare: `// TODO: Implement plugin routes`, `// TODO: Implement cloud routes`.
+- **Plugins:** Es existiert eine rudimentäre Implementierung (`PluginRegistry`, `/plugins` Endpunkte), die JSON zurückgibt (leere Liste oder 404). Es ist kein Platzhalter/TODO-Block mehr.
+- **Cloud:** Es existieren Routen (`/cloud/sync`, `/cloud/fallback`), diese sind jedoch fest verdrahtet, um `501 Not Implemented` mit einem strukturierten JSON-Body (`NotImplementedResponse`) zurückzugeben.
+- **Status:** Die Funktionen sind technisch vorhanden (kein Kompilierfehler, keine leeren `Router::new()`), aber funktional "leer" bzw. explizit als nicht implementiert signalisierend.
 
 **Auswirkung**
 
-- Das HTTP-API wirkt von außen „fertig“, bietet intern aber keinen realen
-  Erweiterungspunkt für Plugins oder Cloud-Fallback.
-- Integratoren, die sich auf die Plugin-/Cloud-Erweiterbarkeit verlassen, laufen ins Leere.
-- Doku erzeugt Erwartungen, die maximal als „Design-Absicht“ gelten.
+- Das HTTP-API wirkt von außen „fertig“ und antwortet korrekt (wenn auch mit Fehlercodes oder leeren Listen).
+- Dies ist ein Fortschritt gegenüber "nicht vorhanden", aber Nutzer sollten keine Geschäftslogik erwarten.
 
 **Empfohlene Maßnahmen**
 
 1. Minimal-Implementierung:
    - Routen anlegen, die wenigstens eine **stabile Fehlerantwort** liefern
      (z. B. `501 Not Implemented`, mit Hinweis auf den geplanten Umfang).
+   *Status: Umgesetzt für Cloud-Routen.*
 2. Doku ergänzen:
-   - Kapitel „Plugin-Schnittstellen“ und „Cloud-Fallback“ mit Status: `planned`.
+   - Kapitel „Plugin-Schnittstellen“ und „Cloud-Fallback“ mit Status: `planned` bzw. `stubbed`.
 3. Sobald ein erster realer Anwendungsfall da ist:
    - Kleines MVP-Plugin implementieren (z. B. ein Stub, der nur Metriken ausliest),
    - Cloud-Fallback zunächst als explizite Feature-Flag-Route.
@@ -139,6 +140,7 @@ Dieses Dokument listet gefundene Abweichungen zwischen der Architektur-Dokumenta
 
 1. In der Architektur-Doku deutlich machen:
    - `heimlern` ist aktuell ein **optional aktivierbares Experiment**, kein Standardteil.
+   *Status: Erledigt.*
 2. In `hauski-core` an mindestens einer klar definierten Stelle einen Hook vorsehen,
    über den `heimlern` injected werden kann (z. B. `PolicyEngine::new(…heimlern…)`).
 3. Ein kleines, messbares Szenario definieren:
@@ -166,7 +168,7 @@ Die folgenden Maßnahmen wurden umgesetzt:
 3. **Status-Übersicht:**
    - **Indexd:** In-Memory-Implementierung dokumentiert, Vektor-/Persistenz-Features als P2 geplant
    - **LLM/ASR/TTS/Audio:** Explizit als "nicht implementiert, geplant P1" gekennzeichnet
-   - **Plugins & Cloud-Fallback:** Status "leere Platzhalter" dokumentiert, als P2 geplant
+   - **Plugins & Cloud-Fallback:** Status aktualisiert (siehe oben Abschnitt 3): Plugins liefern leere Listen, Cloud liefert 501. Dies ersetzt die alte Beschreibung von "leeren Platzhaltern/TODOs".
    - **Heimlern:** Als "optionales Feature in policy_api" dokumentiert, Integration in core als P2 geplant
 
 Diese Änderungen erfüllen die in diesem Dokument unter "Empfohlene Maßnahmen" (jeweils Punkt 1)
