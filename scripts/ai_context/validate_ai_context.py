@@ -9,7 +9,7 @@ from typing import Any
 
 try:
     import yaml
-except Exception:
+except ImportError:
     print("ERROR: PyYAML missing. Install with: pip install pyyaml", file=sys.stderr)
     raise
 
