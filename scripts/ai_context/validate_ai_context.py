@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 import argparse
-import sys
 import re
+import sys
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 try:
     import yaml
-except Exception as e:
+except ImportError:
     print("ERROR: PyYAML missing. Install with: pip install pyyaml", file=sys.stderr)
     raise
 
@@ -26,7 +26,7 @@ def die(msg: str) -> None:
     raise SystemExit(2)
 
 
-def load_yaml(p: Path) -> Dict[str, Any]:
+def load_yaml(p: Path) -> dict[str, Any]:
     try:
         data = yaml.safe_load(p.read_text(encoding="utf-8"))
     except Exception as e:
@@ -36,7 +36,7 @@ def load_yaml(p: Path) -> Dict[str, Any]:
     return data
 
 
-def get_str(d: Dict[str, Any], path: str) -> str:
+def get_str(d: dict[str, Any], path: str) -> str:
     cur: Any = d
     for k in path.split("."):
         if not isinstance(cur, dict) or k not in cur:
@@ -45,7 +45,7 @@ def get_str(d: Dict[str, Any], path: str) -> str:
     return cur if isinstance(cur, str) else ""
 
 
-def get_list(d: Dict[str, Any], path: str) -> List[Any]:
+def get_list(d: dict[str, Any], path: str) -> list[Any]:
     cur: Any = d
     for k in path.split("."):
         if not isinstance(cur, dict) or k not in cur:
@@ -64,9 +64,9 @@ def has_placeholders(obj: Any) -> bool:
     return False
 
 
-def validate_one(p: Path) -> List[str]:
+def validate_one(p: Path) -> list[str]:
     d = load_yaml(p)
-    errs: List[str] = []
+    errs: list[str] = []
 
     # Backwards-compatible: v1.0 has these keys; v1.1 adds more, but we keep required minimal.
     name = get_str(d, "project.name")
@@ -96,7 +96,7 @@ def validate_one(p: Path) -> List[str]:
 def validate_templates(dir_path: Path) -> int:
     if not dir_path.exists() or not dir_path.is_dir():
         die(f"templates dir missing: {dir_path}")
-    problems: List[Tuple[Path, List[str]]] = []
+    problems: list[tuple[Path, list[str]]] = []
     files = sorted(dir_path.glob("*.ai-context.yml"))
     if not files:
         die(f"no template files found in {dir_path}")
