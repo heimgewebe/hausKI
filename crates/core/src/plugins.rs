@@ -6,11 +6,12 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
     time::Instant,
 };
 
 use crate::AppState;
+use tracing::warn;
 
 const PLUGIN_BY_ID_PATH: &str = "/plugins/{id}";
 
@@ -37,27 +38,72 @@ impl PluginRegistry {
     }
 
     pub fn register(&self, plugin: Plugin) {
-        let mut plugins = self
-            .plugins
-            .write()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut plugins = self.write_plugins("register");
         plugins.insert(plugin.id.clone(), plugin);
     }
 
     pub fn list(&self) -> Vec<Plugin> {
-        let plugins = self
-            .plugins
-            .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let plugins = self.read_plugins("list");
         plugins.values().cloned().collect()
     }
 
     pub fn get(&self, id: &str) -> Option<Plugin> {
-        let plugins = self
-            .plugins
-            .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let plugins = self.read_plugins("get");
         plugins.get(id).cloned()
+    }
+
+    fn read_plugins(&self, op: &str) -> RwLockReadGuard<'_, HashMap<String, Plugin>> {
+        self.plugins.read().unwrap_or_else(|poisoned| {
+            warn!(
+                operation = op,
+                "RwLock poisoned, recovered via into_inner()"
+            );
+            poisoned.into_inner()
+        })
+    }
+
+    fn write_plugins(&self, op: &str) -> RwLockWriteGuard<'_, HashMap<String, Plugin>> {
+        self.plugins.write().unwrap_or_else(|poisoned| {
+            warn!(
+                operation = op,
+                "RwLock poisoned, recovered via into_inner()"
+            );
+            poisoned.into_inner()
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread;
+
+    #[test]
+    fn test_poison_recovery() {
+        let registry = Arc::new(PluginRegistry::new());
+        let registry_clone = registry.clone();
+
+        // 1. Poison the lock by panicking while holding write guard
+        let handle = thread::spawn(move || {
+            let _guard = registry_clone.write_plugins("test_panic");
+            panic!("Oops");
+        });
+        let _ = handle.join(); // This will return Err because of panic
+
+        // 2. Verify we can still access it (recovery works)
+        let plugins = registry.list();
+        assert!(plugins.is_empty(), "Should recover empty state");
+
+        // 3. Verify we can still write to it
+        registry.register(Plugin {
+            id: "test".into(),
+            name: "Test".into(),
+            version: "0.1".into(),
+            description: "Desc".into(),
+            enabled: true,
+        });
+
+        assert!(registry.get("test").is_some());
     }
 }
 
