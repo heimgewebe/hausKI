@@ -37,17 +37,26 @@ impl PluginRegistry {
     }
 
     pub fn register(&self, plugin: Plugin) {
-        let mut plugins = self.plugins.write().unwrap();
+        let mut plugins = self
+            .plugins
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         plugins.insert(plugin.id.clone(), plugin);
     }
 
     pub fn list(&self) -> Vec<Plugin> {
-        let plugins = self.plugins.read().unwrap();
+        let plugins = self
+            .plugins
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         plugins.values().cloned().collect()
     }
 
     pub fn get(&self, id: &str) -> Option<Plugin> {
-        let plugins = self.plugins.read().unwrap();
+        let plugins = self
+            .plugins
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         plugins.get(id).cloned()
     }
 }
