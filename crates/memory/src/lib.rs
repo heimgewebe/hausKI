@@ -65,6 +65,16 @@ pub struct Stats {
     pub expired_evictions_total: u64,
 }
 
+/// TTL-Update-Strategie beim Setzen eines Items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TtlUpdate {
+    /// TTL wird gesetzt/überschrieben.
+    Set(i64),
+    /// TTL wird gelöscht.
+    Clear,
+    /// TTL bleibt unverändert (nur sinnvoll, wenn ein Eintrag existiert).
+    Preserve,
+}
 #[derive(Clone, Debug)]
 pub struct MemoryConfig {
     /// Optionaler Pfad zur DB-Datei. Default: $`XDG_STATE_HOME/hauski/memory.db`
@@ -163,7 +173,7 @@ impl MemoryStore {
         &self,
         key: String,
         value: Vec<u8>,
-        ttl_sec: Option<i64>,
+        ttl: TtlUpdate,
         pinned: Option<bool>,
     ) -> Result<()> {
         let db_path = self.db_path.clone();
@@ -173,21 +183,33 @@ impl MemoryStore {
             let now = Utc::now().to_rfc3339();
             let conn = Connection::open(&db_path)?;
 
-            // Bestehende Metadaten (created_ts, pinned) beibehalten, sofern vorhanden.
-            let existing: Option<(String, Option<i64>)> = conn
+            // Bestehende Metadaten (created_ts, pinned, ttl) beibehalten, sofern vorhanden.
+            let existing: Option<(String, Option<i64>, Option<i64>)> = conn
                 .query_row(
-                    "SELECT created_ts, pinned FROM memory_items WHERE key=?1",
+                    "SELECT created_ts, pinned, ttl_sec FROM memory_items WHERE key=?1",
                     params![key],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
                 )
                 .optional()?;
 
-            let (created_ts, pinned_flag) = match existing {
-                Some((created_ts, pinned_i_opt)) => {
+            let (created_ts, pinned_flag, ttl_to_store) = match existing {
+                Some((created_ts, pinned_i_opt, existing_ttl)) => {
                     let current_pinned = pinned_i_opt.unwrap_or(0) != 0;
-                    (created_ts, pinned.unwrap_or(current_pinned))
+                    let ttl = match ttl {
+                        TtlUpdate::Set(value) => Some(value),
+                        TtlUpdate::Clear => None,
+                        TtlUpdate::Preserve => existing_ttl,
+                    };
+                    (created_ts, pinned.unwrap_or(current_pinned), ttl)
                 }
-                None => (now.clone(), pinned.unwrap_or(false)),
+                None => {
+                    let ttl = match ttl {
+                        TtlUpdate::Set(value) => Some(value),
+                        // Neu angelegte Einträge: Clear/Preserve sind identisch.
+                        TtlUpdate::Clear | TtlUpdate::Preserve => None,
+                    };
+                    (now.clone(), pinned.unwrap_or(false), ttl)
+                }
             };
             let pinned_i = i32::from(pinned_flag);
 
@@ -199,7 +221,7 @@ impl MemoryStore {
                         ttl_sec=excluded.ttl_sec,
                         pinned=excluded.pinned,
                         updated_ts=excluded.updated_ts;",
-                params![key, value, ttl_sec, pinned_i, created_ts, now],
+                params![key, value, ttl_to_store, pinned_i, created_ts, now],
             )?;
 
             let c = ops_total.get_or_create(&MemoryLabels {
@@ -370,7 +392,12 @@ mod tests {
     async fn set_get_evict_roundtrip() {
         let (store, _tmp) = test_store(60);
         store
-            .set("k".into(), "v".as_bytes().to_vec(), Some(5), Some(false))
+            .set(
+                "k".into(),
+                "v".as_bytes().to_vec(),
+                TtlUpdate::Set(5),
+                Some(false),
+            )
             .await
             .unwrap();
         let it = store.get("k".into()).await.unwrap().unwrap();
@@ -384,7 +411,12 @@ mod tests {
     async fn janitor_expires() {
         let (store, _tmp) = test_store(1);
         store
-            .set("k".into(), "v".as_bytes().to_vec(), Some(1), Some(false))
+            .set(
+                "k".into(),
+                "v".as_bytes().to_vec(),
+                TtlUpdate::Set(1),
+                Some(false),
+            )
             .await
             .unwrap();
         tokio::time::sleep(Duration::from_secs(3)).await;
@@ -400,13 +432,23 @@ mod tests {
 
         // Initial write sets pinned=true
         store
-            .set("k".into(), "v".as_bytes().to_vec(), None, Some(true))
+            .set(
+                "k".into(),
+                "v".as_bytes().to_vec(),
+                TtlUpdate::Preserve,
+                Some(true),
+            )
             .await
             .unwrap();
 
         // Update without pinned flag should keep pinned=true
         store
-            .set("k".into(), "v2".as_bytes().to_vec(), None, None)
+            .set(
+                "k".into(),
+                "v2".as_bytes().to_vec(),
+                TtlUpdate::Preserve,
+                None,
+            )
             .await
             .unwrap();
 
@@ -424,13 +466,23 @@ mod tests {
 
         // Start pinned
         store
-            .set("k".into(), "v".as_bytes().to_vec(), None, Some(true))
+            .set(
+                "k".into(),
+                "v".as_bytes().to_vec(),
+                TtlUpdate::Preserve,
+                Some(true),
+            )
             .await
             .unwrap();
 
         // Explicit false should unpin
         store
-            .set("k".into(), "v2".as_bytes().to_vec(), None, Some(false))
+            .set(
+                "k".into(),
+                "v2".as_bytes().to_vec(),
+                TtlUpdate::Preserve,
+                Some(false),
+            )
             .await
             .unwrap();
 
@@ -439,6 +491,70 @@ mod tests {
             !item.pinned,
             "pinned flag should update when explicitly set to false"
         );
+        assert_eq!(item.value, b"v2");
+    }
+
+    #[tokio::test]
+    async fn set_preserves_existing_ttl_when_not_provided() {
+        let (store, _tmp) = test_store(60);
+
+        store
+            .set(
+                "k".into(),
+                "v".as_bytes().to_vec(),
+                TtlUpdate::Set(5),
+                Some(false),
+            )
+            .await
+            .unwrap();
+
+        // Updating without a TTL should not clear an existing TTL.
+        store
+            .set(
+                "k".into(),
+                "v2".as_bytes().to_vec(),
+                TtlUpdate::Preserve,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let item = store.get("k".into()).await.unwrap().expect("item missing");
+        assert_eq!(
+            item.ttl_sec,
+            Some(5),
+            "existing TTL should be preserved when no TTL is provided"
+        );
+        assert_eq!(item.value, b"v2");
+    }
+
+    #[tokio::test]
+    async fn set_can_clear_existing_ttl_explicitly() {
+        let (store, _tmp) = test_store(60);
+
+        store
+            .set(
+                "k".into(),
+                "v".as_bytes().to_vec(),
+                TtlUpdate::Set(5),
+                Some(false),
+            )
+            .await
+            .unwrap();
+
+        // Explicitly clear TTL
+        store
+            .set(
+                "k".into(),
+                "v2".as_bytes().to_vec(),
+                TtlUpdate::Clear,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let item = store.get("k".into()).await.unwrap().expect("item missing");
+        assert_eq!(item.ttl_sec, None, "TTL should be cleared explicitly");
         assert_eq!(item.value, b"v2");
     }
 }
