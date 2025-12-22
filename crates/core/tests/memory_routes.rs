@@ -63,3 +63,44 @@ async fn memory_routes_available_without_expose_config() {
     let payload: Value = serde_json::from_slice(&body_bytes).expect("response json");
     assert_eq!(payload["value"], "hello");
 }
+
+#[tokio::test]
+async fn memory_set_rejects_conflicting_ttl_requests() {
+    let limits = Limits::default();
+    let models = ModelsFile::default();
+    let routing = RoutingPolicy::default();
+    let flags = FeatureFlags::default();
+    let allowed_origin = HeaderValue::from_static("*");
+    let (app, _state) = build_app_with_state(limits, models, routing, flags, false, allowed_origin);
+
+    let payload = json!({
+        "key": "conflict-ttl",
+        "value": "hello",
+        "ttl_sec": 120,
+        "clear_ttl": true
+    });
+
+    let response = app
+        .oneshot(
+            Request::post("/memory/set")
+                .header(http::header::CONTENT_TYPE, "application/json")
+                .body(Body::from(payload.to_string()))
+                .expect("failed to build request"),
+        )
+        .await
+        .expect("set request failed");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let body_bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("body bytes")
+        .to_bytes();
+    let payload: Value = serde_json::from_slice(&body_bytes).expect("response json");
+    assert_eq!(
+        payload["error"],
+        "clear_ttl cannot be used together with ttl_sec"
+    );
+}

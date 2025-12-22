@@ -31,7 +31,7 @@ pub struct MemoryGetResponse {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-#[schema(title = "MemorySetRequest", example = json!({"key":"greeting","value":"hi","ttl_sec":300,"pinned":false}))]
+#[schema(title = "MemorySetRequest", example = json!({"key":"greeting","value":"hi","ttl_sec":300,"pinned":false,"clear_ttl":false}))]
 pub struct MemorySetRequest {
     pub key: String,
     pub value: String,
@@ -39,11 +39,19 @@ pub struct MemorySetRequest {
     pub ttl_sec: Option<i64>,
     #[serde(default)]
     pub pinned: Option<bool>,
+    /// Set to true to explicitly clear an existing TTL instead of preserving it.
+    #[serde(default)]
+    pub clear_ttl: bool,
 }
 #[derive(Debug, Serialize, ToSchema)]
 #[schema(title = "MemorySetResponse", example = json!({"ok":true}))]
 pub struct MemorySetResponse {
     pub ok: bool,
+}
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(title = "MemoryErrorResponse", example = json!({"error":"clear_ttl cannot be used together with ttl_sec"}))]
+pub struct MemoryErrorResponse {
+    pub error: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -161,16 +169,36 @@ pub async fn memory_get_handler(
     path = "/memory/set",
     tag = "core",
     request_body = MemorySetRequest,
-    responses((status=200, body=MemorySetResponse), (status=500, description="internal error"))
+    responses(
+        (status=200, body=MemorySetResponse),
+        (status=400, body=MemoryErrorResponse, description="invalid request"),
+        (status=500, description="internal error")
+    )
 )]
 pub async fn memory_set_handler(
     _state: State<AppState>,
     Json(req): Json<MemorySetRequest>,
 ) -> Response {
+    if req.clear_ttl && req.ttl_sec.is_some() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(MemoryErrorResponse {
+                error: "clear_ttl cannot be used together with ttl_sec".to_string(),
+            }),
+        )
+            .into_response();
+    }
     let pol = policy_load_once();
 
-    // TTL: falls im Request nicht gesetzt, Policy-Default verwenden
-    let ttl = req.ttl_sec.or(pol.default_ttl_sec);
+    // TTL: falls im Request nicht gesetzt, Policy-Default verwenden. Falls explizit
+    // clear_ttl=true, wird die TTL gelöscht.
+    let ttl_update = if req.clear_ttl {
+        mem::TtlUpdate::Clear
+    } else if let Some(ttl) = req.ttl_sec.or(pol.default_ttl_sec) {
+        mem::TtlUpdate::Set(ttl)
+    } else {
+        mem::TtlUpdate::Preserve
+    };
 
     // pinned: falls im Request nicht gesetzt, Allowlist aus Policy prüfen
     // Note: This check is purely logical and doesn't block (much), so we can keep it here.
@@ -183,7 +211,7 @@ pub async fn memory_set_handler(
     });
 
     let result = mem::global()
-        .set(req.key, req.value.into_bytes(), ttl, pinned)
+        .set(req.key, req.value.into_bytes(), ttl_update, pinned)
         .await;
 
     match result {
