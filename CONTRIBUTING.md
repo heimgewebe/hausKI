@@ -9,6 +9,23 @@
 - **Sicherheit:** Shell-Skripte laufen mit `set -euo pipefail`. Keine stillen Fehler oder unkontrollierte Netzwerkzugriffe.
 - **Hilfen:** CLI-Kommandos müssen `-h|--help` anbieten und beschreiben Defaults, Flags sowie Konfigurationspfade.
 
+## Epistemische Infrastruktur (Wahrheit & Vertrauen)
+
+HausKI setzt auf **explizite, überprüfbare Wahrheit**.
+
+- **Test-Artefakte:**
+  Aussagen über die Stabilität des Systems sind nur gültig, wenn sie durch das kanonische Artefakt belegt sind.
+  Erzeuge dieses mit: `scripts/generate-test-summary.sh`.
+  Das Ergebnis liegt in `artifacts/test.summary.json`.
+  > "If it is not in this artifact, it is not verified truth."
+
+- **Code Safety:**
+  Beachte [ADR-0003: Code Safety](docs/adr/ADR-0003__code-safety.md).
+  Kein `unwrap()` in Produktionscode, explizite Fehlerbehandlung ist Pflicht.
+
+- **Inkonsistenzen:**
+  Bekannte Abweichungen zwischen Vision und Code sind in `docs/inconsistencies.md` dokumentiert und klassifiziert (z. B. als `accepted limitation`).
+
 ## Entwicklungsumgebung
 
 - Nutze den Devcontainer (`.devcontainer/`). Er bringt `rustup`, CUDA-Basis, `cargo-deny`, `just` und Vale mit.
