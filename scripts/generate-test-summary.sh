@@ -24,13 +24,30 @@ EXIT_CODE=$?
 set -e
 
 # Parse results
-# Look for line: "test result: ok. 65 passed; 0 failed; ..."
-# We sum up all "passed" and "failed" counts from all test suites
-TOTAL_PASSED=$(grep "test result: .*\. [0-9]\+ passed" "$TEMP_LOG" | awk '{sum+=$4} END {print sum+0}')
-TOTAL_FAILED=$(grep "test result: .*\. [0-9]\+ passed" "$TEMP_LOG" | awk '{sum+=$6} END {print sum+0}')
+# Robust parsing using regex to match standard Rust test output:
+# "test result: ok. 65 passed; 0 failed; ..."
+# "test result: FAILED. 64 passed; 1 failed; ..."
+MATCHES=$(grep -E "test result: .*\. [0-9]+ passed; [0-9]+ failed" "$TEMP_LOG" || true)
+
+if [ -z "$MATCHES" ]; then
+    echo "❌ Error: No valid test result lines found in output."
+    echo "This indicates a parsing failure or a cargo failure preventing tests from running."
+    rm "$TEMP_LOG"
+    exit 1
+fi
+
+# Sum up all "passed" and "failed" counts from all matches
+# Extract numbers using sed and sum with awk
+TOTAL_PASSED=$(echo "$MATCHES" | sed -E 's/.* ([0-9]+) passed.*/\1/' | awk '{s+=$1} END {print s+0}')
+TOTAL_FAILED=$(echo "$MATCHES" | sed -E 's/.* ([0-9]+) failed.*/\1/' | awk '{s+=$1} END {print s+0}')
 
 STATUS="success"
 if [ $EXIT_CODE -ne 0 ]; then
+    STATUS="failure"
+fi
+
+# Sanity check: If status is success but we have failures in parsing (should be covered by exit code, but double check)
+if [ "$TOTAL_FAILED" -gt 0 ]; then
     STATUS="failure"
 fi
 
@@ -61,7 +78,7 @@ echo "✅ Truth artifact generated: $ARTIFACT_FILE"
 cat "$ARTIFACT_FILE"
 echo ""
 
-if [ $EXIT_CODE -ne 0 ]; then
+if [ "$STATUS" = "failure" ]; then
     echo "❌ Tests failed. Artifact records this failure."
-    exit $EXIT_CODE
+    exit 1
 fi

@@ -1,7 +1,7 @@
 # ADR-0003: Code Safety & Explicit Truth
 
 * **Status:** Accepted
-* **Date:** 2025-05-18
+* **Date:** 2025-12-22
 * **Context:** The codebase must transition from implicit stability ("it works") to explicit, verifiable stability ("it is proven correct by rules").
 
 ## Context
@@ -16,13 +16,14 @@ We adopt the following explicit norms for Rust code in `hauski`.
 
 ### 1. `unwrap()` and `expect()`
 
-* **Production Code (Libraries/Services):**
-  * **Forbidden:** `unwrap()` is strictly forbidden in runtime logic.
+* **Production Code (Runtime):**
+  * **Forbidden:** `unwrap()` is strictly forbidden in runtime logic (handlers, background tasks, core loops).
   * **Restricted:** `expect()` is allowed ONLY if the invariant is locally provable and documented (e.g., locking a mutex that we know isn't poisoned, though `poisoned.into_inner()` is preferred).
   * **Preferred:** Use `?` (error propagation) or `match` to handle errors gracefully.
 
-* **Startup / Initialization (`main.rs`):**
-  * **Allowed:** `unwrap()` or `expect()` are acceptable during the *first phase* of startup (e.g., resolving bind addresses, loading mandatory config). If startup fails, the process *should* crash immediately and loudly.
+* **Startup Phase 1 (Config/Env Parsing):**
+  * **Allowed:** `unwrap()` or `expect()` are acceptable **only** during the synchronous initialization phase (reading environment variables, parsing config files) **before** the async runtime/server loop is started.
+  * **Rationale:** If basic configuration is invalid, the process *should* crash immediately and loudly to prevent running in an undefined state.
 
 * **Tests:**
   * **Allowed:** `unwrap()` is idiomatic in tests to assert success.

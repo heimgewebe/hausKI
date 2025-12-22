@@ -14,6 +14,7 @@ Dieses Dokument listet bewusste Abweichungen zwischen der Architektur-Dokumentat
 ## 1. Indexierung (`indexd`)
 
 **Status:** `accepted limitation`
+**Gültigkeit:** Bis zur Einführung echter Vektorsuche (Roadmap P2).
 
 **Dokumentation**
 - `indexd` wird als Persistenzschicht beschrieben, die SQLite in Kombination mit einem
@@ -33,6 +34,7 @@ Dieses Dokument listet bewusste Abweichungen zwischen der Architektur-Dokumentat
 ## 2. Fehlende Module (`llm`, `asr`, `tts`, `audio`)
 
 **Status:** `planned gap`
+**Gültigkeit:** Bis zur Implementierung der nativen Inference-Layer (Roadmap P1).
 
 **Dokumentation**
 - `hauski-skizze.md` listet Module wie `llm/` (llama.cpp), `asr/` (whisper-rs) etc. auf.
@@ -41,7 +43,7 @@ Dieses Dokument listet bewusste Abweichungen zwischen der Architektur-Dokumentat
 - Diese Verzeichnisse existieren nicht. Rust-seitig gibt es keine Inference-Implementierung.
 
 **Begründung**
-- Die Integration nativer KI-Bindings ist der nächste große Entwicklungsschritt (P1).
+- Die Integration nativer KI-Bindings ist der nächste große Entwicklungsschritt.
 - Bis dahin wird Inference über externe APIs oder Python-Microservices (z.B. via `uv`) gelöst.
 
 ---
@@ -49,6 +51,7 @@ Dieses Dokument listet bewusste Abweichungen zwischen der Architektur-Dokumentat
 ## 3. Unimplementierte Routen (Core: Plugins & Cloud)
 
 **Status:** `accepted limitation` (Plugins) / `stubbed` (Cloud)
+**Gültigkeit:** Unbegrenzt, bis konkrete Feature-Anforderungen (z.B. Sync) entstehen.
 
 **Dokumentation**
 - Beschreibt Plugin-Schnittstellen und Cloud-Fallback-Routing.
@@ -59,13 +62,14 @@ Dieses Dokument listet bewusste Abweichungen zwischen der Architektur-Dokumentat
 
 **Begründung**
 - Das API-Schema ("Contract") ist definiert, um Frontend-Entwicklung zu ermöglichen.
-- Die Backend-Logik wird erst bei konkretem Bedarf (z.B. Multidevice-Sync) implementiert.
+- Die Backend-Logik wird erst bei konkretem Bedarf implementiert.
 
 ---
 
 ## 4. Nutzung von `heimlern` (Bandits / Policy-Learning)
 
 **Status:** `experimental` / `deprecated assumption`
+**Gültigkeit:** Muss in Dokumentation als "optional" markiert werden.
 
 **Dokumentation**
 - Suggeriert eine "intelligente Steuerung" des Core-Servers durch Banditen-Algorithmen.
