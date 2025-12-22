@@ -544,12 +544,7 @@ mod tests {
 
         // Explicitly clear TTL
         store
-            .set(
-                "k".into(),
-                "v2".as_bytes().to_vec(),
-                TtlUpdate::Clear,
-                None,
-            )
+            .set("k".into(), "v2".as_bytes().to_vec(), TtlUpdate::Clear, None)
             .await
             .expect("clear TTL explicitly");
 
