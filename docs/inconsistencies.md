@@ -1,175 +1,83 @@
 # Inkonsistenzen zwischen Dokumentation und Code
 
-Dieses Dokument listet gefundene Abweichungen zwischen der Architektur-Dokumentation
+Dieses Dokument listet bewusste Abweichungen zwischen der Architektur-Dokumentation
 (z. B. `hauski-skizze.md`, `hauski-stack.md`) und der tatsächlichen Implementierung im
-`crates/` Verzeichnis auf – inklusive Auswirkungen und Vorschlag für das weitere Vorgehen.
+`crates/` Verzeichnis auf.
+
+> **Wichtiger Hinweis:**
+> Die hier gelisteten Punkte sind keine Bugs, sondern bewusste Grenzen („conscious boundaries“).
+> Sie dokumentieren den Unterschied zwischen dem *langfristigen Zielbild* (Vision) und der
+> *aktuellen, stabilen Realität* (Code).
 
 ---
 
 ## 1. Indexierung (`indexd`)
 
-**Dokumentation**
+**Status:** `accepted limitation`
+**Gültigkeit:** Bis zur Einführung echter Vektorsuche (Roadmap P2).
 
+**Dokumentation**
 - `indexd` wird als Persistenzschicht beschrieben, die SQLite in Kombination mit einem
   `VectorStore`-Trait nutzt.
 - Als Backends werden `tantivy+hnsw` (Default) und `Qdrant` (optional) genannt.
-- Erwartung: Vektorsuche + persistente Indizes.
 
-**Code (`crates/indexd/src/lib.rs`)**
-
+**Realität (Code)**
 - Aktuelle Implementierung: reine In-Memory `HashMap` (`IndexState`).
 - Suche: einfacher Substring-Match (`substring_match_score`).
-- Es existiert weder ein `VectorStore`-Trait noch eine Anbindung an SQLite, Tantivy oder Qdrant.
-- Vektorsuche findet nicht statt, Persistenz ist nur in Ansätzen vorhanden/fehlend.
 
-**Auswirkung**
-
-- Externe Architektur-Dokumente suggerieren Fähigkeiten, die der Code nicht hat:
-  - Vektorbasierte Relevanz, skalierbare Indizes, persistente Suchindizes.
-- Nutzer, die „Indexd“ als echte Such-Engine erwarten, bekommen faktisch nur einen
-  In-Memory-Filter mit String-Matching.
-- Performance- und Qualitätsaussagen in der Dokumentation sind aktuell nicht haltbar.
-
-**Empfohlene Maßnahmen**
-
-1. Kurzfristig: In der Doku klar zwischen **aktueller Implementierung** und **Zielbild**
-   unterscheiden (z. B. Abschnitt „Ist-Stand vs. Roadmap“).
-   *Status: Erledigt (siehe unten "Aktualisierungs-Historie").*
-2. Mittelfristig: Minimal-Version des angekündigten Designs implementieren:
-   - `VectorStore`-Trait definieren,
-   - ein einfaches SQLite-Backend + Dummy-Vektorbackend anschließen,
-   - Doku auf diese Minimal-Realität abgleichen.
-3. Wenn die Roadmap unsicher ist: explizit als „geplante Architektur“ markieren und
-   nicht als bereits existierend beschreiben.
+**Begründung**
+- Eine vollwertige Vektorsuche würde die Komplexität und die Dependencies massiv erhöhen.
+- Für aktuelle lokale Testszenarien reicht die In-Memory-Lösung aus.
 
 ---
 
 ## 2. Fehlende Module (`llm`, `asr`, `tts`, `audio`)
 
+**Status:** `planned gap`
+**Gültigkeit:** Bis zur Implementierung der nativen Inference-Layer (Roadmap P1).
+
 **Dokumentation**
+- `hauski-skizze.md` listet Module wie `llm/` (llama.cpp), `asr/` (whisper-rs) etc. auf.
 
-- `hauski-skizze.md` listet unter „2.2 Module“ u. a.:
-  - `llm/` (llama.cpp Bindings),
-  - `asr/` (whisper-rs),
-  - `tts/` (piper-rs),
-  - `audio/` (Profile, Audio-Pipeline).
-- Diese Module werden als Teil der Gesamtarchitektur dargestellt.
+**Realität (Code)**
+- Diese Verzeichnisse existieren nicht. Rust-seitig gibt es keine Inference-Implementierung.
 
-**Code**
-
-- Unter `crates/` existieren diese Verzeichnisse nicht.
-- Im Root-`Cargo.toml` werden sie bestenfalls unter „später“ kommentiert.
-- Rust-seitig gibt es aktuell keine Implementierung für Inference oder Audio.
-
-**Auswirkung**
-
-- Die Dokumentation vermittelt ein Bild eines „vollständigen AI-Stacks“, das de facto
-  nicht vorhanden ist.
-- Das erhöht die kognitive Last: Leser müssen ständig raten, was Vision und was Realität ist.
-- Fehlersuche („wo ist der llama.cpp-Wrapper?“) ist vorprogrammiert.
-
-**Empfohlene Maßnahmen**
-
-1. Die nicht existierenden Crates in der Doku klar als **Future Modules** kennzeichnen
-   (inkl. Hinweis „noch nicht implementiert“).
-   *Status: Erledigt.*
-2. Optional: Dummy-Crates mit minimalem `lib.rs` anlegen, die nur `todo!("geplant")`
-   enthalten – dann passt Workspace-Struktur zu den Skizzen.
-3. Alternativ: Die Module aus der Architekturzeichnung in ein eigenes Kapitel
-   „Langfristige Erweiterungen“ verschieben.
+**Begründung**
+- Die Integration nativer KI-Bindings ist der nächste große Entwicklungsschritt.
+- Bis dahin wird Inference über externe APIs oder Python-Microservices (z.B. via `uv`) gelöst.
 
 ---
 
 ## 3. Unimplementierte Routen (Core: Plugins & Cloud)
 
+**Status:** `accepted limitation` (Plugins) / `stubbed` (Cloud)
+**Gültigkeit:** Unbegrenzt, bis konkrete Feature-Anforderungen (z.B. Sync) entstehen.
+
 **Dokumentation**
+- Beschreibt Plugin-Schnittstellen und Cloud-Fallback-Routing.
 
-- Die Architektur beschreibt Plugin-Schnittstellen und Cloud-Fallback-Routing:
-  - Plugins sollen zusätzliche Fähigkeiten bereitstellen,
-  - Cloud-Fallback für Fälle, in denen lokale Ressourcen nicht genügen.
+**Realität (Code)**
+- **Plugins:** Rudimentäre Registry, liefert leere Listen/404.
+- **Cloud:** Routen existieren, geben aber fest verdrahtet `501 Not Implemented` zurück.
 
-**Code (`crates/core/src/lib.rs`, `crates/core/src/plugins.rs`, `crates/core/src/cloud.rs`)**
-
-- **Plugins:** Es existiert eine rudimentäre Implementierung (`PluginRegistry`, `/plugins` Endpunkte), die JSON zurückgibt (leere Liste oder 404). Es ist kein Platzhalter/TODO-Block mehr.
-- **Cloud:** Es existieren Routen (`/cloud/sync`, `/cloud/fallback`), diese sind jedoch fest verdrahtet, um `501 Not Implemented` mit einem strukturierten JSON-Body (`NotImplementedResponse`) zurückzugeben.
-- **Status:** Die Funktionen sind technisch vorhanden (kein Kompilierfehler, keine leeren `Router::new()`), aber funktional "leer" bzw. explizit als nicht implementiert signalisierend.
-
-**Auswirkung**
-
-- Das HTTP-API wirkt von außen „fertig“ und antwortet korrekt (wenn auch mit Fehlercodes oder leeren Listen).
-- Dies ist ein Fortschritt gegenüber "nicht vorhanden", aber Nutzer sollten keine Geschäftslogik erwarten.
-
-**Empfohlene Maßnahmen**
-
-1. Minimal-Implementierung:
-   - Routen anlegen, die wenigstens eine **stabile Fehlerantwort** liefern
-     (z. B. `501 Not Implemented`, mit Hinweis auf den geplanten Umfang).
-   *Status: Umgesetzt für Cloud-Routen.*
-2. Doku ergänzen:
-   - Kapitel „Plugin-Schnittstellen“ und „Cloud-Fallback“ mit Status: `planned` bzw. `stubbed`.
-3. Sobald ein erster realer Anwendungsfall da ist:
-   - Kleines MVP-Plugin implementieren (z. B. ein Stub, der nur Metriken ausliest),
-   - Cloud-Fallback zunächst als explizite Feature-Flag-Route.
+**Begründung**
+- Das API-Schema ("Contract") ist definiert, um Frontend-Entwicklung zu ermöglichen.
+- Die Backend-Logik wird erst bei konkretem Bedarf implementiert.
 
 ---
 
 ## 4. Nutzung von `heimlern` (Bandits / Policy-Learning)
 
-**Status laut Repository**
+**Status:** `experimental` / `deprecated assumption`
+**Gültigkeit:** Muss in Dokumentation als "optional" markiert werden.
 
-- `vendor/heimlern-core` und `vendor/heimlern-bandits` sind:
-  - Teil des Workspaces,
-  - lokal im `vendor/`-Verzeichnis vorhanden.
-- Die Crates sind damit kompilierbar und versioniert.
+**Dokumentation**
+- Suggeriert eine "intelligente Steuerung" des Core-Servers durch Banditen-Algorithmen.
 
-**Inkonsistenz**
+**Realität (Code)**
+- `vendor/heimlern-*` Crates sind vorhanden, aber in `hauski-core` nicht eingebunden.
+- Sie werden nur optional in `hauski-policy-api` genutzt.
 
-- `hauski-core` bindet diese Crates bisher nicht ein.
-- Sie werden nur optional im Crate `hauski-policy-api` referenziert (Feature `heimlern`).
-- Die in Architektur-Skizzen dargestellte „intelligente Steuerung per Bandits“ ist
-  im zentralen Core-Server nicht aktiv.
-
-**Auswirkung**
-
-- Die versprochene „lernende“ Policy-Steuerung existiert derzeit nur als Option am Rand,
-  nicht im eigentlichen Herzstück.
-- Nutzer, die die Skizze lesen, erwarten adaptive Entscheidungen, bekommen aber
-  eine weitgehend statische Policy-Engine.
-
-**Empfohlene Maßnahmen**
-
-1. In der Architektur-Doku deutlich machen:
-   - `heimlern` ist aktuell ein **optional aktivierbares Experiment**, kein Standardteil.
-   *Status: Erledigt.*
-2. In `hauski-core` an mindestens einer klar definierten Stelle einen Hook vorsehen,
-   über den `heimlern` injected werden kann (z. B. `PolicyEngine::new(…heimlern…)`).
-3. Ein kleines, messbares Szenario definieren:
-   - „Wenn heimlern aktiv ist, wird X über Bandits entschieden, sonst über statische Policy.“
-   - Dokumentation mit diesem realen, nachvollziehbaren Beispiel ergänzen.
-
----
-
-## Aktualisierungs-Historie
-
-**2025-12-03:** Dokumentation aktualisiert zur Klärung Ist-Stand vs. Roadmap
-
-Die folgenden Maßnahmen wurden umgesetzt:
-
-1. **Neues Dokument erstellt:** [`docs/ist-stand-vs-roadmap.md`](./ist-stand-vs-roadmap.md)
-   - Vollständige Übersicht über implementierte Features (✅) und geplante Erweiterungen (🔮)
-   - Priorisierung: P1 (kurzfristig), P2 (mittelfristig), P3 (langfristig)
-   - Detaillierte Status-Tabelle für alle Hauptkomponenten
-
-2. **Architektur-Dokumente aktualisiert:**
-   - `hauski-skizze.md`: Hinweis am Anfang hinzugefügt, dass es sich um eine Vision handelt
-   - `hauski-stack.md`: Status-Marker (✅/🔮) für alle Komponenten ergänzt
-   - Modul-Übersicht in beiden Dokumenten mit klarer Trennung Ist/Roadmap
-
-3. **Status-Übersicht:**
-   - **Indexd:** In-Memory-Implementierung dokumentiert, Vektor-/Persistenz-Features als P2 geplant
-   - **LLM/ASR/TTS/Audio:** Explizit als "nicht implementiert, geplant P1" gekennzeichnet
-   - **Plugins & Cloud-Fallback:** Status aktualisiert (siehe oben Abschnitt 3): Plugins liefern leere Listen, Cloud liefert 501. Dies ersetzt die alte Beschreibung von "leeren Platzhaltern/TODOs".
-   - **Heimlern:** Als "optionales Feature in policy_api" dokumentiert, Integration in core als P2 geplant
-
-Diese Änderungen erfüllen die in diesem Dokument unter "Empfohlene Maßnahmen" (jeweils Punkt 1)
-beschriebenen kurzfristigen Schritte: klare Unterscheidung zwischen aktuellem Stand und Zielbild.
+**Begründung**
+- Die Komplexität von Reinforcement Learning im Core-Loop ist für den aktuellen Reifegrad zu hoch.
+- Dies ist ein Experimentierfeld, keine Kernfunktionalität.
