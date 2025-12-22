@@ -126,6 +126,6 @@ jobs:
           sed -n '1,200p' deny.toml || true
           echo "================="
       - name: Install cargo-audit (fresh)
-        run: cargo install cargo-audit --locked --force
+        run: cargo install cargo-audit --locked --force --version '0.20.1'
       - name: Run cargo audit
         run: cargo audit
