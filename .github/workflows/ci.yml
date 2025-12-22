@@ -64,6 +64,13 @@ jobs:
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
           fetch-depth: 0
+      - name: Validate required toolchain input
+        run: |
+          set -euo pipefail
+          if [ -z "${toolchain}" ]; then
+            echo "'toolchain' input is required; set workflow_dispatch or workflow_call input, or define RUST_TOOLCHAIN." >&2
+            exit 1
+          fi
       - name: Detect changed paths
         id: filter
         env:

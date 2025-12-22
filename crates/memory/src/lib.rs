@@ -399,7 +399,7 @@ mod tests {
                 Some(false),
             )
             .await
-            .unwrap();
+            .expect("set initial value with TTL");
         let it = store.get("k".into()).await.unwrap().unwrap();
         assert_eq!(it.key, "k");
         assert_eq!(it.value, b"v");
@@ -418,7 +418,7 @@ mod tests {
                 Some(false),
             )
             .await
-            .unwrap();
+            .expect("set TTL for janitor to expire");
         tokio::time::sleep(Duration::from_secs(3)).await;
         // allow janitor to run
         tokio::time::sleep(Duration::from_secs(2)).await;
@@ -439,7 +439,7 @@ mod tests {
                 Some(true),
             )
             .await
-            .unwrap();
+            .expect("set pinned item");
 
         // Update without pinned flag should keep pinned=true
         store
@@ -450,7 +450,7 @@ mod tests {
                 None,
             )
             .await
-            .unwrap();
+            .expect("update item while preserving pinned status");
 
         let item = store.get("k".into()).await.unwrap().expect("item missing");
         assert!(
@@ -473,7 +473,7 @@ mod tests {
                 Some(true),
             )
             .await
-            .unwrap();
+            .expect("set pinned item before unpinning");
 
         // Explicit false should unpin
         store
@@ -484,7 +484,7 @@ mod tests {
                 Some(false),
             )
             .await
-            .unwrap();
+            .expect("explicitly unpin item");
 
         let item = store.get("k".into()).await.unwrap().expect("item missing");
         assert!(
@@ -506,7 +506,7 @@ mod tests {
                 Some(false),
             )
             .await
-            .unwrap();
+            .expect("set initial TTL");
 
         // Updating without a TTL should not clear an existing TTL.
         store
@@ -517,7 +517,7 @@ mod tests {
                 None,
             )
             .await
-            .unwrap();
+            .expect("preserve TTL when not provided");
 
         let item = store.get("k".into()).await.unwrap().expect("item missing");
         assert_eq!(
@@ -540,7 +540,7 @@ mod tests {
                 Some(false),
             )
             .await
-            .unwrap();
+            .expect("set TTL before clearing");
 
         // Explicitly clear TTL
         store
@@ -551,7 +551,7 @@ mod tests {
                 None,
             )
             .await
-            .unwrap();
+            .expect("clear TTL explicitly");
 
         let item = store.get("k".into()).await.unwrap().expect("item missing");
         assert_eq!(item.ttl_sec, None, "TTL should be cleared explicitly");
