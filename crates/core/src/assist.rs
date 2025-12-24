@@ -215,50 +215,51 @@ pub async fn assist_handler(
     } else if mode == "insight.negation" {
         // PR3a: Ingest insight.negation
 
-        let (_insight_id, is_dup) = if let Ok(json) = serde_json::from_str::<serde_json::Value>(&req.question) {
-            if let Some(id) = json.get("id").and_then(|v| v.as_str()) {
-                let _insight_id = id.to_string();
-                let mut is_dup = false;
+        let (_insight_id, is_dup) =
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&req.question) {
+                if let Some(id) = json.get("id").and_then(|v| v.as_str()) {
+                    let _insight_id = id.to_string();
+                    let mut is_dup = false;
 
-                if let Some(mem) = hauski_memory::try_global() {
-                    let key = format!("insight.negation:{}", id);
-                    if let Ok(Some(_)) = mem.get(key.clone()).await {
-                        is_dup = true;
-                    } else {
-                        // Mark as processed with 24h TTL
-                        let _ = mem
-                            .set(
-                                key,
-                                vec![],
-                                hauski_memory::TtlUpdate::Set(86400),
-                                Some(false),
-                            )
-                            .await;
+                    if let Some(mem) = hauski_memory::try_global() {
+                        let key = format!("insight.negation:{}", id);
+                        if let Ok(Some(_)) = mem.get(key.clone()).await {
+                            is_dup = true;
+                        } else {
+                            // Mark as processed with 24h TTL
+                            let _ = mem
+                                .set(
+                                    key,
+                                    vec![],
+                                    hauski_memory::TtlUpdate::Set(86400),
+                                    Some(false),
+                                )
+                                .await;
+                        }
                     }
+                    (_insight_id, is_dup)
+                } else {
+                    return (
+                        StatusCode::OK,
+                        Json(AssistResponse {
+                            answer: "Ignored (Missing ID)".to_string(),
+                            citations: Vec::new(),
+                            trace: Vec::new(),
+                            latency_ms: started.elapsed().as_millis() as u64,
+                        }),
+                    );
                 }
-                (_insight_id, is_dup)
             } else {
                 return (
                     StatusCode::OK,
                     Json(AssistResponse {
-                        answer: "Ignored (Missing ID)".to_string(),
+                        answer: "Ignored (Invalid)".to_string(),
                         citations: Vec::new(),
                         trace: Vec::new(),
                         latency_ms: started.elapsed().as_millis() as u64,
                     }),
                 );
-            }
-        } else {
-            return (
-                StatusCode::OK,
-                Json(AssistResponse {
-                    answer: "Ignored (Invalid)".to_string(),
-                    citations: Vec::new(),
-                    trace: Vec::new(),
-                    latency_ms: started.elapsed().as_millis() as u64,
-                }),
-            );
-        };
+            };
 
         if is_dup {
             "Ignored (Duplicate)".to_string()
