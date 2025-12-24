@@ -269,8 +269,8 @@ pub async fn assist_handler(
                 "info",
                 BTreeMap::from([("trigger", serde_json::json!("insight.negation"))]),
                 serde_json::json!({
-                    "type": "reflection.request",
-                    "trigger": "insight.negation",
+                    "insight_id": _insight_id,
+                    "payload": req.question
                 }),
             );
             "Accepted".to_string()
