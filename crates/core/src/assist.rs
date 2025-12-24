@@ -94,6 +94,7 @@ fn route_mode(q: &str, hint: &Option<String>) -> &'static str {
         match h.as_str() {
             "code" => return "code",
             "knowledge" => return "knowledge",
+            "insight.negation" => return "insight.negation",
             _ => {}
         }
     }
@@ -211,6 +212,49 @@ pub async fn assist_handler(
         } else {
             format!("Router wählte {mode}, aber kein Tool gefunden. (MVP-Stub)")
         }
+    } else if mode == "insight.negation" {
+        // PR3a: Ingest insight.negation
+        // 1. Check dedup
+        let mut is_dup = false;
+        let mut insight_id = "unknown".to_string();
+
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&req.question) {
+            if let Some(id) = json.get("id").and_then(|v| v.as_str()) {
+                insight_id = id.to_string();
+                if let Some(mem) = hauski_memory::try_global() {
+                    // Check if already processed (dedup)
+                    if let Ok(Some(_)) = mem.get(format!("dedup:insight:{}", id)).await {
+                        is_dup = true;
+                    } else {
+                        // Mark as processed with 24h TTL
+                        let _ = mem
+                            .set(
+                                format!("dedup:insight:{}", id),
+                                vec![],
+                                hauski_memory::TtlUpdate::Set(86400),
+                                Some(false),
+                            )
+                            .await;
+                    }
+                }
+            }
+        }
+
+        if is_dup {
+            "Ignored (Duplicate)".to_string()
+        } else {
+            // 2. Emit reflection request
+            write_event(
+                "reflection.request",
+                "info",
+                BTreeMap::from([("trigger", serde_json::json!("insight.negation"))]),
+                serde_json::json!({
+                    "insight_id": insight_id,
+                    "payload": req.question
+                }),
+            );
+            "Accepted".to_string()
+        }
     } else {
         format!("Router wählte {mode}. (MVP-Stub)")
     };
@@ -287,6 +331,15 @@ mod tests {
         let q = "Wie dokumentiere ich die API?";
         assert_eq!(route_mode(q, &Some("code".into())), "code");
         assert_eq!(route_mode(q, &Some("knowledge".into())), "knowledge");
+    }
+
+    #[test]
+    fn route_mode_respects_insight_negation() {
+        let q = "{}";
+        assert_eq!(
+            route_mode(q, &Some("insight.negation".into())),
+            "insight.negation"
+        );
     }
 }
 
