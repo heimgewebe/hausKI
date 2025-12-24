@@ -168,6 +168,10 @@ pub fn global() -> &'static MemoryStore {
         .expect("hauski-memory not initialized; call init_default() early")
 }
 
+pub fn try_global() -> Option<&'static MemoryStore> {
+    GLOBAL.get()
+}
+
 impl MemoryStore {
     pub async fn set(
         &self,

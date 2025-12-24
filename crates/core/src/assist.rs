@@ -94,6 +94,7 @@ fn route_mode(q: &str, hint: &Option<String>) -> &'static str {
         match h.as_str() {
             "code" => return "code",
             "knowledge" => return "knowledge",
+            "insight.negation" => return "insight.negation",
             _ => {}
         }
     }
@@ -211,6 +212,70 @@ pub async fn assist_handler(
         } else {
             format!("Router wählte {mode}, aber kein Tool gefunden. (MVP-Stub)")
         }
+    } else if mode == "insight.negation" {
+        // PR3a: Ingest insight.negation
+
+        let (_insight_id, is_dup) =
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&req.question) {
+                if let Some(id) = json.get("id").and_then(|v| v.as_str()) {
+                    let _insight_id = id.to_string();
+                    let mut is_dup = false;
+
+                    if let Some(mem) = hauski_memory::try_global() {
+                        let key = format!("insight.negation:{}", id);
+                        if let Ok(Some(_)) = mem.get(key.clone()).await {
+                            is_dup = true;
+                        } else {
+                            // Mark as processed with 24h TTL
+                            let _ = mem
+                                .set(
+                                    key,
+                                    vec![],
+                                    hauski_memory::TtlUpdate::Set(86400),
+                                    Some(false),
+                                )
+                                .await;
+                        }
+                    }
+                    (_insight_id, is_dup)
+                } else {
+                    return (
+                        StatusCode::OK,
+                        Json(AssistResponse {
+                            answer: "Ignored (Missing ID)".to_string(),
+                            citations: Vec::new(),
+                            trace: Vec::new(),
+                            latency_ms: started.elapsed().as_millis() as u64,
+                        }),
+                    );
+                }
+            } else {
+                return (
+                    StatusCode::OK,
+                    Json(AssistResponse {
+                        answer: "Ignored (Invalid)".to_string(),
+                        citations: Vec::new(),
+                        trace: Vec::new(),
+                        latency_ms: started.elapsed().as_millis() as u64,
+                    }),
+                );
+            };
+
+        if is_dup {
+            "Ignored (Duplicate)".to_string()
+        } else {
+            // 2. Emit reflection request
+            write_event(
+                "reflection.request",
+                "info",
+                BTreeMap::from([("trigger", serde_json::json!("insight.negation"))]),
+                serde_json::json!({
+                    "insight_id": _insight_id,
+                    "payload": req.question
+                }),
+            );
+            "Accepted".to_string()
+        }
     } else {
         format!("Router wählte {mode}. (MVP-Stub)")
     };
@@ -287,6 +352,53 @@ mod tests {
         let q = "Wie dokumentiere ich die API?";
         assert_eq!(route_mode(q, &Some("code".into())), "code");
         assert_eq!(route_mode(q, &Some("knowledge".into())), "knowledge");
+    }
+
+    #[test]
+    fn route_mode_respects_insight_negation() {
+        let q = "{}";
+        assert_eq!(
+            route_mode(q, &Some("insight.negation".into())),
+            "insight.negation"
+        );
+    }
+
+    #[tokio::test]
+    async fn insight_negation_ignores_invalid_json() {
+        // Mock state setup (minimal)
+        let limits = crate::Limits::default();
+        let models = crate::ModelsFile::default();
+        let routing = crate::RoutingPolicy::default();
+        let flags = crate::FeatureFlags::default();
+        let chat_cfg = std::sync::Arc::new(crate::chat::ChatCfg::new(None, None));
+        let state = AppState::new(limits, models, routing, flags, chat_cfg, false);
+
+        let req = AssistRequest {
+            question: "{invalid json".to_string(),
+            mode: Some("insight.negation".to_string()),
+        };
+
+        let (_status, Json(resp)) = assist_handler(State(state), Json(req)).await;
+        assert_eq!(resp.answer, "Ignored (Invalid)");
+    }
+
+    #[tokio::test]
+    async fn insight_negation_ignores_missing_id() {
+        // Mock state setup (minimal)
+        let limits = crate::Limits::default();
+        let models = crate::ModelsFile::default();
+        let routing = crate::RoutingPolicy::default();
+        let flags = crate::FeatureFlags::default();
+        let chat_cfg = std::sync::Arc::new(crate::chat::ChatCfg::new(None, None));
+        let state = AppState::new(limits, models, routing, flags, chat_cfg, false);
+
+        let req = AssistRequest {
+            question: r#"{"foo": "bar"}"#.to_string(),
+            mode: Some("insight.negation".to_string()),
+        };
+
+        let (_status, Json(resp)) = assist_handler(State(state), Json(req)).await;
+        assert_eq!(resp.answer, "Ignored (Missing ID)");
     }
 }
 
