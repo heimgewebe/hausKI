@@ -214,22 +214,21 @@ pub async fn assist_handler(
         }
     } else if mode == "insight.negation" {
         // PR3a: Ingest insight.negation
-        // 1. Check dedup
-        let mut is_dup = false;
-        let mut insight_id = "unknown".to_string();
 
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&req.question) {
+        let (_insight_id, is_dup) = if let Ok(json) = serde_json::from_str::<serde_json::Value>(&req.question) {
             if let Some(id) = json.get("id").and_then(|v| v.as_str()) {
-                insight_id = id.to_string();
+                let _insight_id = id.to_string();
+                let mut is_dup = false;
+
                 if let Some(mem) = hauski_memory::try_global() {
-                    // Check if already processed (dedup)
-                    if let Ok(Some(_)) = mem.get(format!("dedup:insight:{}", id)).await {
+                    let key = format!("insight.negation:{}", id);
+                    if let Ok(Some(_)) = mem.get(key.clone()).await {
                         is_dup = true;
                     } else {
                         // Mark as processed with 24h TTL
                         let _ = mem
                             .set(
-                                format!("dedup:insight:{}", id),
+                                key,
                                 vec![],
                                 hauski_memory::TtlUpdate::Set(86400),
                                 Some(false),
@@ -237,8 +236,29 @@ pub async fn assist_handler(
                             .await;
                     }
                 }
+                (_insight_id, is_dup)
+            } else {
+                return (
+                    StatusCode::OK,
+                    Json(AssistResponse {
+                        answer: "Ignored (Missing ID)".to_string(),
+                        citations: Vec::new(),
+                        trace: Vec::new(),
+                        latency_ms: started.elapsed().as_millis() as u64,
+                    }),
+                );
             }
-        }
+        } else {
+            return (
+                StatusCode::OK,
+                Json(AssistResponse {
+                    answer: "Ignored (Invalid)".to_string(),
+                    citations: Vec::new(),
+                    trace: Vec::new(),
+                    latency_ms: started.elapsed().as_millis() as u64,
+                }),
+            );
+        };
 
         if is_dup {
             "Ignored (Duplicate)".to_string()
@@ -249,8 +269,8 @@ pub async fn assist_handler(
                 "info",
                 BTreeMap::from([("trigger", serde_json::json!("insight.negation"))]),
                 serde_json::json!({
-                    "insight_id": insight_id,
-                    "payload": req.question
+                    "type": "reflection.request",
+                    "trigger": "insight.negation",
                 }),
             );
             "Accepted".to_string()
@@ -340,6 +360,44 @@ mod tests {
             route_mode(q, &Some("insight.negation".into())),
             "insight.negation"
         );
+    }
+
+    #[tokio::test]
+    async fn insight_negation_ignores_invalid_json() {
+        // Mock state setup (minimal)
+        let limits = crate::Limits::default();
+        let models = crate::ModelsFile::default();
+        let routing = crate::RoutingPolicy::default();
+        let flags = crate::FeatureFlags::default();
+        let chat_cfg = std::sync::Arc::new(crate::chat::ChatCfg::new(None, None));
+        let state = AppState::new(limits, models, routing, flags, chat_cfg, false);
+
+        let req = AssistRequest {
+            question: "{invalid json".to_string(),
+            mode: Some("insight.negation".to_string()),
+        };
+
+        let (_status, Json(resp)) = assist_handler(State(state), Json(req)).await;
+        assert_eq!(resp.answer, "Ignored (Invalid)");
+    }
+
+    #[tokio::test]
+    async fn insight_negation_ignores_missing_id() {
+        // Mock state setup (minimal)
+        let limits = crate::Limits::default();
+        let models = crate::ModelsFile::default();
+        let routing = crate::RoutingPolicy::default();
+        let flags = crate::FeatureFlags::default();
+        let chat_cfg = std::sync::Arc::new(crate::chat::ChatCfg::new(None, None));
+        let state = AppState::new(limits, models, routing, flags, chat_cfg, false);
+
+        let req = AssistRequest {
+            question: r#"{"foo": "bar"}"#.to_string(),
+            mode: Some("insight.negation".to_string()),
+        };
+
+        let (_status, Json(resp)) = assist_handler(State(state), Json(req)).await;
+        assert_eq!(resp.answer, "Ignored (Missing ID)");
     }
 }
 
