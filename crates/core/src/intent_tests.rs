@@ -90,3 +90,31 @@ fn test_intent_resolver_contracts() {
     let intent = resolver.resolve(&ctx);
     assert_eq!(intent.intent, IntentType::ContractsWork);
 }
+
+#[test]
+fn test_intent_serialization_contract() {
+    use serde_json::Value;
+    use crate::intent::Intent;
+
+    let mut intent = Intent::new();
+    intent.intent = IntentType::Coding;
+    intent.confidence = 0.85;
+    intent.signals.push(crate::intent::IntentSignal {
+        kind: "test_signal".to_string(),
+        r#ref: "test_ref".to_string(),
+        weight: 1.0,
+    });
+    // created_at is dynamic
+
+    let json_str = serde_json::to_string(&intent).unwrap();
+    let v: Value = serde_json::from_str(&json_str).unwrap();
+
+    // Assert field existence and types (Contract Stability)
+    // The requirement is: intent as enum-string, plus confidence, signals, created_at
+    assert_eq!(v["intent"], "coding");
+    assert_eq!(v["confidence"], 0.85);
+    assert!(v["signals"].is_array());
+    assert_eq!(v["signals"][0]["kind"], "test_signal");
+    assert!(v["created_at"].is_string());
+    assert!(v["context"].is_object());
+}

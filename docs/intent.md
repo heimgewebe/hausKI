@@ -2,29 +2,49 @@
 
 Der `intent-resolver` analysiert den Kontext (Git, GitHub Events), um die Absicht der aktuellen Änderung zu bestimmen. Dies hilft `hausKI` zu entscheiden, welche Tools oder Prozesse verwendet werden sollen (z.B. Coding vs. Writing vs. CI Triage).
 
-## Funktionsweise
+## Contract Specification
 
-Der Resolver sammelt Signale aus:
-1.  **Geänderten Dateien**: Pfade und Dateiendungen.
-2.  **Workflow-Namen**: Wenn in CI ausgeführt.
-3.  **PR-Kommentaren**: Spezielle Befehle wie `/quick` oder `/review`.
+This section defines the canonical schema and behavior for the Intent artifact. Ideally, this should be formalized in a `metarepo` contract (e.g. `contracts/events/hauski.intent.v1.schema.json`).
 
-Basierend auf diesen Signalen wird ein `Intent` mit einer `confidence` (0.0 - 1.0) berechnet.
+### Schema (JSON)
 
-### Intent-Typen
+The `hauski intent` command produces a JSON object with the following fields. This schema is covered by regression tests to ensure stability.
 
-*   `coding`: Änderungen an Quellcode (`src/`, `crates/`, `.rs`, `.py` etc.).
-*   `writing`: Änderungen an Dokumentation (`docs/`, `*.md`).
-*   `ci_triage`: Änderungen an CI-Konfigurationen (`.github/workflows/`) oder getriggert durch PR-Kommentare.
-*   `contracts_work`: Änderungen an Contracts (`contracts/`).
-*   `unknown`: Keine klaren Signale.
+```json
+{
+  "intent": "coding",       // Enum String: coding, writing, ci_triage, contracts_work, unknown
+  "confidence": 0.7,        // Float: 0.0 - 1.0
+  "signals": [              // Array of signals contributing to the decision
+    {
+      "kind": "changed_path", // Type of signal
+      "ref": "crates/core/src/lib.rs", // Reference (path, comment, etc.)
+      "weight": 0.9         // Weight of this specific signal
+    }
+  ],
+  "created_at": "2023-10-27T10:00:00Z", // ISO 8601 Timestamp
+  "context": {}             // Raw context data (optional)
+}
+```
 
-### Confidence Berechnung
+### Intent Types (Enum)
 
-*   Basis: 0.55
-*   +0.15: Starke Pfad-Signale (> 80% der Änderungen deuten auf einen Typ hin).
-*   -0.20: Gemischte/unklare Signale (< 60% Dominanz).
-*   Clamp: 0.0 - 1.0
+*   `coding`: Source code changes (`src/`, `crates/`, `.rs`, `.py`).
+*   `writing`: Documentation changes (`docs/`, `*.md`).
+*   `ci_triage`: CI configuration changes (`.github/workflows/`) or via PR comments.
+*   `contracts_work`: Contract definition changes (`contracts/`).
+*   `unknown`: No clear signals identified.
+
+### Confidence Logic
+
+*   **Base Confidence**: 0.55
+*   **Boost (+0.15)**: Strong path signals (> 80% of changes align with one type).
+*   **Penalty (-0.20)**: Mixed or unclear signals (< 60% dominance).
+*   **Range**: Clamped between 0.0 and 1.0.
+
+The resolver aggregates signals from:
+1.  **Changed Files**: Paths and extensions.
+2.  **Workflow Name**: If running in CI.
+3.  **PR Comments**: Commands like `/quick` or `/review`.
 
 ## Verwendung
 
