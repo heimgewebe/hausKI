@@ -127,5 +127,7 @@ jobs:
           echo "================="
       - name: Install cargo-audit (fresh)
         run: cargo install cargo-audit --locked --force
+      - name: Clean RustSec advisory-db cache (CVSS v4 support)
+        run: rm -rf ~/.cargo/advisory-db
       - name: Run cargo audit
         run: cargo audit
