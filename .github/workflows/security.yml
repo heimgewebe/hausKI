@@ -126,7 +126,7 @@ jobs:
           sed -n '1,200p' deny.toml || true
           echo "================="
       - name: Install cargo-audit (fresh)
-        run: cargo install cargo-audit --locked --force
+        run: cargo install cargo-audit --force
       - name: Clean RustSec advisory-db cache (CVSS v4 support)
         run: rm -rf ~/.cargo/advisory-db
       - name: Run cargo audit
