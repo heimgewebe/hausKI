@@ -1,16 +1,15 @@
 #[cfg(test)]
 mod tests {
+    use crate::{build_app_with_state, AppState, FeatureFlags, Limits, ModelsFile, RoutingPolicy};
+    use axum::http::HeaderValue;
     use axum::{
         body::Body,
         http::{header, Method, Request, StatusCode},
         Router,
     };
-    use tower::ServiceExt; // for oneshot
-    use serde_json::json;
-    use crate::{build_app_with_state, AppState, FeatureFlags, Limits, ModelsFile, RoutingPolicy};
-    use axum::http::HeaderValue;
-    use std::sync::Arc;
     use hauski_memory as mem;
+    use serde_json::json;
+    use tower::ServiceExt; // for oneshot
 
     // Helper to build a minimal app for testing
     fn test_app(flags: FeatureFlags) -> (Router, AppState) {
@@ -22,7 +21,8 @@ mod tests {
         // Ensure memory is initialized (it might be already if running multiple tests, but init_default handles OnceCell)
         let _ = mem::init_default();
 
-        let (app, state) = build_app_with_state(limits, models, routing, flags, false, allowed_origin);
+        let (app, state) =
+            build_app_with_state(limits, models, routing, flags, false, allowed_origin);
         state.set_ready();
         (app, state)
     }
@@ -185,7 +185,15 @@ mod tests {
         let key_open = "decision.preimage:open";
         let val_open = json!({ "status": "open", "context": "foo" });
 
-        mem::global().set(key_open.to_string(), serde_json::to_vec(&val_open).unwrap(), mem::TtlUpdate::Set(300), Some(false)).await.unwrap();
+        mem::global()
+            .set(
+                key_open.to_string(),
+                serde_json::to_vec(&val_open).unwrap(),
+                mem::TtlUpdate::Set(300),
+                Some(false),
+            )
+            .await
+            .unwrap();
 
         // 2. Action: Send the event
         let event_payload = json!({
@@ -213,9 +221,16 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         // 3. Assertion:
-        let item_open = mem::global().get(key_open.to_string()).await.unwrap().expect("open item missing");
+        let item_open = mem::global()
+            .get(key_open.to_string())
+            .await
+            .unwrap()
+            .expect("open item missing");
         let json_open: serde_json::Value = serde_json::from_slice(&item_open.value).unwrap();
-        assert_eq!(json_open["needs_recheck"], true, "Open item should be marked");
+        assert_eq!(
+            json_open["needs_recheck"], true,
+            "Open item should be marked"
+        );
 
         // Cleanup
         mem::global().evict(key_open.to_string()).await.unwrap();
