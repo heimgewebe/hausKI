@@ -128,6 +128,7 @@ pub struct FeatureFlags {
     pub safe_mode: bool,
     pub chat_upstream_url: Option<String>,
     pub chat_model: Option<String>,
+    pub events_token: Option<String>,
 }
 
 fn parse_env_bool(value: &str) -> Option<bool> {
@@ -216,6 +217,14 @@ pub fn load_flags<P: AsRef<Path>>(path: P) -> Result<FeatureFlags> {
             flags.chat_model = None;
         } else {
             flags.chat_model = Some(model);
+        }
+    }
+
+    if let Ok(token) = env::var("HAUSKI_EVENTS_TOKEN") {
+        if token.trim().is_empty() {
+            flags.events_token = None;
+        } else {
+            flags.events_token = Some(token);
         }
     }
 

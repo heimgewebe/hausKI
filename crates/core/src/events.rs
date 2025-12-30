@@ -1,4 +1,4 @@
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use crate::AppState;
 use hauski_memory as mem;
@@ -26,9 +26,40 @@ struct RecheckReason {
 }
 
 pub async fn event_handler(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
+    headers: HeaderMap,
     Json(event): Json<Event>,
 ) -> impl IntoResponse {
+    // 1. Authorization Gate
+    if let Some(token) = &state.flags().events_token {
+        // Token is configured, must match
+        let auth_header = headers.get(axum::http::header::AUTHORIZATION)
+            .and_then(|val| val.to_str().ok());
+
+        let valid = match auth_header {
+            Some(h) if h.starts_with("Bearer ") => {
+                let provided = h.trim_start_matches("Bearer ");
+                provided == token
+            }
+            _ => false,
+        };
+
+        if !valid {
+            tracing::warn!("Unauthorized access attempt to /events");
+            return StatusCode::UNAUTHORIZED;
+        }
+    } else {
+        // Token is NOT configured -> Endpoint Disabled (403 Forbidden)
+        tracing::warn!("/events endpoint is disabled (HAUSKI_EVENTS_TOKEN not set)");
+        return StatusCode::FORBIDDEN;
+    }
+
+    // 2. HTTPS enforcement for URL (SSRF prevention)
+    if !event.payload.url.starts_with("https://") {
+        tracing::warn!("Rejected event with non-https URL: {}", event.payload.url);
+        return StatusCode::BAD_REQUEST;
+    }
+
     if event.event_type == "knowledge.observatory.published.v1" {
         tracing::info!("Received observatory event, checking for decision preimages");
 
