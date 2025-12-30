@@ -48,7 +48,7 @@ jobs:
         run: bash scripts/check-vendor.sh
       - name: Install cargo-deny
         run: |
-          cargo install cargo-deny --locked --force --version '0.15.1'
+          cargo install cargo-deny --force
           cargo deny --version
 
       - name: Cache cargo registry and git index
@@ -66,6 +66,8 @@ jobs:
       - name: Fetch workspace crates index
         run: cargo fetch --locked
 
+      - name: Clean RustSec advisory-db cache (CVSS v4 support)
+        run: rm -rf ~/.cargo/advisory-db
       - name: Fetch advisory database
         run: cargo deny fetch db
 
@@ -103,7 +105,7 @@ jobs:
         run: bash scripts/check-vendor.sh
       - name: Install cargo-deny
         run: |
-          cargo install cargo-deny --locked --force --version '0.15.1'
+          cargo install cargo-deny --force
           cargo deny --version
 
       - name: Cache cargo registry and git index
@@ -126,6 +128,8 @@ jobs:
           sed -n '1,200p' deny.toml || true
           echo "================="
       - name: Install cargo-audit (fresh)
-        run: cargo install cargo-audit --locked --force
+        run: cargo install cargo-audit --force
+      - name: Clean RustSec advisory-db cache (CVSS v4 support)
+        run: rm -rf ~/.cargo/advisory-db
       - name: Run cargo audit
         run: cargo audit
