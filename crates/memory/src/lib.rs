@@ -324,6 +324,24 @@ impl MemoryStore {
         .await
         .map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
     }
+
+    pub async fn scan_prefix(&self, prefix: String) -> Result<Vec<String>> {
+        let db_path = self.db_path.clone();
+
+        task::spawn_blocking(move || {
+            let conn = Connection::open(&db_path)?;
+            let mut stmt = conn.prepare("SELECT key FROM memory_items WHERE key LIKE ?1")?;
+            let keys_iter = stmt.query_map(params![format!("{}%", prefix)], |row| row.get(0))?;
+
+            let mut keys = Vec::new();
+            for key in keys_iter {
+                keys.push(key?);
+            }
+            Ok::<Vec<String>, anyhow::Error>(keys)
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
+    }
 }
 
 async fn janitor_task(db_path: PathBuf, every_secs: u64) {

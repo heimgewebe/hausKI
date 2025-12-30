@@ -39,6 +39,9 @@ mod cloud;
 mod config;
 mod egress;
 pub mod error;
+pub mod events;
+#[cfg(test)]
+mod events_tests;
 pub mod intent;
 mod memory_api;
 mod plugins;
@@ -694,6 +697,7 @@ fn core_routes() -> Router<AppState> {
         .route("/ask", get(ask::ask_handler))
         .route("/assist", post(assist::assist_handler))
         .route("/v1/chat", post(chat::chat_handler))
+        .route("/events", post(events::event_handler))
 }
 
 fn memory_routes() -> Router<AppState> {
