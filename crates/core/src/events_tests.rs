@@ -33,18 +33,19 @@ mod tests {
     async fn test_observatory_event_triggers_preimage_flagging() {
         let (app, _state) = test_app();
 
-        // 1. Setup: Insert a dummy "decision.preimage" into memory
-        let key = "decision.preimage:123";
-        let initial_value = json!({ "status": "open", "context": "foo" });
-        mem::global()
-            .set(
-                key.to_string(),
-                serde_json::to_vec(&initial_value).unwrap(),
-                mem::TtlUpdate::Set(300),
-                Some(false),
-            )
-            .await
-            .expect("failed to set setup memory");
+        // 1. Setup: Insert open and closed preimages
+        let key_open = "decision.preimage:open";
+        let val_open = json!({ "status": "open", "context": "foo" });
+
+        let key_closed = "decision.preimage:closed";
+        let val_closed = json!({ "status": "closed", "context": "bar" });
+
+        let key_flagged = "decision.preimage:flagged";
+        let val_flagged = json!({ "status": "open", "needs_recheck": true });
+
+        mem::global().set(key_open.to_string(), serde_json::to_vec(&val_open).unwrap(), mem::TtlUpdate::Set(300), Some(false)).await.unwrap();
+        mem::global().set(key_closed.to_string(), serde_json::to_vec(&val_closed).unwrap(), mem::TtlUpdate::Set(300), Some(false)).await.unwrap();
+        mem::global().set(key_flagged.to_string(), serde_json::to_vec(&val_flagged).unwrap(), mem::TtlUpdate::Set(300), Some(false)).await.unwrap();
 
         // 2. Action: Send the event
         let event_payload = json!({
@@ -70,15 +71,31 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        // 3. Assertion: Check if "needs_recheck" was added to the memory item
-        let item = mem::global().get(key.to_string()).await.unwrap().expect("item missing");
-        let updated_json: serde_json::Value = serde_json::from_slice(&item.value).unwrap();
+        // 3. Assertion:
 
-        assert_eq!(updated_json["needs_recheck"], true, "Item should be marked for recheck");
-        assert_eq!(updated_json["status"], "open", "Original fields should be preserved");
+        // Open item should be flagged and have reason
+        let item_open = mem::global().get(key_open.to_string()).await.unwrap().expect("open item missing");
+        let json_open: serde_json::Value = serde_json::from_slice(&item_open.value).unwrap();
+        assert_eq!(json_open["needs_recheck"], true, "Open item should be marked");
+        assert!(json_open.get("recheck_reason").is_some(), "Reason should be added");
+        assert_eq!(json_open["recheck_reason"]["type"], "knowledge.observatory.published.v1");
+
+        // Closed item should be untouched
+        let item_closed = mem::global().get(key_closed.to_string()).await.unwrap().expect("closed item missing");
+        let json_closed: serde_json::Value = serde_json::from_slice(&item_closed.value).unwrap();
+        assert!(json_closed.get("needs_recheck").is_none(), "Closed item should not be marked");
+
+        // Already flagged item should be untouched (to be idempotent/not overwrite existing reason if we wanted, though current logic overwrites reason if not filtered out, but here we filter by !needs_recheck)
+        // Wait, logic says: if is_open && !already_flagged. So it should skip.
+        // Let's verify it skipped by checking if reason was added (it shouldn't be, because val_flagged didn't have it)
+        let item_flagged = mem::global().get(key_flagged.to_string()).await.unwrap().expect("flagged item missing");
+        let json_flagged: serde_json::Value = serde_json::from_slice(&item_flagged.value).unwrap();
+        assert!(json_flagged.get("recheck_reason").is_none(), "Already flagged item should be skipped");
 
         // Cleanup
-        mem::global().evict(key.to_string()).await.unwrap();
+        mem::global().evict(key_open.to_string()).await.unwrap();
+        mem::global().evict(key_closed.to_string()).await.unwrap();
+        mem::global().evict(key_flagged.to_string()).await.unwrap();
     }
 
     #[tokio::test]
