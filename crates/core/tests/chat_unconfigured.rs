@@ -46,14 +46,9 @@ async fn chat_returns_503_when_unconfigured() {
         .await
         .expect("request failed");
 
-    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-    let retry_after = response
-        .headers()
-        .get(http::header::RETRY_AFTER)
-        .expect("missing Retry-After header")
-        .to_str()
-        .expect("Retry-After not valid utf8");
-    assert_eq!(retry_after, "30");
+    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+    // No Retry-After header for 501 responses
+    assert!(response.headers().get(http::header::RETRY_AFTER).is_none());
 
     let body_bytes = response
         .into_body()
@@ -62,5 +57,5 @@ async fn chat_returns_503_when_unconfigured() {
         .expect("body bytes")
         .to_bytes();
     let stub: Value = serde_json::from_slice(&body_bytes).expect("stub response");
-    assert_eq!(stub["status"], "unavailable");
+    assert_eq!(stub["status"], "not_implemented");
 }
