@@ -174,9 +174,9 @@ jobs:
             ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}-
             ${{ runner.os }}-uv-
 
-      - name: Sync dev deps (locked & frozen)
+      - name: Sync dev deps (locked)
         if: ${{ hashFiles('pyproject.toml') != '' }}
-        run: uv sync --extra dev --locked --frozen
+        run: uv sync --extra dev --locked
 
       - name: Show Ruff version
         if: ${{ hashFiles('pyproject.toml') != '' }}
