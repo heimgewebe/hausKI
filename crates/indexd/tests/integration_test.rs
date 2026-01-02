@@ -72,8 +72,8 @@ async fn test_fixture_corpus_indexing_and_search() {
                 meta: json!({"severity": "info"}),
                 source_ref: Some(SourceRef {
                     origin: "chronik".into(),
-                    id: format!("event-{}", i),
-                    offset: Some(format!("/var/log/events/{}.log", i)),
+                    id: format!("/var/log/events/{}.log", i),
+                    offset: Some(format!("line:{}", i * 10)), // Line position in log file
                 }),
             })
             .await;

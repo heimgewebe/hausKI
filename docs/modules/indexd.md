@@ -62,17 +62,36 @@ pub struct SourceRef {
 }
 ```
 
-Beispiel:
+**Konventionen:**
+- `origin`: Quell-Namespace (chronik, osctx, code, docs, insights)
+- `id`: Eindeutige Referenz (Event-ID, Dateipfad, Commit-Hash)
+- `offset`: Position innerhalb der Quelle (Zeile, Byte-Range)
+  - ✅ Korrekt: `"line:42"`, `"byte:1337-2048"`, `"offset:123"`
+  - ❌ Falsch: Dateipfade gehören nach `id`, nicht nach `offset`
+
+Beispiele:
 ```json
+// Event aus Chronik-Log
 {
-  "doc_id": "event-42",
-  "namespace": "chronik",
-  "source_ref": {
-    "origin": "chronik",
-    "id": "event-2024-01-01",
-    "offset": "42"
-  }
+  "origin": "chronik",
+  "id": "/var/log/events/2024-01-01.log",
+  "offset": "line:42"
 }
+
+// Code-Snippet
+{
+  "origin": "code",
+  "id": "src/main.rs",
+  "offset": "line:100-120"
+}
+
+// Dokument ohne Positions-Info
+{
+  "origin": "docs",
+  "id": "README.md",
+  "offset": null
+}
+```
 ```
 
 ---
