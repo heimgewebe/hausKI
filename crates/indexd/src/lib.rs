@@ -5,6 +5,7 @@ use axum::{
     routing::post,
     Json, Router,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{borrow::Cow, cmp::Ordering, collections::HashMap, sync::Arc, time::Instant};
@@ -49,6 +50,8 @@ struct DocumentRecord {
     namespace: String,
     chunks: Vec<ChunkPayload>,
     meta: Value,
+    source_ref: Option<String>,
+    ingested_at: DateTime<Utc>,
 }
 
 impl IndexState {
@@ -76,6 +79,7 @@ impl IndexState {
             namespace,
             chunks,
             meta,
+            source_ref,
         } = payload;
         let namespace = normalize_namespace(&namespace);
         let mut store = self.inner.store.write().await;
@@ -88,6 +92,8 @@ impl IndexState {
                 namespace: namespace.clone(),
                 chunks,
                 meta,
+                source_ref,
+                ingested_at: Utc::now(),
             },
         );
         ingested
@@ -136,6 +142,8 @@ impl IndexState {
                     } else {
                         chunk.meta.clone()
                     },
+                    source_ref: doc.source_ref.clone(),
+                    ingested_at: doc.ingested_at.to_rfc3339(),
                 });
             }
         }
@@ -236,6 +244,8 @@ pub struct UpsertRequest {
     pub chunks: Vec<ChunkPayload>,
     #[serde(default)]
     pub meta: Value,
+    #[serde(default)]
+    pub source_ref: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -280,6 +290,9 @@ pub struct SearchMatch {
     pub score: f32,
     pub text: String,
     pub meta: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_ref: Option<String>,
+    pub ingested_at: String,
 }
 
 fn default_namespace() -> String {
@@ -352,6 +365,7 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "rust"}),
+                source_ref: Some("test_file.rs:42".into()),
             })
             .await;
 
@@ -366,6 +380,7 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "cooking"}),
+                source_ref: None,
             })
             .await;
 
@@ -397,6 +412,7 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "trim"}),
+                source_ref: None,
             })
             .await;
 
@@ -438,6 +454,7 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "empty"}),
+                source_ref: None,
             })
             .await;
 

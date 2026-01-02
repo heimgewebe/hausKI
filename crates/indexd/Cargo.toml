@@ -10,6 +10,10 @@ serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+rusqlite.workspace = true
+chrono.workspace = true
+anyhow.workspace = true
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }
+tempfile.workspace = true
