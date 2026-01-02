@@ -237,7 +237,7 @@ async fn test_source_ref_and_ingested_at_populated() {
             source_ref: Some(SourceRef {
                 origin: "chronik".into(),
                 id: "event-2024-01-01".into(),
-                offset: Some("42".into()),
+                offset: Some("line:42".into()),
             }),
         })
         .await;
@@ -256,7 +256,7 @@ async fn test_source_ref_and_ingested_at_populated() {
         Some(SourceRef {
             origin: "chronik".into(),
             id: "event-2024-01-01".into(),
-            offset: Some("42".into()),
+            offset: Some("line:42".into()),
         })
     );
     assert!(!results[0].ingested_at.is_empty());

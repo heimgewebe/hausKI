@@ -544,7 +544,7 @@ mod tests {
                 source_ref: Some(SourceRef {
                     origin: "code".into(),
                     id: "test_file.rs".into(),
-                    offset: Some("42".into()),
+                    offset: Some("line:42".into()),
                 }),
             })
             .await;

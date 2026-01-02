@@ -92,7 +92,6 @@ Beispiele:
   "offset": null
 }
 ```
-```
 
 ---
 
