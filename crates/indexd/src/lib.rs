@@ -163,11 +163,8 @@ impl IndexState {
 
         for (namespace, namespace_store) in store.iter() {
             let doc_count = namespace_store.len();
-            let chunk_count: usize = namespace_store
-                .values()
-                .map(|doc| doc.chunks.len())
-                .sum();
-            
+            let chunk_count: usize = namespace_store.values().map(|doc| doc.chunks.len()).sum();
+
             total_docs += doc_count;
             total_chunks += chunk_count;
             namespace_counts.insert(namespace.clone(), doc_count);
@@ -181,39 +178,44 @@ impl IndexState {
         }
     }
 
-    pub async fn related(&self, doc_id: String, k: Option<usize>, namespace: Option<String>) -> Vec<SearchMatch> {
+    pub async fn related(
+        &self,
+        doc_id: String,
+        k: Option<usize>,
+        namespace: Option<String>,
+    ) -> Vec<SearchMatch> {
         let store = self.inner.store.read().await;
         let namespace = resolve_namespace(namespace.as_deref());
         let Some(namespace_store) = store.get(namespace.as_ref()) else {
             return Vec::new();
         };
-        
+
         let Some(source_doc) = namespace_store.get(&doc_id) else {
             return Vec::new();
         };
-        
+
         let limit = k.unwrap_or(20).min(100);
         let mut matches: Vec<SearchMatch> = Vec::new();
-        
+
         // For now, use simple text-based similarity (compare all chunks with source)
         // In future: use embedding-based similarity
         for (other_doc_id, other_doc) in namespace_store.iter() {
             if other_doc_id == &doc_id {
                 continue; // skip self
             }
-            
+
             for (idx, chunk) in other_doc.chunks.iter().enumerate() {
                 let Some(text) = chunk.text.as_ref() else {
                     continue;
                 };
-                
+
                 // Simple heuristic: calculate overlap with source document text
                 let source_text: Vec<String> = source_doc
                     .chunks
                     .iter()
                     .filter_map(|c| c.text.as_ref().map(|t| t.to_lowercase()))
                     .collect();
-                
+
                 let text_lower = text.to_lowercase();
                 let mut score = 0.0f32;
                 for src_text in &source_text {
@@ -224,7 +226,7 @@ impl IndexState {
                         }
                     }
                 }
-                
+
                 if score > 0.0 {
                     matches.push(SearchMatch {
                         doc_id: other_doc.doc_id.clone(),
@@ -246,7 +248,7 @@ impl IndexState {
                 }
             }
         }
-        
+
         matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
         if matches.len() > limit {
             matches.truncate(limit);

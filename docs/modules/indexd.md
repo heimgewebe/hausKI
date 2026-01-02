@@ -66,17 +66,47 @@ index:
 
 ## Metriken & Budgets
 
-- `index_queries_total`
-- `index_query_duration_seconds`
-  *Budget:* p95 ≤ 60 ms
+- `index_queries_total` – Gesamtzahl aller Index-Anfragen (inkl. /search, /related)
+- `index_query_duration_seconds` – Latenzverteilung der Anfragen
+  *Budget:* p95 ≤ 60 ms (konfigurierbar über Limits)
+
+### Budget-Leitplanke
+
+Das System nutzt ein latenzbasiertes Budget:
+- Bei Überschreitung des Budgets (> 60 ms p95) sollten Degradations-Maßnahmen greifen
+- Aktuelle Implementierung: Warnung im Log, keine automatische Degradation
+- Zukünftig: Reduzierung von k, einfachere Filter, Caching
+
+### API-Endpunkte
+
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/index/upsert` | POST | Dokument-Chunks mit Embeddings registrieren |
+| `/index/search` | POST | Semantische Suche mit Top-k und Namespace-Filter |
+| `/index/related` | POST | Ähnliche Dokumente zu einem gegebenen doc_id finden |
+| `/index/stats` | GET | Statistiken über den Index (Dokumente, Chunks, Namespaces) |
 
 ---
 
 ## Offene Aufgaben
 
-- [ ] HNSW-Backend dokumentieren
-- [ ] Beispiel-Querys ergänzen
+- [ ] SQLite-Persistenz implementieren (aktuell nur In-Memory)
+- [ ] HNSW-Backend für echte Vektor-Ähnlichkeitssuche
+- [ ] Beispiel-Querys in Dokumentation ergänzen
 - [ ] API-Spec per `utoipa` exportieren
+
+## Status
+
+**Implementiert:**
+- ✅ In-Memory-Store mit Namespace-Support
+- ✅ Substring-basierte Textsuche
+- ✅ Metadaten (source_ref, ingested_at)
+- ✅ /upsert, /search, /related, /stats Endpoints
+- ✅ Metriken-Integration
+
+**In Entwicklung:**
+- 🔄 SQLite-Persistenz
+- 🔄 Vektor-Embeddings und HNSW-Index
 
 ---
 
