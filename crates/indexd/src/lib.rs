@@ -73,7 +73,7 @@ impl IndexState {
         (self.inner.metrics)(method, path, status, started);
     }
 
-    async fn upsert(&self, payload: UpsertRequest) -> usize {
+    pub async fn upsert(&self, payload: UpsertRequest) -> usize {
         let UpsertRequest {
             doc_id,
             namespace,
