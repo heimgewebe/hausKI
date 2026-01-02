@@ -1,4 +1,4 @@
-use hauski_indexd::{ChunkPayload, IndexState, SearchRequest, UpsertRequest};
+use hauski_indexd::{ChunkPayload, IndexState, SearchRequest, SourceRef, UpsertRequest};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -23,7 +23,11 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"topic": "rust", "id": i}),
                 }],
                 meta: json!({"language": "rust"}),
-                source_ref: Some(format!("docs/rust-{}.md", i)),
+                source_ref: Some(SourceRef {
+                    origin: "docs".into(),
+                    id: format!("rust-{}.md", i),
+                    offset: None,
+                }),
             })
             .await;
     }
@@ -41,7 +45,11 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"topic": "python", "id": i}),
                 }],
                 meta: json!({"language": "python"}),
-                source_ref: Some(format!("docs/python-{}.md", i)),
+                source_ref: Some(SourceRef {
+                    origin: "docs".into(),
+                    id: format!("python-{}.md", i),
+                    offset: None,
+                }),
             })
             .await;
     }
@@ -62,7 +70,11 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"event_type": "process_start", "id": i}),
                 }],
                 meta: json!({"severity": "info"}),
-                source_ref: Some(format!("/var/log/events/{}.log", i)),
+                source_ref: Some(SourceRef {
+                    origin: "chronik".into(),
+                    id: format!("event-{}", i),
+                    offset: Some(format!("/var/log/events/{}.log", i)),
+                }),
             })
             .await;
     }
@@ -80,7 +92,11 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"section": "getting-started", "id": i}),
                 }],
                 meta: json!({"category": "tutorial"}),
-                source_ref: Some(format!("docs/page-{}.md", i)),
+                source_ref: Some(SourceRef {
+                    origin: "docs".into(),
+                    id: format!("page-{}.md", i),
+                    offset: None,
+                }),
             })
             .await;
     }
@@ -218,7 +234,11 @@ async fn test_source_ref_and_ingested_at_populated() {
                 meta: json!({}),
             }],
             meta: json!({}),
-            source_ref: Some("events/2024-01-01.log:42".into()),
+            source_ref: Some(SourceRef {
+                origin: "chronik".into(),
+                id: "event-2024-01-01".into(),
+                offset: Some("42".into()),
+            }),
         })
         .await;
 
@@ -233,7 +253,11 @@ async fn test_source_ref_and_ingested_at_populated() {
     assert_eq!(results.len(), 1);
     assert_eq!(
         results[0].source_ref,
-        Some("events/2024-01-01.log:42".into())
+        Some(SourceRef {
+            origin: "chronik".into(),
+            id: "event-2024-01-01".into(),
+            offset: Some("42".into()),
+        })
     );
     assert!(!results[0].ingested_at.is_empty());
     // Verify it's a valid RFC3339 timestamp

@@ -17,6 +17,19 @@ const WORD_MATCH_SCORE_INCREMENT: f32 = 0.1;
 
 pub type MetricsRecorder = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
 
+/// Structured reference to document source for provenance tracking.
+/// This replaces the previous Option<String> to provide clear semantics.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SourceRef {
+    /// Origin namespace or system (e.g., "chronik", "osctx", "code", "docs")
+    pub origin: String,
+    /// Unique identifier within the origin (e.g., event_id, file path, hash)
+    pub id: String,
+    /// Optional location within the source (e.g., "line:42", "byte:1337-2048")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset: Option<String>,
+}
+
 fn normalize_namespace(input: &str) -> String {
     let trimmed = input.trim();
     if trimmed.is_empty() {
@@ -52,8 +65,8 @@ struct DocumentRecord {
     namespace: String,
     chunks: Vec<ChunkPayload>,
     meta: Value,
-    /// Optional source reference provided by the user (e.g., "events/2024-01-01.log:42")
-    source_ref: Option<String>,
+    /// Structured source reference for provenance tracking
+    source_ref: Option<SourceRef>,
     /// System-generated ingestion timestamp (always present, set at document creation)
     ingested_at: DateTime<Utc>,
 }
@@ -201,6 +214,13 @@ impl IndexState {
         let limit = k.unwrap_or(20).min(100);
         let mut matches: Vec<SearchMatch> = Vec::new();
 
+        // Pre-compute source text once (outside loops for performance)
+        let source_text: Vec<String> = source_doc
+            .chunks
+            .iter()
+            .filter_map(|c| c.text.as_ref().map(|t| t.to_lowercase()))
+            .collect();
+
         // For now, use simple text-based similarity (compare all chunks with source)
         // In future: use embedding-based similarity
         for (other_doc_id, other_doc) in namespace_store.iter() {
@@ -214,12 +234,6 @@ impl IndexState {
                 };
 
                 // Simple heuristic: calculate overlap with source document text
-                let source_text: Vec<String> = source_doc
-                    .chunks
-                    .iter()
-                    .filter_map(|c| c.text.as_ref().map(|t| t.to_lowercase()))
-                    .collect();
-
                 let text_lower = text.to_lowercase();
                 let mut score = 0.0f32;
                 for src_text in &source_text {
@@ -300,6 +314,9 @@ where
     S: Clone + Send + Sync + 'static,
     IndexState: FromRef<S>,
 {
+    // Note: This router is nested under /index in core (see core/src/lib.rs),
+    // so routes like /stats become /index/stats when mounted.
+    // Metrics are recorded with full paths (/index/stats, etc.) for consistency.
     Router::<S>::new()
         .route("/upsert", post(upsert_handler))
         .route("/search", post(search_handler))
@@ -380,7 +397,7 @@ pub struct UpsertRequest {
     pub chunks: Vec<ChunkPayload>,
     #[serde(default)]
     pub meta: Value,
-    pub source_ref: Option<String>,
+    pub source_ref: Option<SourceRef>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -450,7 +467,7 @@ pub struct SearchMatch {
     pub text: String,
     pub meta: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub source_ref: Option<String>,
+    pub source_ref: Option<SourceRef>,
     pub ingested_at: String,
 }
 
@@ -524,7 +541,11 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "rust"}),
-                source_ref: Some("test_file.rs:42".into()),
+                source_ref: Some(SourceRef {
+                    origin: "code".into(),
+                    id: "test_file.rs".into(),
+                    offset: Some("42".into()),
+                }),
             })
             .await;
 

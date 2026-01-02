@@ -50,6 +50,31 @@ Alle Namespaces werden normalisiert (getrimmt, Fallback zu `default` bei leer/wh
 | **Store** | persistiert Embeddings (SQLite oder remote Vector-DB) |
 | **API** | REST-Endpunkte `/index`, `/query`, `/related` |
 
+### Provenance Tracking (source_ref)
+
+Dokumente können eine strukturierte Herkunftsreferenz (`SourceRef`) enthalten:
+
+```rust
+pub struct SourceRef {
+    pub origin: String,   // "chronik", "osctx", "code", "docs", "insights"
+    pub id: String,       // event_id, file path, hash
+    pub offset: Option<String>, // "line:42", "byte:1337-2048"
+}
+```
+
+Beispiel:
+```json
+{
+  "doc_id": "event-42",
+  "namespace": "chronik",
+  "source_ref": {
+    "origin": "chronik",
+    "id": "event-2024-01-01",
+    "offset": "42"
+  }
+}
+```
+
 ---
 
 ## Konfiguration
@@ -107,7 +132,3 @@ Das System nutzt ein latenzbasiertes Budget:
 **In Entwicklung:**
 - 🔄 SQLite-Persistenz
 - 🔄 Vektor-Embeddings und HNSW-Index
-
----
-
-**Letzte Aktualisierung:** 2025-10-23
