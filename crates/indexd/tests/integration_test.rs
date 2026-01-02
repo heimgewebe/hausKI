@@ -1,6 +1,4 @@
-use hauski_indexd::{
-    ChunkPayload, IndexState, SearchRequest, UpsertRequest,
-};
+use hauski_indexd::{ChunkPayload, IndexState, SearchRequest, UpsertRequest};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -119,8 +117,9 @@ async fn test_fixture_corpus_indexing_and_search() {
         "Expected at least 5 event results, got {}",
         event_results.len()
     );
-    assert!(event_results.iter().all(|m| m.namespace == "chronik"
-        && m.text.to_lowercase().contains("process")));
+    assert!(event_results
+        .iter()
+        .all(|m| m.namespace == "chronik" && m.text.to_lowercase().contains("process")));
 
     // Test 3: Stats should show correct counts
     let stats = state.stats().await;

@@ -12,6 +12,8 @@ use std::{borrow::Cow, cmp::Ordering, collections::HashMap, sync::Arc, time::Ins
 use tokio::sync::RwLock;
 
 const DEFAULT_NAMESPACE: &str = "default";
+const MIN_WORD_LENGTH_FOR_SIMILARITY: usize = 3;
+const WORD_MATCH_SCORE_INCREMENT: f32 = 0.1;
 
 pub type MetricsRecorder = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
 
@@ -50,7 +52,9 @@ struct DocumentRecord {
     namespace: String,
     chunks: Vec<ChunkPayload>,
     meta: Value,
+    /// Optional source reference provided by the user (e.g., "events/2024-01-01.log:42")
     source_ref: Option<String>,
+    /// System-generated ingestion timestamp (always present, set at document creation)
     ingested_at: DateTime<Utc>,
 }
 
@@ -221,8 +225,9 @@ impl IndexState {
                 for src_text in &source_text {
                     let words: Vec<&str> = src_text.split_whitespace().collect();
                     for word in words {
-                        if word.len() > 3 && text_lower.contains(word) {
-                            score += 0.1;
+                        if word.len() > MIN_WORD_LENGTH_FOR_SIMILARITY && text_lower.contains(word)
+                        {
+                            score += WORD_MATCH_SCORE_INCREMENT;
                         }
                     }
                 }
@@ -375,7 +380,6 @@ pub struct UpsertRequest {
     pub chunks: Vec<ChunkPayload>,
     #[serde(default)]
     pub meta: Value,
-    #[serde(default)]
     pub source_ref: Option<String>,
 }
 
