@@ -227,7 +227,8 @@ impl IndexState {
                 };
 
                 // Apply time-decay if configured
-                let age_seconds = (now - doc.ingested_at).num_seconds();
+                // Clamp age to 0 to handle future timestamps gracefully (clock skew)
+                let age_seconds = (now - doc.ingested_at).num_seconds().max(0);
                 let decay_factor = if let Some(config) = retention_config {
                     calculate_decay_factor(age_seconds, config.half_life_seconds)
                 } else {
@@ -487,7 +488,8 @@ impl IndexState {
             let retention_config = retention_configs.get(namespace.as_ref());
 
             for doc in namespace_store.values() {
-                let age_seconds = (now - doc.ingested_at).num_seconds();
+                // Clamp age to 0 to handle future timestamps gracefully (clock skew)
+                let age_seconds = (now - doc.ingested_at).num_seconds().max(0);
                 let decay_factor = if let Some(config) = retention_config {
                     calculate_decay_factor(age_seconds, config.half_life_seconds)
                 } else {

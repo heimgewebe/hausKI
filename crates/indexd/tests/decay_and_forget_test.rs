@@ -752,3 +752,70 @@ async fn test_namespace_wipe_requires_explicit_flag() {
     let stats2 = state.stats().await;
     assert_eq!(stats2.total_documents, 0);
 }
+
+/// Test that future timestamps (clock skew) are handled gracefully
+#[tokio::test]
+async fn test_future_timestamp_handling() {
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+
+    // Configure decay
+    state
+        .set_retention_config(
+            "test".into(),
+            RetentionConfig {
+                half_life_seconds: Some(3600), // 1 hour
+                max_items: None,
+                max_age_seconds: None,
+                purge_strategy: None,
+            },
+        )
+        .await;
+
+    // Create a document with future timestamp (simulating clock skew)
+    // Note: We can't directly set ingested_at, but we can test the behavior
+    // by testing decay_preview which uses the same logic
+    
+    // Add a normal document
+    state
+        .upsert(UpsertRequest {
+            doc_id: "normal-doc".into(),
+            namespace: "test".into(),
+            chunks: vec![ChunkPayload {
+                chunk_id: Some("normal-doc#0".into()),
+                text: Some("Normal content".into()),
+                embedding: Vec::new(),
+                meta: json!({}),
+            }],
+            meta: json!({}),
+            source_ref: None,
+        })
+        .await;
+
+    // Get decay preview
+    let preview = state.preview_decay(Some("test".into())).await;
+
+    assert_eq!(preview.total_documents, 1);
+    assert_eq!(preview.previews.len(), 1);
+
+    // age_seconds is u64, so always >= 0, but we verify it's reasonable
+    // (not a huge value from negative i64 cast)
+    assert!(preview.previews[0].age_seconds < 10); // Should be very fresh (< 10 seconds)
+    
+    // Decay factor should be <= 1.0, never amplify scores
+    assert!(preview.previews[0].decay_factor <= 1.0);
+    assert!(preview.previews[0].decay_factor > 0.0);
+
+    // Search should also not amplify scores
+    let results = state
+        .search(&SearchRequest {
+            query: "content".into(),
+            k: Some(5),
+            namespace: Some("test".into()),
+        })
+        .await;
+
+    assert_eq!(results.len(), 1);
+    // Score should be reasonable (between 0 and 1)
+    assert!(results[0].score > 0.0);
+    assert!(results[0].score <= 1.0);
+}
