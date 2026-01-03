@@ -12,22 +12,144 @@ use std::{borrow::Cow, cmp::Ordering, collections::HashMap, sync::Arc, time::Ins
 use tokio::sync::RwLock;
 
 const DEFAULT_NAMESPACE: &str = "default";
+const QUARANTINE_NAMESPACE: &str = "quarantine";
 const MIN_WORD_LENGTH_FOR_SIMILARITY: usize = 3;
 const WORD_MATCH_SCORE_INCREMENT: f32 = 0.1;
 
 pub type MetricsRecorder = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
 
+/// Trust level for document sources - indicates how much to trust this content
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "lowercase")]
+pub enum TrustLevel {
+    /// Low trust - external sources, user input, tool output
+    Low,
+    /// Medium trust - OS context, application logs
+    Medium,
+    /// High trust - chronik events, verified internal sources
+    High,
+}
+
+impl TrustLevel {
+    /// Returns the default trust level for a given origin
+    pub fn default_for_origin(origin: &str) -> Self {
+        match origin {
+            "chronik" => TrustLevel::High,
+            "osctx" => TrustLevel::Medium,
+            "user" | "external" | "tool" => TrustLevel::Low,
+            _ => TrustLevel::Medium,
+        }
+    }
+}
+
+/// Content flags indicating potential security or quality issues
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ContentFlag {
+    /// Content contains possible prompt injection patterns
+    PossiblePromptInjection,
+    /// Content contains imperative language
+    ImperativeLanguage,
+    /// Content contains system claims or policy overrides
+    SystemClaim,
+    /// Content contains meta-prompt markers
+    MetaPromptMarker,
+}
+
+impl std::fmt::Display for ContentFlag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ContentFlag::PossiblePromptInjection => write!(f, "possible_prompt_injection"),
+            ContentFlag::ImperativeLanguage => write!(f, "imperative_language"),
+            ContentFlag::SystemClaim => write!(f, "system_claim"),
+            ContentFlag::MetaPromptMarker => write!(f, "meta_prompt_marker"),
+        }
+    }
+}
+
+/// Detect potential prompt injection patterns in text
+/// Returns a set of flags indicating issues found
+fn detect_injection_patterns(text: &str) -> Vec<ContentFlag> {
+    let mut flags = Vec::new();
+    let text_lower = text.to_lowercase();
+
+    // Imperative language patterns
+    let imperative_patterns = [
+        "du sollst",
+        "du musst",
+        "you must",
+        "you should",
+        "ignore previous",
+        "disregard",
+        "forget everything",
+    ];
+    
+    for pattern in &imperative_patterns {
+        if text_lower.contains(pattern) {
+            flags.push(ContentFlag::ImperativeLanguage);
+            break;
+        }
+    }
+
+    // System claims and policy overrides
+    let system_patterns = [
+        "this system must",
+        "system prompt",
+        "policy override",
+        "override policy",
+        "system instruction",
+        "admin mode",
+        "bypass",
+    ];
+    
+    for pattern in &system_patterns {
+        if text_lower.contains(pattern) {
+            flags.push(ContentFlag::SystemClaim);
+            break;
+        }
+    }
+
+    // Meta-prompt markers
+    let meta_patterns = [
+        "as an ai",
+        "as a language model",
+        "i am an ai",
+        "i'm an ai",
+        "assistant mode",
+        "system role",
+    ];
+    
+    for pattern in &meta_patterns {
+        if text_lower.contains(pattern) {
+            flags.push(ContentFlag::MetaPromptMarker);
+            break;
+        }
+    }
+
+    // If multiple flags, add overall prompt injection flag
+    if flags.len() >= 2 {
+        flags.push(ContentFlag::PossiblePromptInjection);
+    }
+
+    flags
+}
+
 /// Structured reference to document source for provenance tracking.
 /// This replaces the previous Option<String> to provide clear semantics.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SourceRef {
-    /// Origin namespace or system (e.g., "chronik", "osctx", "code", "docs")
+    /// Origin namespace or system (e.g., "chronik", "osctx", "user", "tool", "external")
     pub origin: String,
     /// Unique identifier within the origin (e.g., event_id, file path, hash)
     pub id: String,
     /// Optional location within the source (e.g., "line:42", "byte:1337-2048")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<String>,
+    /// Trust level - how much to trust this content
+    pub trust_level: TrustLevel,
+    /// Optional agent or tool that injected this content
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub injected_by: Option<String>,
 }
 
 /// Retention configuration for a namespace
@@ -140,10 +262,12 @@ struct DocumentRecord {
     namespace: String,
     chunks: Vec<ChunkPayload>,
     meta: Value,
-    /// Structured source reference for provenance tracking
+    /// Structured source reference for provenance tracking (mandatory for semantic security)
     source_ref: Option<SourceRef>,
     /// System-generated ingestion timestamp (always present, set at document creation)
     ingested_at: DateTime<Utc>,
+    /// Content flags indicating potential security or quality issues
+    flags: Vec<ContentFlag>,
 }
 
 impl IndexState {
@@ -174,19 +298,59 @@ impl IndexState {
             meta,
             source_ref,
         } = payload;
-        let namespace = normalize_namespace(&namespace);
+        
+        // Enforce source_ref requirement for semantic security
+        let source_ref = source_ref.expect("source_ref is mandatory for all index entries");
+        
+        // Detect injection patterns in all chunk text
+        let mut flags = Vec::new();
+        for chunk in &chunks {
+            if let Some(text) = &chunk.text {
+                let chunk_flags = detect_injection_patterns(text);
+                for flag in chunk_flags {
+                    if !flags.contains(&flag) {
+                        flags.push(flag);
+                    }
+                }
+            }
+        }
+        
+        // Auto-quarantine if multiple injection flags detected
+        let mut target_namespace = normalize_namespace(&namespace);
+        if flags.len() >= 2 || flags.contains(&ContentFlag::PossiblePromptInjection) {
+            tracing::warn!(
+                doc_id = %doc_id,
+                flags = ?flags,
+                original_namespace = %target_namespace,
+                "Auto-quarantining document with multiple injection flags"
+            );
+            target_namespace = QUARANTINE_NAMESPACE.to_string();
+        }
+        
         let mut store = self.inner.store.write().await;
-        let namespace_store = store.entry(namespace.clone()).or_insert_with(HashMap::new);
+        let namespace_store = store.entry(target_namespace.clone()).or_insert_with(HashMap::new);
         let ingested = chunks.len();
+        
+        // Log flag detection
+        if !flags.is_empty() {
+            tracing::info!(
+                doc_id = %doc_id,
+                namespace = %target_namespace,
+                flags = ?flags,
+                "Document flagged during upsert"
+            );
+        }
+        
         namespace_store.insert(
             doc_id.clone(),
             DocumentRecord {
                 doc_id,
-                namespace: namespace.clone(),
+                namespace: target_namespace.clone(),
                 chunks,
                 meta,
-                source_ref,
+                source_ref: Some(source_ref),
                 ingested_at: Utc::now(),
+                flags,
             },
         );
         ingested
@@ -212,9 +376,48 @@ impl IndexState {
 
         // Get retention config for namespace (if any)
         let retention_config = retention_configs.get(namespace.as_ref());
+        
+        // Prepare filter criteria (default policy: exclude possible_prompt_injection)
+        let exclude_flags_set: Vec<String> = request
+            .exclude_flags
+            .clone()
+            .unwrap_or_else(|| vec!["possible_prompt_injection".to_string()]);
+        let min_trust = request.min_trust_level;
+        let exclude_origins_set: Vec<String> = request.exclude_origins.clone().unwrap_or_default();
 
         let mut matches: Vec<SearchMatch> = Vec::new();
+        let mut filtered_count = 0;
+        
         for doc in namespace_store.values() {
+            // Apply trust level filter
+            if let Some(min_trust_level) = min_trust {
+                if let Some(ref source_ref) = doc.source_ref {
+                    if source_ref.trust_level < min_trust_level {
+                        filtered_count += 1;
+                        continue;
+                    }
+                }
+            }
+            
+            // Apply origin filter
+            if !exclude_origins_set.is_empty() {
+                if let Some(ref source_ref) = doc.source_ref {
+                    if exclude_origins_set.contains(&source_ref.origin) {
+                        filtered_count += 1;
+                        continue;
+                    }
+                }
+            }
+            
+            // Apply flag filter
+            let has_excluded_flag = doc.flags.iter().any(|flag| {
+                exclude_flags_set.contains(&flag.to_string())
+            });
+            if has_excluded_flag {
+                filtered_count += 1;
+                continue;
+            }
+            
             for (idx, chunk) in doc.chunks.iter().enumerate() {
                 let Some(text) = chunk.text.as_ref() else {
                     continue;
@@ -252,8 +455,18 @@ impl IndexState {
                     },
                     source_ref: doc.source_ref.clone(),
                     ingested_at: doc.ingested_at.to_rfc3339(),
+                    flags: doc.flags.clone(),
                 });
             }
+        }
+        
+        // Log filter statistics
+        if filtered_count > 0 {
+            tracing::debug!(
+                namespace = %namespace,
+                filtered_count = filtered_count,
+                "Documents filtered during search due to security policies"
+            );
         }
 
         matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
@@ -354,6 +567,7 @@ impl IndexState {
                         },
                         source_ref: other_doc.source_ref.clone(),
                         ingested_at: other_doc.ingested_at.to_rfc3339(),
+                        flags: other_doc.flags.clone(),
                     });
                 }
             }
@@ -782,6 +996,30 @@ pub struct SearchRequest {
     pub k: Option<usize>,
     #[serde(default)]
     pub namespace: Option<String>,
+    /// Exclude documents with any of these flags (default: filters prompt_injection in decision contexts)
+    #[serde(default)]
+    pub exclude_flags: Option<Vec<String>>,
+    /// Minimum trust level required (Low, Medium, High)
+    #[serde(default)]
+    pub min_trust_level: Option<TrustLevel>,
+    /// Exclude documents from these origins
+    #[serde(default)]
+    pub exclude_origins: Option<Vec<String>>,
+}
+
+impl SearchRequest {
+    /// Create a basic search request for testing (no security filters)
+    #[cfg(test)]
+    pub fn test_basic(query: impl Into<String>) -> Self {
+        Self {
+            query: query.into(),
+            k: None,
+            namespace: None,
+            exclude_flags: Some(vec![]), // Empty = no filtering
+            min_trust_level: None,
+            exclude_origins: None,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -832,6 +1070,9 @@ pub struct SearchMatch {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_ref: Option<SourceRef>,
     pub ingested_at: String,
+    /// Content flags indicating potential security or quality issues
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub flags: Vec<ContentFlag>,
 }
 
 fn default_namespace() -> String {
@@ -927,6 +1168,17 @@ mod tests {
     use axum::http::Request;
     use serde_json::json;
     use tower::ServiceExt;
+    
+    // Helper to create test source refs
+    fn test_source_ref(origin: &str, id: &str) -> SourceRef {
+        SourceRef {
+            origin: origin.to_string(),
+            id: id.to_string(),
+            offset: None,
+            trust_level: TrustLevel::default_for_origin(origin),
+            injected_by: None,
+        }
+    }
 
     #[tokio::test]
     async fn upsert_and_search_return_ok() {
@@ -939,7 +1191,12 @@ mod tests {
             "chunks": [
                 {"chunk_id": "doc-1#0", "text": "Hallo Welt", "embedding": []}
             ],
-            "meta": {"kind": "markdown"}
+            "meta": {"kind": "markdown"},
+            "source_ref": {
+                "origin": "chronik",
+                "id": "test-event-1",
+                "trust_level": "high"
+            }
         });
 
         let res = app
@@ -987,11 +1244,7 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "rust"}),
-                source_ref: Some(SourceRef {
-                    origin: "code".into(),
-                    id: "test_file.rs".into(),
-                    offset: Some("line:42".into()),
-                }),
+                source_ref: Some(test_source_ref("code", "test_file.rs")),
             })
             .await;
 
@@ -1006,7 +1259,7 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "cooking"}),
-                source_ref: None,
+                source_ref: Some(test_source_ref("user", "recipe-book")),
             })
             .await;
 
@@ -1015,6 +1268,9 @@ mod tests {
                 query: "rust".into(),
                 k: Some(5),
                 namespace: Some("default".into()),
+                exclude_flags: None,
+                min_trust_level: None,
+                exclude_origins: None,
             })
             .await;
 
@@ -1038,7 +1294,7 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "trim"}),
-                source_ref: None,
+                source_ref: Some(test_source_ref("chronik", "trim-test")),
             })
             .await;
 
@@ -1047,6 +1303,9 @@ mod tests {
                 query: "rust".into(),
                 k: Some(5),
                 namespace: Some("custom".into()),
+                exclude_flags: None,
+                min_trust_level: None,
+                exclude_origins: None,
             })
             .await;
 
@@ -1058,6 +1317,9 @@ mod tests {
                 query: "rust".into(),
                 k: Some(5),
                 namespace: Some("   custom   ".into()),
+                exclude_flags: None,
+                min_trust_level: None,
+                exclude_origins: None,
             })
             .await;
 
@@ -1080,7 +1342,7 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "empty"}),
-                source_ref: None,
+                source_ref: Some(test_source_ref("chronik", "empty-test")),
             })
             .await;
 
@@ -1089,6 +1351,9 @@ mod tests {
                 query: "hello".into(),
                 k: Some(5),
                 namespace: None,
+                exclude_flags: None,
+                min_trust_level: None,
+                exclude_origins: None,
             })
             .await;
 
@@ -1100,6 +1365,9 @@ mod tests {
                 query: "hello".into(),
                 k: Some(5),
                 namespace: Some("   ".into()),
+                exclude_flags: None,
+                min_trust_level: None,
+                exclude_origins: None,
             })
             .await;
 
@@ -1131,7 +1399,7 @@ mod tests {
                     },
                 ],
                 meta: json!({}),
-                source_ref: None,
+                source_ref: Some(test_source_ref("chronik", "doc-1")),
             })
             .await;
 
@@ -1146,7 +1414,7 @@ mod tests {
                     meta: json!({}),
                 }],
                 meta: json!({}),
-                source_ref: None,
+                source_ref: Some(test_source_ref("chronik", "doc-2")),
             })
             .await;
 
@@ -1173,7 +1441,7 @@ mod tests {
                     meta: json!({}),
                 }],
                 meta: json!({}),
-                source_ref: None,
+                source_ref: Some(test_source_ref("code", "rust-doc")),
             })
             .await;
 
@@ -1188,7 +1456,7 @@ mod tests {
                     meta: json!({}),
                 }],
                 meta: json!({}),
-                source_ref: None,
+                source_ref: Some(test_source_ref("code", "rust-guide")),
             })
             .await;
 
@@ -1203,7 +1471,7 @@ mod tests {
                     meta: json!({}),
                 }],
                 meta: json!({}),
-                source_ref: None,
+                source_ref: Some(test_source_ref("code", "python-doc")),
             })
             .await;
 
