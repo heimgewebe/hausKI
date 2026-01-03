@@ -534,8 +534,8 @@ Für eine dauerhafte Installation kann `hauski` als `systemd`-Dienst konfigurier
 
 ## Weiterführende Dokumente
 - [`docs/ist-stand-vs-roadmap.md`](docs/ist-stand-vs-roadmap.md) – **Implementierungsstatus**: Übersicht über alle Features mit klarer Trennung zwischen Ist-Stand (✅) und Roadmap (🔮).
-- [`hauski-skizze.md`](hauski-skizze.md) – Vision, Funktionsumfang, Performance-Budgets, Security-Ansatz (Roadmap-fokussiert).
-- [`hauski-stack.md`](hauski-stack.md) – Technologiewahl, Tooling, CI-Strategie und Testpyramide (inkl. Status-Marker).
+- [`docs/hauski-skizze.md`](docs/hauski-skizze.md) – Vision, Funktionsumfang, Performance-Budgets, Security-Ansatz (Roadmap-fokussiert).
+- [`docs/hauski-stack.md`](docs/hauski-stack.md) – Technologiewahl, Tooling, CI-Strategie und Testpyramide (inkl. Status-Marker).
 - [`docs/inconsistencies.md`](docs/inconsistencies.md) – Dokumentierte Abweichungen zwischen Architektur-Dokumenten und aktueller Implementierung.
 - [`docs/vision/multi-agent-rag.md`](docs/vision/multi-agent-rag.md) – Orchestrierung der spezialisierten Agenten inkl. Contracts.
   Einstieg über `just agents.sync` (Template spiegeln) und `just agents.run` (Dry-Run).
