@@ -125,7 +125,7 @@ test-full:
 codex-doctor:
     @echo "🔎 Checking codex availability…"
     @if command -v codex >/dev/null; then echo "✅ codex in PATH"; \
-    else echo "ℹ️  using npx @openai/codex@1.0.0"; fi
+    else echo "ℹ️  using npx @openai/codex@0.77.0"; fi
 
 codex-bugfix:
     bash scripts/hauski-codex.sh . scripts/codex-prompts/bugfix.md scripts/policies/codex.policy.yml

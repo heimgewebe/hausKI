@@ -12,8 +12,9 @@ concurrency:
   cancel-in-progress: true
 jobs:
   review:
+    # Skip if secret is missing to avoid failure in PRs
+    if: ${{ github.event.pull_request.draft == false && secrets.OPENAI_API_KEY != '' }}
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.draft == false }}
     steps:
       - name: Checkout repository
         # Pin to fixed v4.2.2 release to keep builds deterministic
@@ -73,6 +74,7 @@ jobs:
         id: codex
         env:
           DIFF_LINES: ${{ steps.diff.outputs.lines }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           echo "### REVIEW PROMPT" > prompt.md
           cat <<'EOP' >> prompt.md
@@ -84,7 +86,9 @@ jobs:
           echo >> prompt.md
           echo "### DIFF (gekürzt)" >> prompt.md
           head -n 1000 pr.diff >> prompt.md
-          npx -y @openai/codex@1.0.0 < prompt.md > review.txt
+          # NOTE: "@openai/codex@1.0.0" does not exist on npm and causes ETARGET/notarget failures.
+          # Keep this pinned deterministically; update intentionally when needed.
+          npx -y @openai/codex@0.77.0 exec < prompt.md > review.txt
       - name: Upload review as artifact
         uses: actions/upload-artifact@v4
         with:

@@ -6,7 +6,9 @@ PROMPT_FILE="${2:-scripts/codex-prompts/bugfix.md}"
 POLICY="${3:-scripts/policies/codex.policy.yml}"
 LOCAL_POLICY="scripts/policies/codex.policy.local.yml"
 CODEX_BIN="${CODEX_BIN:-codex}"
-CODEX_NPX_SPEC="${CODEX_NPX_SPEC:-@openai/codex@1.0.0}"
+# Keep in sync with .github/workflows/codex-review.yml
+# "@openai/codex@1.0.0" does not exist on npm.
+CODEX_NPX_SPEC="${CODEX_NPX_SPEC:-@openai/codex@0.77.0}"
 
 cd "$ROOT"
 git rev-parse --show-toplevel >/dev/null
@@ -32,12 +34,19 @@ cp "$PROMPT_FILE" "$LOGDIR/prompt.md"
 cp "$POLICY_COMBINED" "$LOGDIR/policy.yml"
 
 run_codex() {
+  local cmd
   if command -v "$CODEX_BIN" >/dev/null 2>&1; then
-    "$CODEX_BIN"
+    cmd="$CODEX_BIN"
   elif command -v codex >/dev/null 2>&1; then
-    codex
+    cmd="codex"
   else
-    npx -y "$CODEX_NPX_SPEC"
+    cmd="npx -y $CODEX_NPX_SPEC"
+  fi
+
+  if [ ! -t 0 ] || [ "${CI:-}" = "true" ]; then
+    $cmd exec
+  else
+    $cmd
   fi
 }
 
