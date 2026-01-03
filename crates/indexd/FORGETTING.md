@@ -60,6 +60,11 @@ curl -X POST http://localhost:8080/index/forget \
 - `older_than`: Filtere nach Zeitstempel (ISO 8601)
 - `source_ref_origin`: Filtere nach Herkunft (z.B. "chronik", "osctx")
 - `doc_id`: Filtere nach spezifischer Dokument-ID
+- `allow_namespace_wipe`: Erlaube Löschen aller Dokumente im Namespace (Standard: false)
+
+**Filter-Semantik:** AND-Logik – alle angegebenen Filter müssen übereinstimmen.
+
+**Sicherheit:** Mindestens ein Content-Filter (`older_than`, `source_ref_origin`, `doc_id`) ODER `allow_namespace_wipe: true` erforderlich.
 
 ### 4. Decay Preview (Dry-Run-Simulation)
 
@@ -82,17 +87,19 @@ curl -X POST http://localhost:8080/index/decay/preview \
 ## Sicherheitsgarantien
 
 1. **Bestätigung erforderlich**: Nicht-dry-run-Löschungen erfordern `confirm: true`
-2. **Dry-Run-Modus**: Alle Operationen unterstützen `dry_run: true`
-3. **Strukturiertes Logging**: Alle Löschvorgänge werden geloggt
-4. **Keine impliziten Löschungen**: Kein automatisches Vergessen bei Index-Rebuilds
+2. **Filter-Pflicht**: Mindestens ein Content-Filter ODER `allow_namespace_wipe: true`
+3. **AND-Semantik**: Alle Filter müssen übereinstimmen (keine OR-Logik)
+4. **Dry-Run-Modus**: Alle Operationen unterstützen `dry_run: true`
+5. **Strukturiertes Logging**: Alle Löschvorgänge werden geloggt
+6. **Keine impliziten Löschungen**: Kein automatisches Vergessen bei Index-Rebuilds
 
 ## Tests
 
-23 Tests decken alle Funktionen ab:
+26 Tests decken alle Funktionen ab:
 
 - **6 Unit-Tests**: Bestehende Funktionalität
-- **9 Decay/Forget-Tests**: Neue Vergessenslogik
-- **5 API-Tests**: HTTP-Endpunkte
+- **11 Decay/Forget-Tests**: Neue Vergessenslogik (inkl. AND-Semantik & Safety)
+- **6 API-Tests**: HTTP-Endpunkte (inkl. Filter-Validierung)
 - **3 Integration-Tests**: Bestehende Integration
 
 Alle Tests: `cargo test --package hauski-indexd`
@@ -125,14 +132,28 @@ let results = state.search(&search_request).await;
 // 5. Decay-Preview abrufen
 let preview = state.preview_decay(Some("chronik".into())).await;
 
-// 6. Intentional Forget (mit Bestätigung)
+// 6. Intentional Forget mit AND-Semantik (alle Filter müssen matchen)
 let result = state.forget(
     ForgetFilter {
         namespace: Some("chronik".into()),
         older_than: Some(cutoff_timestamp),
-        ..Default::default()
+        source_ref_origin: Some("osctx".into()),
+        doc_id: None,
+        allow_namespace_wipe: false,
     },
     false, // nicht dry_run
+).await;
+
+// 7. Namespace-Wipe (erfordert explizite Erlaubnis)
+let result = state.forget(
+    ForgetFilter {
+        namespace: Some("old_namespace".into()),
+        older_than: None,
+        source_ref_origin: None,
+        doc_id: None,
+        allow_namespace_wipe: true,  // Explizit erforderlich
+    },
+    false,
 ).await;
 ```
 

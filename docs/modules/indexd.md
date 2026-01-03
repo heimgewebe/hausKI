@@ -215,11 +215,29 @@ Content-Type: application/json
 }
 ```
 
+**Filter-Semantik:** AND-Logik – alle angegebenen Filter müssen übereinstimmen.
+- `older_than` UND `source_ref_origin` → nur Dokumente, die beide Bedingungen erfüllen
+- Mindestens ein Content-Filter (`older_than`, `source_ref_origin`, `doc_id`) erforderlich
+- Namespace-Wipe erfordert `allow_namespace_wipe: true` im Filter
+
 **Sicherheitsgeländer:**
-- Erfordert `confirm: true` im Request-Body
-- Keine globalen Löschungen ohne Filter
+- Erfordert `confirm: true` im Request-Body (nicht bei dry_run)
+- Mindestens ein Content-Filter ODER `allow_namespace_wipe: true` erforderlich
+- Verhindert versehentliches Löschen aller Dokumente
 - Erzeugt strukturierte Logs + Metriken
-- Dry-Run via `/index/forget?dry_run=true`
+- Dry-Run via `"dry_run": true` im Request-Body
+
+**Beispiel: Namespace-Wipe (erfordert explizite Erlaubnis)**
+```json
+{
+  "filter": {
+    "namespace": "old_namespace",
+    "allow_namespace_wipe": true
+  },
+  "reason": "Removing deprecated namespace",
+  "confirm": true
+}
+```
 
 #### 4. Semantisches Vergessen (Relevanzabnahme)
 

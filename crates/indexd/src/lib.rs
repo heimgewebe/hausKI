@@ -380,51 +380,72 @@ impl IndexState {
 
     /// Forget (delete) documents matching the given filter
     /// Returns the number of documents forgotten
+    /// 
+    /// Filter semantics: Uses AND logic - ALL specified filters must match for a document to be forgotten.
+    /// 
+    /// Safety guarantees:
+    /// - At least one content filter (older_than, source_ref_origin, doc_id) must be specified,
+    ///   OR namespace must be set with allow_namespace_wipe=true
+    /// - Without content filters and allow_namespace_wipe=false, no documents are forgotten
+    /// - This prevents accidental global or namespace-wide deletion
     pub async fn forget(&self, filter: ForgetFilter, dry_run: bool) -> ForgetResult {
         let mut store = self.inner.store.write().await;
         let mut forgotten_count = 0;
         let mut forgotten_docs = Vec::new();
 
-        for (namespace_name, namespace_store) in store.iter_mut() {
-            // Apply namespace filter if specified
-            if let Some(ref filter_ns) = filter.namespace {
-                if namespace_name != filter_ns {
-                    continue;
-                }
+        // Determine which namespaces to process
+        let namespaces_to_check: Vec<String> = if let Some(ref filter_ns) = filter.namespace {
+            // Specific namespace requested
+            if store.contains_key(filter_ns) {
+                vec![filter_ns.clone()]
+            } else {
+                vec![]
             }
+        } else {
+            // No namespace filter - iterate all namespaces
+            store.keys().cloned().collect()
+        };
+
+        // Check if we have at least one content filter
+        let has_content_filters = filter.older_than.is_some()
+            || filter.source_ref_origin.is_some()
+            || filter.doc_id.is_some();
+
+        for namespace_name in namespaces_to_check {
+            let namespace_store = match store.get_mut(&namespace_name) {
+                Some(ns) => ns,
+                None => continue,
+            };
 
             let mut to_remove = Vec::new();
 
             for (doc_id, doc) in namespace_store.iter() {
-                // Start with true if no filters are specified (except namespace)
-                // Otherwise, start with false and set to true if any filter matches
-                let has_filters = filter.older_than.is_some()
-                    || filter.source_ref_origin.is_some()
-                    || filter.doc_id.is_some();
+                // Start with true, then apply AND logic for all filters
+                let mut should_forget = true;
 
-                let mut should_forget = !has_filters; // If no filters, forget everything in namespace
+                // If no content filters and namespace wipe not explicitly allowed, skip everything
+                if !has_content_filters && !filter.allow_namespace_wipe {
+                    should_forget = false;
+                }
 
-                // Apply older_than filter
+                // Apply older_than filter (if specified)
                 if let Some(older_than) = filter.older_than {
-                    if doc.ingested_at < older_than {
-                        should_forget = true;
-                    }
+                    should_forget = should_forget && (doc.ingested_at < older_than);
                 }
 
-                // Apply source_ref filter
+                // Apply source_ref filter (if specified)
                 if let Some(ref filter_origin) = filter.source_ref_origin {
-                    if let Some(ref doc_source_ref) = doc.source_ref {
-                        if &doc_source_ref.origin == filter_origin {
-                            should_forget = true;
-                        }
-                    }
+                    let matches_origin = doc
+                        .source_ref
+                        .as_ref()
+                        .map(|sr| &sr.origin == filter_origin)
+                        .unwrap_or(false);
+                    should_forget = should_forget && matches_origin;
                 }
 
-                // Apply doc_id filter
+                // Apply doc_id filter (if specified)
                 if let Some(ref filter_doc_id) = filter.doc_id {
-                    if doc_id == filter_doc_id {
-                        should_forget = true;
-                    }
+                    should_forget = should_forget && (doc_id == filter_doc_id);
                 }
 
                 if should_forget {
@@ -636,6 +657,29 @@ async fn forget_handler(
             .into_response();
     }
 
+    // Safety check: prevent unfiltered deletion
+    // At least one content filter must be specified, OR allow_namespace_wipe must be true
+    let has_content_filters = payload.filter.older_than.is_some()
+        || payload.filter.source_ref_origin.is_some()
+        || payload.filter.doc_id.is_some();
+    
+    if !has_content_filters && !payload.filter.allow_namespace_wipe {
+        state.record(
+            Method::POST,
+            "/index/forget",
+            StatusCode::BAD_REQUEST,
+            started,
+        );
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "At least one content filter must be specified (older_than, source_ref_origin, doc_id), or set 'allow_namespace_wipe: true' to delete entire namespace",
+                "hint": "This safety check prevents accidental deletion of all documents"
+            })),
+        )
+            .into_response();
+    }
+
     let result = state.forget(payload.filter, payload.dry_run).await;
 
     // Log the forget operation
@@ -777,6 +821,11 @@ pub struct ForgetFilter {
     /// Filter by specific doc_id
     #[serde(default)]
     pub doc_id: Option<String>,
+    
+    /// Explicitly allow wiping entire namespace when only namespace filter is set
+    /// This is a safety flag to prevent accidental deletion of all documents in a namespace
+    #[serde(default)]
+    pub allow_namespace_wipe: bool,
 }
 
 /// Request for intentional forgetting

@@ -151,6 +151,7 @@ async fn test_forget_by_namespace() {
                 older_than: None,
                 source_ref_origin: None,
                 doc_id: None,
+                allow_namespace_wipe: true, // Explicitly allow wiping the namespace
             },
             true, // dry_run
         )
@@ -179,6 +180,7 @@ async fn test_forget_by_namespace() {
                 older_than: None,
                 source_ref_origin: None,
                 doc_id: None,
+                allow_namespace_wipe: true, // Explicitly allow wiping the namespace
             },
             false, // not dry_run
         )
@@ -260,6 +262,7 @@ async fn test_forget_by_source_ref_origin() {
                 older_than: None,
                 source_ref_origin: Some("chronik".into()),
                 doc_id: None,
+                allow_namespace_wipe: false,
             },
             false,
         )
@@ -310,6 +313,7 @@ async fn test_forget_older_than() {
                 older_than: Some(cutoff),
                 source_ref_origin: None,
                 doc_id: None,
+                allow_namespace_wipe: false,
             },
             false,
         )
@@ -327,6 +331,7 @@ async fn test_forget_older_than() {
                 older_than: Some(future_cutoff),
                 source_ref_origin: None,
                 doc_id: None,
+                allow_namespace_wipe: false,
             },
             false,
         )
@@ -367,6 +372,7 @@ async fn test_forget_by_doc_id() {
                 older_than: None,
                 source_ref_origin: None,
                 doc_id: Some("doc-2".into()),
+                allow_namespace_wipe: false,
             },
             false,
         )
@@ -572,4 +578,177 @@ async fn test_decay_affects_search_ranking() {
         actual_decay_factor,
         expected_decay_factor
     );
+}
+
+/// Test that filter semantics use AND logic (all filters must match)
+#[tokio::test]
+async fn test_forget_uses_and_semantics() {
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+
+    // Add documents with different characteristics
+    // Doc 1: old, from chronik
+    state
+        .upsert(UpsertRequest {
+            doc_id: "doc-old-chronik".into(),
+            namespace: "default".into(),
+            chunks: vec![ChunkPayload {
+                chunk_id: Some("doc-old-chronik#0".into()),
+                text: Some("Old chronik content".into()),
+                embedding: Vec::new(),
+                meta: json!({}),
+            }],
+            meta: json!({}),
+            source_ref: Some(SourceRef {
+                origin: "chronik".into(),
+                id: "event-old".into(),
+                offset: None,
+            }),
+        })
+        .await;
+
+    // Doc 2: old, from code (different origin)
+    state
+        .upsert(UpsertRequest {
+            doc_id: "doc-old-code".into(),
+            namespace: "default".into(),
+            chunks: vec![ChunkPayload {
+                chunk_id: Some("doc-old-code#0".into()),
+                text: Some("Old code content".into()),
+                embedding: Vec::new(),
+                meta: json!({}),
+            }],
+            meta: json!({}),
+            source_ref: Some(SourceRef {
+                origin: "code".into(),
+                id: "file.rs".into(),
+                offset: None,
+            }),
+        })
+        .await;
+
+    // Doc 3: recent, from chronik
+    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+    state
+        .upsert(UpsertRequest {
+            doc_id: "doc-new-chronik".into(),
+            namespace: "default".into(),
+            chunks: vec![ChunkPayload {
+                chunk_id: Some("doc-new-chronik#0".into()),
+                text: Some("New chronik content".into()),
+                embedding: Vec::new(),
+                meta: json!({}),
+            }],
+            meta: json!({}),
+            source_ref: Some(SourceRef {
+                origin: "chronik".into(),
+                id: "event-new".into(),
+                offset: None,
+            }),
+        })
+        .await;
+
+    // Test: Forget old AND chronik documents (AND semantics)
+    let cutoff = Utc::now() - Duration::milliseconds(5);
+    let result = state
+        .forget(
+            ForgetFilter {
+                namespace: None,
+                older_than: Some(cutoff),
+                source_ref_origin: Some("chronik".into()),
+                doc_id: None,
+                allow_namespace_wipe: false,
+            },
+            false,
+        )
+        .await;
+
+    // Should only forget doc-old-chronik (old AND chronik)
+    // doc-old-code is old but not chronik (fails chronik filter)
+    // doc-new-chronik is chronik but not old (fails older_than filter)
+    assert_eq!(result.forgotten_count, 1);
+    assert_eq!(result.forgotten_docs[0].doc_id, "doc-old-chronik");
+
+    // Verify the other two documents remain
+    let stats = state.stats().await;
+    assert_eq!(stats.total_documents, 2);
+
+    let search = state
+        .search(&SearchRequest {
+            query: "content".into(),
+            k: Some(10),
+            namespace: None,
+        })
+        .await;
+
+    assert_eq!(search.len(), 2);
+    let doc_ids: Vec<&str> = search.iter().map(|m| m.doc_id.as_str()).collect();
+    assert!(doc_ids.contains(&"doc-old-code"));
+    assert!(doc_ids.contains(&"doc-new-chronik"));
+    assert!(!doc_ids.contains(&"doc-old-chronik"));
+}
+
+/// Test that namespace wipe without allow_namespace_wipe flag doesn't delete anything
+#[tokio::test]
+async fn test_namespace_wipe_requires_explicit_flag() {
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+
+    // Add documents
+    for i in 1..=3 {
+        state
+            .upsert(UpsertRequest {
+                doc_id: format!("doc-{}", i),
+                namespace: "test".into(),
+                chunks: vec![ChunkPayload {
+                    chunk_id: Some(format!("doc-{}#0", i)),
+                    text: Some(format!("Content {}", i)),
+                    embedding: Vec::new(),
+                    meta: json!({}),
+                }],
+                meta: json!({}),
+                source_ref: None,
+            })
+            .await;
+    }
+
+    // Try to forget namespace without explicit flag (should delete nothing)
+    let result = state
+        .forget(
+            ForgetFilter {
+                namespace: Some("test".into()),
+                older_than: None,
+                source_ref_origin: None,
+                doc_id: None,
+                allow_namespace_wipe: false, // Explicit false
+            },
+            false,
+        )
+        .await;
+
+    // Should not delete anything
+    assert_eq!(result.forgotten_count, 0);
+
+    // Verify documents still exist
+    let stats = state.stats().await;
+    assert_eq!(stats.total_documents, 3);
+
+    // Now with explicit flag (should delete everything)
+    let result2 = state
+        .forget(
+            ForgetFilter {
+                namespace: Some("test".into()),
+                older_than: None,
+                source_ref_origin: None,
+                doc_id: None,
+                allow_namespace_wipe: true, // Explicit true
+            },
+            false,
+        )
+        .await;
+
+    // Should delete all 3 documents
+    assert_eq!(result2.forgotten_count, 3);
+
+    // Verify documents are gone
+    let stats2 = state.stats().await;
+    assert_eq!(stats2.total_documents, 0);
 }

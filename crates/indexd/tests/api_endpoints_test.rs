@@ -37,7 +37,8 @@ async fn test_forget_api_requires_confirmation() {
     // Try to forget without confirmation (should fail)
     let forget_payload = json!({
         "filter": {
-            "namespace": "test"
+            "namespace": "test",
+            "allow_namespace_wipe": true
         },
         "reason": "Test cleanup",
         "confirm": false,
@@ -62,7 +63,8 @@ async fn test_forget_api_requires_confirmation() {
     // Now with confirmation (should succeed)
     let forget_confirmed = json!({
         "filter": {
-            "namespace": "test"
+            "namespace": "test",
+            "allow_namespace_wipe": true
         },
         "reason": "Test cleanup",
         "confirm": true,
@@ -224,7 +226,8 @@ async fn test_forget_dry_run_api() {
     // Dry-run forget
     let forget_dry = json!({
         "filter": {
-            "namespace": "test"
+            "namespace": "test",
+            "allow_namespace_wipe": true
         },
         "reason": "Testing dry run",
         "confirm": false,
@@ -377,4 +380,85 @@ async fn test_search_with_decay_applied() {
         decayed_score,
         initial_score
     );
+}
+
+/// Test that forget API prevents unfiltered deletion
+#[tokio::test]
+async fn test_forget_api_prevents_unfiltered_deletion() {
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    
+    // Add documents
+    for i in 1..=3 {
+        state
+            .upsert(hauski_indexd::UpsertRequest {
+                doc_id: format!("doc-{}", i),
+                namespace: "test".into(),
+                chunks: vec![hauski_indexd::ChunkPayload {
+                    chunk_id: Some(format!("doc-{}#0", i)),
+                    text: Some(format!("Content {}", i)),
+                    embedding: Vec::new(),
+                    meta: json!({}),
+                }],
+                meta: json!({}),
+                source_ref: None,
+            })
+            .await;
+    }
+
+    let app = router().with_state(state.clone());
+
+    // Try to forget without any content filters and without allow_namespace_wipe (should fail)
+    let forget_no_filters = json!({
+        "filter": {
+            "namespace": "test"
+            // No allow_namespace_wipe, no other filters
+        },
+        "reason": "Attempting unfiltered delete",
+        "confirm": true,
+        "dry_run": false
+    });
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/forget")
+                .method("POST")
+                .header("content-type", "application/json")
+                .body(Body::from(forget_no_filters.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Should be rejected with BAD_REQUEST
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    let body_bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+    
+    // Check error message
+    assert!(body.get("error").is_some());
+    assert!(body.get("error").unwrap().as_str().unwrap().contains("content filter"));
+
+    // Verify documents still exist
+    let stats_res = app
+        .oneshot(
+            Request::builder()
+                .uri("/stats")
+                .method("GET")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let stats_bytes = axum::body::to_bytes(stats_res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let stats: serde_json::Value = serde_json::from_slice(&stats_bytes).unwrap();
+
+    assert_eq!(stats.get("total_documents").unwrap(), 3);
 }
