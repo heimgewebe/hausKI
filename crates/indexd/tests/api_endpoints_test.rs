@@ -439,9 +439,14 @@ async fn test_forget_api_prevents_unfiltered_deletion() {
         .unwrap();
     let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
     
-    // Check error message
-    assert!(body.get("error").is_some());
-    assert!(body.get("error").unwrap().as_str().unwrap().contains("content filter"));
+    // Check error message - should mention content filter requirement
+    assert!(body.get("error").is_some(), "Response should contain 'error' field");
+    let error_msg = body.get("error").unwrap().as_str().unwrap();
+    assert!(
+        error_msg.contains("content filter"),
+        "Error message should mention 'content filter', got: {}",
+        error_msg
+    );
 
     // Verify documents still exist
     let stats_res = app
