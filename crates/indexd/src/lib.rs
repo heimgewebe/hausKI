@@ -61,6 +61,15 @@ pub enum PurgeStrategy {
 }
 
 /// Reason for forgetting/deletion
+/// 
+/// This enum is intended for use in metrics and structured logging
+/// to track why documents are being forgotten. Currently exported
+/// for future integration with metrics recording (Phase 6).
+/// 
+/// Example future usage:
+/// ```ignore
+/// metrics.record_forgotten(namespace, ForgetReason::Manual, count);
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ForgetReason {
