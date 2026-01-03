@@ -33,7 +33,8 @@ To prevent drift and redundancy, workflows are semantically classified into thre
 *   `secret-scan-gitleaks.yml`: Secret scanning (runs on PRs and pushes).
 *   `release.yml`: Release automation.
 *   `pr-heimgewebe-commands.yml`: ChatOps and PR interactions.
-*   `codex-review.yml`, `review-cycle-check.yml`: Review process logic.
+*   `codex-review.yml`: Automated code review (runs only if `OPENAI_API_KEY` is set).
+*   `review-cycle-check.yml`: Review process logic.
 
 ---
 

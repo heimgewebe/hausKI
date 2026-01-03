@@ -34,12 +34,19 @@ cp "$PROMPT_FILE" "$LOGDIR/prompt.md"
 cp "$POLICY_COMBINED" "$LOGDIR/policy.yml"
 
 run_codex() {
+  local cmd
   if command -v "$CODEX_BIN" >/dev/null 2>&1; then
-    "$CODEX_BIN"
+    cmd="$CODEX_BIN"
   elif command -v codex >/dev/null 2>&1; then
-    codex
+    cmd="codex"
   else
-    npx -y "$CODEX_NPX_SPEC"
+    cmd="npx -y $CODEX_NPX_SPEC"
+  fi
+
+  if [ ! -t 0 ] || [ "${CI:-}" = "true" ]; then
+    $cmd exec
+  else
+    $cmd
   fi
 }
 
