@@ -685,6 +685,7 @@ name = "hauski-indexd"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "serde",
  "serde_json",
  "tokio",

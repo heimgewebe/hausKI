@@ -1,19 +1,44 @@
 # Modul: indexd
 
-**Rolle:** Speicherung und semantische Suche
+**Rolle:** Langzeitgedächtnis (episodisch, semantisch)
 **Komponente:** `hauski-indexd` (Crate)
 
 ---
 
 ## Überblick
 
-`indexd` implementiert die Indexierungs- und Query-Schicht von hausKI.
+`indexd` implementiert die Indexierungs- und Query-Schicht von hausKI als **persistentes semantisches Gedächtnis**.
 Zentral ist das **`VectorStore`-Trait**, das abstrakte Such- und Embedding-Backends erlaubt (z. B. *tantivy+hnsw* oder *Qdrant*).
+
+## Abgrenzung zu Memory
+
+| Aspekt | Memory (Arbeitsgedächtnis) | indexd (Langzeitgedächtnis) |
+|--------|----------------------------|------------------------------|
+| **Persistenz** | SQLite K/V | SQLite + Vektoren |
+| **Lebensdauer** | TTL-basiert (Sekunden bis Minuten) | Persistent, episodisch |
+| **Datentyp** | Key/Value (Bytes) | Dokumente + Embeddings + Metadaten |
+| **Zugriff** | Direkt per Key | Semantische Suche, Namespace-Filter |
+| **Anwendung** | Session-State, kurzfristige Flags | Chronik, OS-Kontext, Code-Snippets, Insights |
 
 ### Hauptaufgaben
 - Speichern von Dokument-Embeddings (Text, OS-Kontext, Memory-Snippets)
 - Durchführen semantischer Queries (Top-k, Score, Namespace-Filter)
 - Bereitstellen der Index-Metriken für `/metrics`
+
+### Namespace-Konventionen
+
+indexd nutzt Namespaces zur semantischen Trennung verschiedener Datenquellen:
+
+| Namespace | Beschreibung | Beispiel-Inhalte |
+|-----------|--------------|------------------|
+| `chronik` | Ereignis-Historie aus OS/App-Events | System-Events, User-Actions |
+| `osctx` | Betriebssystem-Kontext | Prozesse, Netzwerk, Hardware-State |
+| `code` | Code-Snippets und Entwickler-Artefakte | Funktionen, Klassen, Commits |
+| `docs` | Dokumentation und Wissensartefakte | Markdown, PDFs, API-Docs |
+| `insights` | Generierte Insights und Metawissen | Analyse-Ergebnisse, Zusammenfassungen |
+| `default` | Fallback für unspezifizierte Inhalte | Allgemeine Einträge |
+
+Alle Namespaces werden normalisiert (getrimmt, Fallback zu `default` bei leer/whitespace).
 
 ---
 
@@ -24,6 +49,49 @@ Zentral ist das **`VectorStore`-Trait**, das abstrakte Such- und Embedding-Backe
 | **Indexer** | wandelt Events/Texts in Embeddings um (via `semantAH`) |
 | **Store** | persistiert Embeddings (SQLite oder remote Vector-DB) |
 | **API** | REST-Endpunkte `/index`, `/query`, `/related` |
+
+### Provenance Tracking (source_ref)
+
+Dokumente können eine strukturierte Herkunftsreferenz (`SourceRef`) enthalten:
+
+```rust
+pub struct SourceRef {
+    pub origin: String,   // "chronik", "osctx", "code", "docs", "insights"
+    pub id: String,       // event_id, file path, hash
+    pub offset: Option<String>, // "line:42", "byte:1337-2048"
+}
+```
+
+**Konventionen:**
+- `origin`: Quell-Namespace (chronik, osctx, code, docs, insights)
+- `id`: Eindeutige Referenz (Event-ID, Dateipfad, Commit-Hash)
+- `offset`: Position innerhalb der Quelle (Zeile, Byte-Range)
+  - ✅ Korrekt: `"line:42"`, `"byte:1337-2048"`, `"offset:123"`
+  - ❌ Falsch: Dateipfade gehören nach `id`, nicht nach `offset`
+
+Beispiele:
+```json
+// Event aus Chronik-Log
+{
+  "origin": "chronik",
+  "id": "/var/log/events/2024-01-01.log",
+  "offset": "line:42"
+}
+
+// Code-Snippet
+{
+  "origin": "code",
+  "id": "src/main.rs",
+  "offset": "line:100-120"
+}
+
+// Dokument ohne Positions-Info
+{
+  "origin": "docs",
+  "id": "README.md",
+  "offset": null
+}
+```
 
 ---
 
@@ -41,18 +109,44 @@ index:
 
 ## Metriken & Budgets
 
-- `index_queries_total`
-- `index_query_duration_seconds`
-  *Budget:* p95 ≤ 60 ms
+- `index_queries_total` – Gesamtzahl aller Index-Anfragen (inkl. /search, /related)
+- `index_query_duration_seconds` – Latenzverteilung der Anfragen
+  *Budget:* p95 ≤ 60 ms (konfigurierbar über Limits)
+
+### Budget-Leitplanke
+
+Das System nutzt ein latenzbasiertes Budget:
+- Bei Überschreitung des Budgets (> 60 ms p95) sollten Degradations-Maßnahmen greifen
+- Aktuelle Implementierung: Warnung im Log, keine automatische Degradation
+- Zukünftig: Reduzierung von k, einfachere Filter, Caching
+
+### API-Endpunkte
+
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/index/upsert` | POST | Dokument-Chunks mit Embeddings registrieren |
+| `/index/search` | POST | Semantische Suche mit Top-k und Namespace-Filter |
+| `/index/related` | POST | Ähnliche Dokumente zu einem gegebenen doc_id finden |
+| `/index/stats` | GET | Statistiken über den Index (Dokumente, Chunks, Namespaces) |
 
 ---
 
 ## Offene Aufgaben
 
-- [ ] HNSW-Backend dokumentieren
-- [ ] Beispiel-Querys ergänzen
+- [ ] SQLite-Persistenz implementieren (aktuell nur In-Memory)
+- [ ] HNSW-Backend für echte Vektor-Ähnlichkeitssuche
+- [ ] Beispiel-Querys in Dokumentation ergänzen
 - [ ] API-Spec per `utoipa` exportieren
 
----
+## Status
 
-**Letzte Aktualisierung:** 2025-10-23
+**Implementiert:**
+- ✅ In-Memory-Store mit Namespace-Support
+- ✅ Substring-basierte Textsuche
+- ✅ Metadaten (source_ref, ingested_at)
+- ✅ /upsert, /search, /related, /stats Endpoints
+- ✅ Metriken-Integration
+
+**In Entwicklung:**
+- 🔄 SQLite-Persistenz
+- 🔄 Vektor-Embeddings und HNSW-Index

@@ -5,14 +5,30 @@ use axum::{
     routing::post,
     Json, Router,
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{borrow::Cow, cmp::Ordering, collections::HashMap, sync::Arc, time::Instant};
 use tokio::sync::RwLock;
 
 const DEFAULT_NAMESPACE: &str = "default";
+const MIN_WORD_LENGTH_FOR_SIMILARITY: usize = 3;
+const WORD_MATCH_SCORE_INCREMENT: f32 = 0.1;
 
 pub type MetricsRecorder = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
+
+/// Structured reference to document source for provenance tracking.
+/// This replaces the previous Option<String> to provide clear semantics.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SourceRef {
+    /// Origin namespace or system (e.g., "chronik", "osctx", "code", "docs")
+    pub origin: String,
+    /// Unique identifier within the origin (e.g., event_id, file path, hash)
+    pub id: String,
+    /// Optional location within the source (e.g., "line:42", "byte:1337-2048")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset: Option<String>,
+}
 
 fn normalize_namespace(input: &str) -> String {
     let trimmed = input.trim();
@@ -49,6 +65,10 @@ struct DocumentRecord {
     namespace: String,
     chunks: Vec<ChunkPayload>,
     meta: Value,
+    /// Structured source reference for provenance tracking
+    source_ref: Option<SourceRef>,
+    /// System-generated ingestion timestamp (always present, set at document creation)
+    ingested_at: DateTime<Utc>,
 }
 
 impl IndexState {
@@ -70,12 +90,13 @@ impl IndexState {
         (self.inner.metrics)(method, path, status, started);
     }
 
-    async fn upsert(&self, payload: UpsertRequest) -> usize {
+    pub async fn upsert(&self, payload: UpsertRequest) -> usize {
         let UpsertRequest {
             doc_id,
             namespace,
             chunks,
             meta,
+            source_ref,
         } = payload;
         let namespace = normalize_namespace(&namespace);
         let mut store = self.inner.store.write().await;
@@ -88,6 +109,8 @@ impl IndexState {
                 namespace: namespace.clone(),
                 chunks,
                 meta,
+                source_ref,
+                ingested_at: Utc::now(),
             },
         );
         ingested
@@ -136,7 +159,112 @@ impl IndexState {
                     } else {
                         chunk.meta.clone()
                     },
+                    source_ref: doc.source_ref.clone(),
+                    ingested_at: doc.ingested_at.to_rfc3339(),
                 });
+            }
+        }
+
+        matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+        if matches.len() > limit {
+            matches.truncate(limit);
+        }
+        matches
+    }
+
+    pub async fn stats(&self) -> StatsResponse {
+        let store = self.inner.store.read().await;
+        let mut total_docs = 0;
+        let mut total_chunks = 0;
+        let mut namespace_counts = HashMap::new();
+
+        for (namespace, namespace_store) in store.iter() {
+            let doc_count = namespace_store.len();
+            let chunk_count: usize = namespace_store.values().map(|doc| doc.chunks.len()).sum();
+
+            total_docs += doc_count;
+            total_chunks += chunk_count;
+            namespace_counts.insert(namespace.clone(), doc_count);
+        }
+
+        StatsResponse {
+            total_documents: total_docs,
+            total_chunks,
+            namespaces: namespace_counts,
+            budget_ms: self.inner.budget_ms,
+        }
+    }
+
+    pub async fn related(
+        &self,
+        doc_id: String,
+        k: Option<usize>,
+        namespace: Option<String>,
+    ) -> Vec<SearchMatch> {
+        let store = self.inner.store.read().await;
+        let namespace = resolve_namespace(namespace.as_deref());
+        let Some(namespace_store) = store.get(namespace.as_ref()) else {
+            return Vec::new();
+        };
+
+        let Some(source_doc) = namespace_store.get(&doc_id) else {
+            return Vec::new();
+        };
+
+        let limit = k.unwrap_or(20).min(100);
+        let mut matches: Vec<SearchMatch> = Vec::new();
+
+        // Pre-compute source text once (outside loops for performance)
+        let source_text: Vec<String> = source_doc
+            .chunks
+            .iter()
+            .filter_map(|c| c.text.as_ref().map(|t| t.to_lowercase()))
+            .collect();
+
+        // For now, use simple text-based similarity (compare all chunks with source)
+        // In future: use embedding-based similarity
+        for (other_doc_id, other_doc) in namespace_store.iter() {
+            if other_doc_id == &doc_id {
+                continue; // skip self
+            }
+
+            for (idx, chunk) in other_doc.chunks.iter().enumerate() {
+                let Some(text) = chunk.text.as_ref() else {
+                    continue;
+                };
+
+                // Simple heuristic: calculate overlap with source document text
+                let text_lower = text.to_lowercase();
+                let mut score = 0.0f32;
+                for src_text in &source_text {
+                    let words: Vec<&str> = src_text.split_whitespace().collect();
+                    for word in words {
+                        if word.len() > MIN_WORD_LENGTH_FOR_SIMILARITY && text_lower.contains(word)
+                        {
+                            score += WORD_MATCH_SCORE_INCREMENT;
+                        }
+                    }
+                }
+
+                if score > 0.0 {
+                    matches.push(SearchMatch {
+                        doc_id: other_doc.doc_id.clone(),
+                        namespace: other_doc.namespace.clone(),
+                        chunk_id: chunk
+                            .chunk_id
+                            .clone()
+                            .unwrap_or_else(|| format!("{}#{idx}", other_doc.doc_id)),
+                        score,
+                        text: text.clone(),
+                        meta: if chunk.meta.is_null() {
+                            other_doc.meta.clone()
+                        } else {
+                            chunk.meta.clone()
+                        },
+                        source_ref: other_doc.source_ref.clone(),
+                        ingested_at: other_doc.ingested_at.to_rfc3339(),
+                    });
+                }
             }
         }
 
@@ -186,9 +314,14 @@ where
     S: Clone + Send + Sync + 'static,
     IndexState: FromRef<S>,
 {
+    // Note: This router is nested under /index in core (see core/src/lib.rs),
+    // so routes like /stats become /index/stats when mounted.
+    // Metrics are recorded with full paths (/index/stats, etc.) for consistency.
     Router::<S>::new()
         .route("/upsert", post(upsert_handler))
         .route("/search", post(search_handler))
+        .route("/stats", axum::routing::get(stats_handler))
+        .route("/related", post(related_handler))
 }
 
 async fn upsert_handler(
@@ -227,6 +360,34 @@ async fn search_handler(
         .into_response()
 }
 
+async fn stats_handler(State(state): State<IndexState>) -> Response {
+    let started = Instant::now();
+    let stats = state.stats().await;
+    state.record(Method::GET, "/index/stats", StatusCode::OK, started);
+    (StatusCode::OK, Json(stats)).into_response()
+}
+
+async fn related_handler(
+    State(state): State<IndexState>,
+    Json(payload): Json<RelatedRequest>,
+) -> Response {
+    let started = Instant::now();
+    let matches = state
+        .related(payload.doc_id, payload.k, payload.namespace)
+        .await;
+    let latency_ms = started.elapsed().as_secs_f64() * 1000.0;
+    state.record(Method::POST, "/index/related", StatusCode::OK, started);
+    (
+        StatusCode::OK,
+        Json(RelatedResponse {
+            matches,
+            latency_ms,
+            budget_ms: state.budget_ms(),
+        }),
+    )
+        .into_response()
+}
+
 #[derive(Debug, Deserialize)]
 pub struct UpsertRequest {
     pub doc_id: String,
@@ -236,6 +397,7 @@ pub struct UpsertRequest {
     pub chunks: Vec<ChunkPayload>,
     #[serde(default)]
     pub meta: Value,
+    pub source_ref: Option<SourceRef>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -259,6 +421,15 @@ pub struct SearchRequest {
     pub namespace: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RelatedRequest {
+    pub doc_id: String,
+    #[serde(default)]
+    pub k: Option<usize>,
+    #[serde(default)]
+    pub namespace: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct UpsertResponse {
     pub status: String,
@@ -272,6 +443,21 @@ pub struct SearchResponse {
     pub budget_ms: u64,
 }
 
+#[derive(Debug, Serialize)]
+pub struct RelatedResponse {
+    pub matches: Vec<SearchMatch>,
+    pub latency_ms: f64,
+    pub budget_ms: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StatsResponse {
+    pub total_documents: usize,
+    pub total_chunks: usize,
+    pub namespaces: HashMap<String, usize>,
+    pub budget_ms: u64,
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct SearchMatch {
     pub doc_id: String,
@@ -280,6 +466,9 @@ pub struct SearchMatch {
     pub score: f32,
     pub text: String,
     pub meta: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_ref: Option<SourceRef>,
+    pub ingested_at: String,
 }
 
 fn default_namespace() -> String {
@@ -352,6 +541,11 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "rust"}),
+                source_ref: Some(SourceRef {
+                    origin: "code".into(),
+                    id: "test_file.rs".into(),
+                    offset: Some("line:42".into()),
+                }),
             })
             .await;
 
@@ -366,6 +560,7 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "cooking"}),
+                source_ref: None,
             })
             .await;
 
@@ -397,6 +592,7 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "trim"}),
+                source_ref: None,
             })
             .await;
 
@@ -438,6 +634,7 @@ mod tests {
                     meta: json!({"chunk": 0}),
                 }],
                 meta: json!({"doc": "empty"}),
+                source_ref: None,
             })
             .await;
 
@@ -463,5 +660,113 @@ mod tests {
         assert_eq!(spaced_results.len(), 1);
         assert_eq!(spaced_results[0].doc_id, "doc-empty");
         assert_eq!(spaced_results[0].namespace, DEFAULT_NAMESPACE);
+    }
+
+    #[tokio::test]
+    async fn stats_returns_correct_counts() {
+        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+
+        state
+            .upsert(UpsertRequest {
+                doc_id: "doc-1".into(),
+                namespace: "default".into(),
+                chunks: vec![
+                    ChunkPayload {
+                        chunk_id: Some("doc-1#0".into()),
+                        text: Some("First chunk".into()),
+                        embedding: Vec::new(),
+                        meta: json!({}),
+                    },
+                    ChunkPayload {
+                        chunk_id: Some("doc-1#1".into()),
+                        text: Some("Second chunk".into()),
+                        embedding: Vec::new(),
+                        meta: json!({}),
+                    },
+                ],
+                meta: json!({}),
+                source_ref: None,
+            })
+            .await;
+
+        state
+            .upsert(UpsertRequest {
+                doc_id: "doc-2".into(),
+                namespace: "custom".into(),
+                chunks: vec![ChunkPayload {
+                    chunk_id: Some("doc-2#0".into()),
+                    text: Some("Third chunk".into()),
+                    embedding: Vec::new(),
+                    meta: json!({}),
+                }],
+                meta: json!({}),
+                source_ref: None,
+            })
+            .await;
+
+        let stats = state.stats().await;
+        assert_eq!(stats.total_documents, 2);
+        assert_eq!(stats.total_chunks, 3);
+        assert_eq!(stats.namespaces.len(), 2);
+        assert_eq!(stats.namespaces.get("default"), Some(&1));
+        assert_eq!(stats.namespaces.get("custom"), Some(&1));
+    }
+
+    #[tokio::test]
+    async fn related_finds_similar_documents() {
+        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+
+        state
+            .upsert(UpsertRequest {
+                doc_id: "doc-rust".into(),
+                namespace: "default".into(),
+                chunks: vec![ChunkPayload {
+                    chunk_id: Some("doc-rust#0".into()),
+                    text: Some("Rust programming language with memory safety".into()),
+                    embedding: Vec::new(),
+                    meta: json!({}),
+                }],
+                meta: json!({}),
+                source_ref: None,
+            })
+            .await;
+
+        state
+            .upsert(UpsertRequest {
+                doc_id: "doc-rust-guide".into(),
+                namespace: "default".into(),
+                chunks: vec![ChunkPayload {
+                    chunk_id: Some("doc-rust-guide#0".into()),
+                    text: Some("A guide to memory management in Rust".into()),
+                    embedding: Vec::new(),
+                    meta: json!({}),
+                }],
+                meta: json!({}),
+                source_ref: None,
+            })
+            .await;
+
+        state
+            .upsert(UpsertRequest {
+                doc_id: "doc-python".into(),
+                namespace: "default".into(),
+                chunks: vec![ChunkPayload {
+                    chunk_id: Some("doc-python#0".into()),
+                    text: Some("Python scripting tutorial".into()),
+                    embedding: Vec::new(),
+                    meta: json!({}),
+                }],
+                meta: json!({}),
+                source_ref: None,
+            })
+            .await;
+
+        let related = state
+            .related("doc-rust".into(), Some(5), Some("default".into()))
+            .await;
+
+        // Should find doc-rust-guide as related (shares "rust" and "memory" words)
+        assert!(!related.is_empty());
+        assert!(related.iter().any(|m| m.doc_id == "doc-rust-guide"));
     }
 }

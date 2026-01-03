@@ -1,7 +1,19 @@
 # Memory (SQLite + TTL, MVP)
 
+**Rolle:** Arbeitsgedächtnis (kurzlebig, TTL-basiert)
+
 Ein schlanker Key/Value-Speicher mit optionalem TTL und Pin-Flag.
 Nur sichtbar, wenn `HAUSKI_EXPOSE_CONFIG=true`.
+
+## Abgrenzung zu indexd
+
+| Aspekt | Memory (Arbeitsgedächtnis) | indexd (Langzeitgedächtnis) |
+|--------|----------------------------|------------------------------|
+| **Persistenz** | SQLite K/V | SQLite + Vektoren |
+| **Lebensdauer** | TTL-basiert (Sekunden bis Minuten) | Persistent, episodisch |
+| **Datentyp** | Key/Value (Bytes) | Dokumente + Embeddings + Metadaten |
+| **Zugriff** | Direkt per Key | Semantische Suche, Namespace-Filter |
+| **Anwendung** | Session-State, kurzfristige Flags | Chronik, OS-Kontext, Code-Snippets, Insights |
 
 ## Endpunkte
 
