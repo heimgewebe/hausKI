@@ -61,11 +61,11 @@ pub enum PurgeStrategy {
 }
 
 /// Reason for forgetting/deletion
-/// 
+///
 /// This enum is intended for use in metrics and structured logging
 /// to track why documents are being forgotten. Currently exported
 /// for future integration with metrics recording (Phase 6).
-/// 
+///
 /// Example future usage:
 /// ```ignore
 /// metrics.record_forgotten(namespace, ForgetReason::Manual, count);
@@ -381,9 +381,9 @@ impl IndexState {
 
     /// Forget (delete) documents matching the given filter
     /// Returns the number of documents forgotten
-    /// 
+    ///
     /// Filter semantics: Uses AND logic - ALL specified filters must match for a document to be forgotten.
-    /// 
+    ///
     /// Safety guarantees:
     /// - At least one content filter (older_than, source_ref_origin, doc_id) must be specified,
     ///   OR namespace must be set with allow_namespace_wipe=true
@@ -678,7 +678,7 @@ async fn forget_handler(
     let has_content_filters = payload.filter.older_than.is_some()
         || payload.filter.source_ref_origin.is_some()
         || payload.filter.doc_id.is_some();
-    
+
     if !has_content_filters && !payload.filter.allow_namespace_wipe {
         state.record(
             Method::POST,
@@ -856,7 +856,7 @@ pub struct ForgetFilter {
     /// Filter by specific doc_id
     #[serde(default)]
     pub doc_id: Option<String>,
-    
+
     /// Explicitly allow wiping entire namespace when only namespace filter is set
     /// This is a safety flag to prevent accidental deletion of all documents in a namespace
     #[serde(default)]

@@ -1,6 +1,6 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use hauski_indexd::{router, IndexState, RetentionConfig, PurgeStrategy};
+use hauski_indexd::{router, IndexState, PurgeStrategy, RetentionConfig};
 use serde_json::json;
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -91,7 +91,7 @@ async fn test_forget_api_requires_confirmation() {
 #[tokio::test]
 async fn test_retention_api_endpoint() {
     let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
-    
+
     // Set retention configs
     state
         .set_retention_config(
@@ -135,7 +135,7 @@ async fn test_retention_api_endpoint() {
 #[tokio::test]
 async fn test_decay_preview_api_endpoint() {
     let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
-    
+
     // Configure decay
     state
         .set_retention_config(
@@ -202,7 +202,7 @@ async fn test_decay_preview_api_endpoint() {
 #[tokio::test]
 async fn test_forget_dry_run_api() {
     let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
-    
+
     // Add documents
     for i in 1..=3 {
         state
@@ -281,7 +281,7 @@ async fn test_forget_dry_run_api() {
 #[tokio::test]
 async fn test_search_with_decay_applied() {
     let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
-    
+
     // Configure very aggressive decay
     state
         .set_retention_config(
@@ -337,7 +337,7 @@ async fn test_search_with_decay_applied() {
         .await
         .unwrap();
     let body1: serde_json::Value = serde_json::from_slice(&body1_bytes).unwrap();
-    
+
     let matches1 = body1.get("matches").unwrap().as_array().unwrap();
     assert_eq!(matches1.len(), 1);
     let initial_score = matches1[0].get("score").unwrap().as_f64().unwrap();
@@ -368,7 +368,7 @@ async fn test_search_with_decay_applied() {
         .await
         .unwrap();
     let body2: serde_json::Value = serde_json::from_slice(&body2_bytes).unwrap();
-    
+
     let matches2 = body2.get("matches").unwrap().as_array().unwrap();
     assert_eq!(matches2.len(), 1);
     let decayed_score = matches2[0].get("score").unwrap().as_f64().unwrap();
@@ -386,7 +386,7 @@ async fn test_search_with_decay_applied() {
 #[tokio::test]
 async fn test_forget_api_prevents_unfiltered_deletion() {
     let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
-    
+
     // Add documents
     for i in 1..=3 {
         state
@@ -438,9 +438,12 @@ async fn test_forget_api_prevents_unfiltered_deletion() {
         .await
         .unwrap();
     let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-    
+
     // Check error message - should mention content filter requirement
-    assert!(body.get("error").is_some(), "Response should contain 'error' field");
+    assert!(
+        body.get("error").is_some(),
+        "Response should contain 'error' field"
+    );
     let error_msg = body.get("error").unwrap().as_str().unwrap();
     assert!(
         error_msg.contains("content filter"),
@@ -473,7 +476,7 @@ async fn test_forget_api_prevents_unfiltered_deletion() {
 async fn test_forget_api_prevents_global_wipe() {
     let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
     let app = router().with_state(state.clone());
-    
+
     // Add documents in multiple namespaces
     for ns in &["ns1", "ns2", "ns3"] {
         for i in 1..=2 {
@@ -531,7 +534,7 @@ async fn test_forget_api_prevents_global_wipe() {
         .await
         .unwrap();
     let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-    
+
     let error_msg = body.get("error").unwrap().as_str().unwrap();
     assert!(
         error_msg.contains("allow_namespace_wipe") && error_msg.contains("namespace"),

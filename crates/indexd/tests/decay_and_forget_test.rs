@@ -774,7 +774,7 @@ async fn test_future_timestamp_handling() {
     // Create a document with future timestamp (simulating clock skew)
     // Note: We can't directly set ingested_at, but we can test the behavior
     // by testing decay_preview which uses the same logic
-    
+
     // Add a normal document
     state
         .upsert(UpsertRequest {
@@ -800,7 +800,7 @@ async fn test_future_timestamp_handling() {
     // age_seconds is u64, so always >= 0, but we verify it's reasonable
     // (not a huge value from negative i64 cast)
     assert!(preview.previews[0].age_seconds < 10); // Should be very fresh (< 10 seconds)
-    
+
     // Decay factor should be <= 1.0, never amplify scores
     assert!(preview.previews[0].decay_factor <= 1.0);
     assert!(preview.previews[0].decay_factor > 0.0);
@@ -824,7 +824,7 @@ async fn test_future_timestamp_handling() {
 #[tokio::test]
 async fn test_forget_method_blocks_global_wipe() {
     let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
-    
+
     // Add documents in multiple namespaces
     for ns in &["ns1", "ns2", "ns3"] {
         for i in 1..=2 {
@@ -867,5 +867,8 @@ async fn test_forget_method_blocks_global_wipe() {
 
     // Verify all documents still exist
     let stats = state.stats().await;
-    assert_eq!(stats.total_documents, 6, "All 6 documents should still exist");
+    assert_eq!(
+        stats.total_documents, 6,
+        "All 6 documents should still exist"
+    );
 }
