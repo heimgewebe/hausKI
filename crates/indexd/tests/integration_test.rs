@@ -1,4 +1,7 @@
-use hauski_indexd::{ChunkPayload, IndexState, SearchRequest, SourceRef, UpsertRequest};
+mod common;
+use common::{test_source_ref, test_search_request};
+
+use hauski_indexd::{ChunkPayload, IndexState, SearchRequest, SourceRef, TrustLevel, UpsertRequest};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -23,11 +26,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"topic": "rust", "id": i}),
                 }],
                 meta: json!({"language": "rust"}),
-                source_ref: Some(SourceRef {
-                    origin: "docs".into(),
-                    id: format!("rust-{}.md", i),
-                    offset: None,
-                }),
+                source_ref: Some(test_source_ref("docs", &format!("rust-{}.md", i))),
             })
             .await;
     }
@@ -45,11 +44,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"topic": "python", "id": i}),
                 }],
                 meta: json!({"language": "python"}),
-                source_ref: Some(SourceRef {
-                    origin: "docs".into(),
-                    id: format!("python-{}.md", i),
-                    offset: None,
-                }),
+                source_ref: Some(test_source_ref("docs", &format!("python-{}.md", i))),
             })
             .await;
     }
@@ -70,11 +65,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"event_type": "process_start", "id": i}),
                 }],
                 meta: json!({"severity": "info"}),
-                source_ref: Some(SourceRef {
-                    origin: "chronik".into(),
-                    id: format!("/var/log/events/{}.log", i),
-                    offset: Some(format!("line:{}", i * 10)), // Line position in log file
-                }),
+                source_ref: Some(test_source_ref("chronik", &format!("/var/log/events/{}.log", i))),
             })
             .await;
     }
@@ -92,11 +83,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"section": "getting-started", "id": i}),
                 }],
                 meta: json!({"category": "tutorial"}),
-                source_ref: Some(SourceRef {
-                    origin: "docs".into(),
-                    id: format!("page-{}.md", i),
-                    offset: None,
-                }),
+                source_ref: Some(test_source_ref("docs", &format!("page-{}.md", i))),
             })
             .await;
     }
@@ -107,6 +94,9 @@ async fn test_fixture_corpus_indexing_and_search() {
             query: "rust".into(),
             k: Some(10),
             namespace: Some("code".into()),
+            exclude_flags: None,
+            min_trust_level: None,
+            exclude_origins: None,
         })
         .await;
 
@@ -125,6 +115,9 @@ async fn test_fixture_corpus_indexing_and_search() {
             query: "process".into(),
             k: Some(10),
             namespace: Some("chronik".into()),
+            exclude_flags: None,
+            min_trust_level: None,
+            exclude_origins: None,
         })
         .await;
 
@@ -175,7 +168,7 @@ async fn test_namespace_isolation() {
                 meta: json!({}),
             }],
             meta: json!({}),
-            source_ref: None,
+            source_ref: Some(test_source_ref("chronik", "test-doc")),
         })
         .await;
 
@@ -190,7 +183,7 @@ async fn test_namespace_isolation() {
                 meta: json!({}),
             }],
             meta: json!({}),
-            source_ref: None,
+            source_ref: Some(test_source_ref("chronik", "test-doc")),
         })
         .await;
 
@@ -200,6 +193,9 @@ async fn test_namespace_isolation() {
             query: "shared".into(),
             k: Some(10),
             namespace: Some("ns1".into()),
+            exclude_flags: None,
+            min_trust_level: None,
+            exclude_origins: None,
         })
         .await;
 
@@ -212,6 +208,9 @@ async fn test_namespace_isolation() {
             query: "shared".into(),
             k: Some(10),
             namespace: Some("ns2".into()),
+            exclude_flags: None,
+            min_trust_level: None,
+            exclude_origins: None,
         })
         .await;
 
@@ -234,11 +233,7 @@ async fn test_source_ref_and_ingested_at_populated() {
                 meta: json!({}),
             }],
             meta: json!({}),
-            source_ref: Some(SourceRef {
-                origin: "chronik".into(),
-                id: "event-2024-01-01".into(),
-                offset: Some("line:42".into()),
-            }),
+            source_ref: Some(test_source_ref("chronik", "event-2024-01-01")),
         })
         .await;
 
@@ -247,17 +242,16 @@ async fn test_source_ref_and_ingested_at_populated() {
             query: "content".into(),
             k: Some(1),
             namespace: None,
+            exclude_flags: None,
+            min_trust_level: None,
+            exclude_origins: None,
         })
         .await;
 
     assert_eq!(results.len(), 1);
     assert_eq!(
         results[0].source_ref,
-        Some(SourceRef {
-            origin: "chronik".into(),
-            id: "event-2024-01-01".into(),
-            offset: Some("line:42".into()),
-        })
+        Some(test_source_ref("chronik", "event-2024-01-01"))
     );
     assert!(!results[0].ingested_at.is_empty());
     // Verify it's a valid RFC3339 timestamp

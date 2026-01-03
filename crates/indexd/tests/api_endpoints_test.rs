@@ -1,3 +1,5 @@
+mod common;
+use common::{test_source_ref, test_search_request};
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use hauski_indexd::{router, IndexState, PurgeStrategy, RetentionConfig};
@@ -18,7 +20,12 @@ async fn test_forget_api_requires_confirmation() {
         "chunks": [
             {"chunk_id": "test-doc#0", "text": "Test content", "embedding": []}
         ],
-        "meta": {}
+        "meta": {},
+        "source_ref": {
+            "origin": "chronik",
+            "id": "test-doc",
+            "trust_level": "high"
+        }
     });
 
     let _upsert_res = app
@@ -162,7 +169,7 @@ async fn test_decay_preview_api_endpoint() {
                     meta: json!({}),
                 }],
                 meta: json!({}),
-                source_ref: None,
+                source_ref: Some(test_source_ref("chronik", "test-doc")),
             })
             .await;
     }
@@ -216,7 +223,7 @@ async fn test_forget_dry_run_api() {
                     meta: json!({}),
                 }],
                 meta: json!({}),
-                source_ref: None,
+                source_ref: Some(test_source_ref("chronik", "test-doc")),
             })
             .await;
     }
@@ -307,7 +314,7 @@ async fn test_search_with_decay_applied() {
                 meta: json!({}),
             }],
             meta: json!({}),
-            source_ref: None,
+            source_ref: Some(test_source_ref("chronik", "test-doc")),
         })
         .await;
 
@@ -400,7 +407,7 @@ async fn test_forget_api_prevents_unfiltered_deletion() {
                     meta: json!({}),
                 }],
                 meta: json!({}),
-                source_ref: None,
+                source_ref: Some(test_source_ref("chronik", "test-doc")),
             })
             .await;
     }
@@ -486,7 +493,12 @@ async fn test_forget_api_prevents_global_wipe() {
                 "chunks": [
                     {"chunk_id": format!("doc-{}#0", i), "text": format!("Content {} in {}", i, ns), "embedding": []}
                 ],
-                "meta": {}
+                "meta": {},
+                "source_ref": {
+                    "origin": "chronik",
+                    "id": format!("doc-{}", i),
+                    "trust_level": "high"
+                }
             });
 
             app.clone()
