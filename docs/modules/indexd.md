@@ -128,6 +128,142 @@ Das System nutzt ein latenzbasiertes Budget:
 | `/index/search` | POST | Semantische Suche mit Top-k und Namespace-Filter |
 | `/index/related` | POST | Ähnliche Dokumente zu einem gegebenen doc_id finden |
 | `/index/stats` | GET | Statistiken über den Index (Dokumente, Chunks, Namespaces) |
+| `/index/forget` | POST | Policy-gesteuertes Vergessen von Dokumenten (Admin-Scope) |
+| `/index/retention` | GET | Aktive Retention-Policies anzeigen |
+| `/index/decay/preview` | POST | Dry-Run: Score-Decay simulieren ohne Änderungen |
+
+---
+
+## Vergessen, Decay & semantische Hygiene
+
+**Konzept:** Ein Gedächtnis ohne Vergessen wird zur Datenkippe. indexd implementiert kontrolliertes, policy-gesteuertes Vergessen zur Vermeidung von semantischer Drift und Bedeutungsüberlagerung.
+
+### Vergessensmodi
+
+indexd unterstützt vier explizite Modi des Vergessens:
+
+#### 1. Zeitliches Vergessen (Time-Decay)
+
+Ältere Einträge verlieren kontinuierlich an Relevanz.
+
+**Mechanismus:**
+- Jeder Eintrag hat ein `ingested_at`-Timestamp
+- Optional: `half_life` (in Sekunden) pro Namespace oder Document
+- Score-Berechnung: `final_score = similarity_score × decay_factor`
+- Decay-Faktor: `decay_factor = 0.5 ^ (age_seconds / half_life)`
+
+**Beispiel:**
+```yaml
+# policies/indexd_retention.yaml
+namespaces:
+  chronik:
+    half_life_seconds: 2592000  # 30 Tage
+  osctx:
+    half_life_seconds: 86400    # 1 Tag
+  code:
+    half_life_seconds: null     # Kein Decay
+```
+
+**Eigenschaften:**
+- Kontinuierlicher, deterministischer Relevanzverlust
+- Keine harten Löschungen – nur Score-Reduktion
+- Semantisch relevante alte Einträge können durch hohe similarity_score überleben
+
+#### 2. Namespace-Retention (Strukturelles Vergessen)
+
+Pro Namespace konfigurierbare Limits und Purge-Strategien.
+
+**Konfiguration:**
+```yaml
+namespaces:
+  chronik:
+    max_items: 10000
+    max_age_seconds: 7776000  # 90 Tage
+    purge_strategy: oldest     # oldest | lowest_score
+  default:
+    max_items: null            # Unbegrenzt
+    max_age_seconds: null
+    purge_strategy: null
+```
+
+**Purge-Strategien:**
+- `oldest`: Älteste Einträge zuerst (FIFO)
+- `lowest_score`: Niedrigste kombinierte Scores (Decay + Relevanz)
+- `random`: **VERBOTEN** – keine zufälligen Löschungen
+
+**Triggering:**
+- Automatisch bei Überschreitung von `max_items` oder `max_age_seconds`
+- Nur bei `/upsert`-Operationen (niemals implizit bei Queries)
+
+#### 3. Intentional Forget (Policy-Entscheid)
+
+Explizite Löschung durch Policy-gesteuerte Events.
+
+**API:**
+```http
+POST /index/forget
+Content-Type: application/json
+
+{
+  "filter": {
+    "namespace": "chronik",
+    "older_than": "2024-01-01T00:00:00Z",
+    "source_ref_origin": "osctx"
+  },
+  "reason": "Manual cleanup after system migration",
+  "confirm": true
+}
+```
+
+**Sicherheitsgeländer:**
+- Erfordert `confirm: true` im Request-Body
+- Keine globalen Löschungen ohne Filter
+- Erzeugt strukturierte Logs + Metriken
+- Dry-Run via `/index/forget?dry_run=true`
+
+#### 4. Semantisches Vergessen (Relevanzabnahme)
+
+**Status:** Geplant (nicht in v0.1)
+
+Dokumente mit dauerhaft niedrigen Scores werden als irrelevant markiert und priorisiert vergessen.
+
+---
+
+### Metriken für Vergessen
+
+indexd exportiert folgende Observability-Metriken:
+
+| Metrik | Typ | Beschreibung |
+|--------|-----|--------------|
+| `index_items_total{namespace}` | Gauge | Aktuelle Anzahl Dokumente pro Namespace |
+| `index_items_forgotten_total{namespace,reason}` | Counter | Gelöschte Dokumente (Grund: ttl, retention, manual) |
+| `index_decay_applied_total` | Counter | Anzahl Score-Decay-Berechnungen |
+| `index_retention_purges_total{namespace,strategy}` | Counter | Ausgeführte Retention-Purges |
+
+**Verwendung:**
+```promql
+# Vergessensrate pro Namespace
+rate(index_items_forgotten_total[5m])
+
+# Anteil Decay-betroffener Dokumente
+index_decay_applied_total / index_items_total
+```
+
+---
+
+### Sicherheitsrichtlinien
+
+**Verboten:**
+- ❌ Implizites Vergessen (z. B. bei Index-Rebuild)
+- ❌ Globales `DELETE *` ohne Filter
+- ❌ Zufällige Purge-Strategien (`random`)
+- ❌ Stilles Vergessen ohne Logs/Metriken
+
+**Pflicht:**
+- ✅ Alle Löschungen erzeugen Metriken
+- ✅ Intentional Forget erfordert `reason`-String
+- ✅ Dry-Run-Modus für alle Purge-Operationen
+- ✅ Vergessen ist beobachtbar (Logs, Metrics, Events)
 
 ---
 
@@ -137,6 +273,7 @@ Das System nutzt ein latenzbasiertes Budget:
 - [ ] HNSW-Backend für echte Vektor-Ähnlichkeitssuche
 - [ ] Beispiel-Querys in Dokumentation ergänzen
 - [ ] API-Spec per `utoipa` exportieren
+- [ ] Semantisches Vergessen (Relevanzabnahme) implementieren
 
 ## Status
 
@@ -150,3 +287,5 @@ Das System nutzt ein latenzbasiertes Budget:
 **In Entwicklung:**
 - 🔄 SQLite-Persistenz
 - 🔄 Vektor-Embeddings und HNSW-Index
+- 🔄 Time-Decay und Retention-Policies
+- 🔄 Forget-API und Dry-Run-Modus

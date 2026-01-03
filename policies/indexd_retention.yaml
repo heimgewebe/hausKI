@@ -1,0 +1,86 @@
+# indexd Retention & Decay Policies
+#
+# Kontrolliertes Vergessen zur Vermeidung von semantischer Drift
+# und Bedeutungsüberlagerung im Langzeitgedächtnis.
+
+# Globale Defaults (können pro Namespace überschrieben werden)
+defaults:
+  # Time-Decay aktiviert (null = deaktiviert)
+  half_life_seconds: null
+  
+  # Namespace-Retention Limits
+  max_items: null  # Unbegrenzt
+  max_age_seconds: null  # Unbegrenzt
+  
+  # Purge-Strategie: oldest | lowest_score
+  # random ist verboten (semantisch blind)
+  purge_strategy: null
+
+# Namespace-spezifische Retention Policies
+namespaces:
+  # chronik: System-Events, kurze Retention
+  chronik:
+    half_life_seconds: 2592000  # 30 Tage (Decay)
+    max_items: 10000
+    max_age_seconds: 7776000  # 90 Tage (Hard-Limit)
+    purge_strategy: oldest
+    
+  # osctx: OS-Kontext, sehr kurze Retention
+  osctx:
+    half_life_seconds: 86400  # 1 Tag
+    max_items: 5000
+    max_age_seconds: 604800  # 7 Tage
+    purge_strategy: oldest
+    
+  # code: Code-Snippets, lange Retention
+  code:
+    half_life_seconds: null  # Kein Decay
+    max_items: 50000
+    max_age_seconds: null  # Unbegrenzt
+    purge_strategy: lowest_score
+    
+  # docs: Dokumentation, mittlere Retention
+  docs:
+    half_life_seconds: 7776000  # 90 Tage
+    max_items: 20000
+    max_age_seconds: 31536000  # 365 Tage
+    purge_strategy: lowest_score
+    
+  # insights: Generierte Insights, mittlere Retention
+  insights:
+    half_life_seconds: 5184000  # 60 Tage
+    max_items: 10000
+    max_age_seconds: 15552000  # 180 Tage
+    purge_strategy: lowest_score
+    
+  # default: Fallback-Namespace, moderate Retention
+  default:
+    half_life_seconds: 5184000  # 60 Tage
+    max_items: 10000
+    max_age_seconds: 15552000  # 180 Tage
+    purge_strategy: oldest
+
+# Sicherheitsgeländer
+safety:
+  # Mindestbestätigung für globale Löschungen
+  require_confirmation: true
+  
+  # Dry-Run standardmäßig aktiviert für /forget
+  default_dry_run: false
+  
+  # Logs für alle Löschoperationen
+  log_all_deletions: true
+  
+  # Metriken für alle Forget-Events
+  emit_metrics: true
+
+# Verbotene Operationen
+forbidden:
+  # Keine impliziten Löschungen
+  - implicit_forget_on_rebuild
+  
+  # Keine globalen Löschungen ohne Filter
+  - unfiltered_global_delete
+  
+  # Keine zufälligen Purge-Strategien
+  - random_purge
