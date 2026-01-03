@@ -198,7 +198,7 @@ Codex-Läufe schreiben ihre Rohdaten nach `~/.hauski/review/hauski/`. Lege dir i
 ln -s ~/.hauski/review/hauski .hauski-reports
 ```
 
-Nutze `just codex:doctor`, um vor einem Run schnell zu prüfen, ob eine lokale `codex`-Installation gefunden wird oder automatisch auf `npx @openai/codex@1.0.0` zurückgefallen wird.
+Nutze `just codex:doctor`, um vor einem Run schnell zu prüfen, ob eine lokale `codex`-Installation gefunden wird oder automatisch auf `npx @openai/codex@0.77.0` zurückgefallen wird.
 
 ---
 

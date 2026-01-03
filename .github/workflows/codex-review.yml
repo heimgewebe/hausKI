@@ -84,7 +84,9 @@ jobs:
           echo >> prompt.md
           echo "### DIFF (gekürzt)" >> prompt.md
           head -n 1000 pr.diff >> prompt.md
-          npx -y @openai/codex@1.0.0 < prompt.md > review.txt
+          # NOTE: "@openai/codex@1.0.0" does not exist on npm and causes ETARGET/notarget failures.
+          # Keep this pinned deterministically; update intentionally when needed.
+          npx -y @openai/codex@0.77.0 < prompt.md > review.txt
       - name: Upload review as artifact
         uses: actions/upload-artifact@v4
         with:
