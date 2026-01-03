@@ -154,7 +154,7 @@ indexd unterstützt vier explizite Modi des Vergessens:
 
 **Beispiel:**
 ```yaml
-# policies/indexd_retention.yaml
+# policies/indexd_retention.example.yaml (Template - not loaded at runtime)
 namespaces:
   chronik:
     half_life_seconds: 2592000  # 30 Tage
@@ -249,14 +249,16 @@ Dokumente mit dauerhaft niedrigen Scores werden als irrelevant markiert und prio
 
 ### Metriken für Vergessen
 
-indexd exportiert folgende Observability-Metriken:
+**Status:** Geplant (nicht in v0.1) - Infrastructure vorbereitet, Prometheus-Integration ausstehend
 
-| Metrik | Typ | Beschreibung |
-|--------|-----|--------------|
-| `index_items_total{namespace}` | Gauge | Aktuelle Anzahl Dokumente pro Namespace |
-| `index_items_forgotten_total{namespace,reason}` | Counter | Gelöschte Dokumente (Grund: ttl, retention, manual) |
-| `index_decay_applied_total` | Counter | Anzahl Score-Decay-Berechnungen |
-| `index_retention_purges_total{namespace,strategy}` | Counter | Ausgeführte Retention-Purges |
+Die folgenden Observability-Metriken sind für zukünftige Integration vorgesehen:
+
+| Metrik | Typ | Beschreibung | Status |
+|--------|-----|--------------|--------|
+| `index_items_total{namespace}` | Gauge | Aktuelle Anzahl Dokumente pro Namespace | ⏳ Planned |
+| `index_items_forgotten_total{namespace,reason}` | Counter | Gelöschte Dokumente (Grund: ttl, retention, manual) | ⏳ Planned |
+| `index_decay_applied_total` | Counter | Anzahl Score-Decay-Berechnungen | ⏳ Planned |
+| `index_retention_purges_total{namespace,strategy}` | Counter | Ausgeführte Retention-Purges | ⏳ Planned |
 
 **Verwendung:**
 ```promql

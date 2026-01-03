@@ -35,7 +35,7 @@ Pro-Namespace-Limits mit konfigurierbaren Purge-Strategien:
 - `max_age_seconds`: Maximales Alter in Sekunden
 - `purge_strategy`: `Oldest` oder `LowestScore`
 
-**Beispiel:** Siehe `policies/indexd_retention.yaml`
+**Beispiel:** Siehe `policies/indexd_retention.example.yaml` (Template - Policy loading not yet implemented)
 
 ### 3. Intentional Forget (Manuelles Vergessen)
 
@@ -168,5 +168,5 @@ let result = state.forget(
 
 - **Issue**: #2 (indexd – Vergessen, Decay & semantische Hygiene)
 - **Dokumentation**: `docs/modules/indexd.md`
-- **Policies**: `policies/indexd_retention.yaml`
+- **Policy Template**: `policies/indexd_retention.example.yaml` (not loaded at runtime)
 - **Tests**: `crates/indexd/tests/`

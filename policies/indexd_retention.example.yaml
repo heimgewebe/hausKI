@@ -1,7 +1,13 @@
-# indexd Retention & Decay Policies
+# indexd Retention & Decay Policies - EXAMPLE TEMPLATE
+#
+# ⚠️  WARNING: This file is NOT loaded by the runtime.
+# ⚠️  This is a template for future policy loading implementation.
+# ⚠️  Currently, retention configs must be set programmatically via API.
 #
 # Kontrolliertes Vergessen zur Vermeidung von semantischer Drift
 # und Bedeutungsüberlagerung im Langzeitgedächtnis.
+#
+# Status: Template only - Policy loading planned for future release
 
 # Globale Defaults (können pro Namespace überschrieben werden)
 defaults:
