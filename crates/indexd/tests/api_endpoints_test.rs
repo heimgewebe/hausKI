@@ -467,3 +467,95 @@ async fn test_forget_api_prevents_unfiltered_deletion() {
 
     assert_eq!(stats.get("total_documents").unwrap(), 3);
 }
+
+/// Test critical security check: allow_namespace_wipe without namespace should be rejected
+#[tokio::test]
+async fn test_forget_api_prevents_global_wipe() {
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let app = router().with_state(state.clone());
+    
+    // Add documents in multiple namespaces
+    for ns in &["ns1", "ns2", "ns3"] {
+        for i in 1..=2 {
+            let upsert_payload = json!({
+                "doc_id": format!("doc-{}", i),
+                "namespace": ns,
+                "chunks": [
+                    {"chunk_id": format!("doc-{}#0", i), "text": format!("Content {} in {}", i, ns), "embedding": []}
+                ],
+                "meta": {}
+            });
+
+            app.clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/upsert")
+                        .method("POST")
+                        .header("content-type", "application/json")
+                        .body(Body::from(upsert_payload.to_string()))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+    }
+
+    // Attempt: allow_namespace_wipe WITHOUT namespace (should fail)
+    let forget_payload = json!({
+        "filter": {
+            "allow_namespace_wipe": true
+            // namespace deliberately omitted
+        },
+        "reason": "Attempted global wipe",
+        "confirm": true,
+        "dry_run": false
+    });
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/forget")
+                .method("POST")
+                .header("content-type", "application/json")
+                .body(Body::from(forget_payload.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Should be rejected with BAD_REQUEST
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    let body_bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+    
+    let error_msg = body.get("error").unwrap().as_str().unwrap();
+    assert!(
+        error_msg.contains("allow_namespace_wipe") && error_msg.contains("namespace"),
+        "Error should mention allow_namespace_wipe requires namespace, got: {}",
+        error_msg
+    );
+
+    // Verify ALL documents still exist in ALL namespaces
+    let stats_res = app
+        .oneshot(
+            Request::builder()
+                .uri("/stats")
+                .method("GET")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let stats_bytes = axum::body::to_bytes(stats_res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let stats: serde_json::Value = serde_json::from_slice(&stats_bytes).unwrap();
+
+    // Should have 6 total documents (3 namespaces × 2 docs each)
+    assert_eq!(stats.get("total_documents").unwrap(), 6);
+}

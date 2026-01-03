@@ -64,7 +64,9 @@ curl -X POST http://localhost:8080/index/forget \
 
 **Filter-Semantik:** AND-Logik – alle angegebenen Filter müssen übereinstimmen.
 
-**Sicherheit:** Mindestens ein Content-Filter (`older_than`, `source_ref_origin`, `doc_id`) ODER `allow_namespace_wipe: true` erforderlich.
+**Sicherheit:** 
+- Mindestens ein Content-Filter (`older_than`, `source_ref_origin`, `doc_id`) ODER `allow_namespace_wipe: true` erforderlich
+- **KRITISCH:** `allow_namespace_wipe` erfordert `namespace` im Filter (verhindert globale Löschung über alle Namespaces hinweg)
 
 ### 4. Decay Preview (Dry-Run-Simulation)
 
@@ -88,18 +90,20 @@ curl -X POST http://localhost:8080/index/decay/preview \
 
 1. **Bestätigung erforderlich**: Nicht-dry-run-Löschungen erfordern `confirm: true`
 2. **Filter-Pflicht**: Mindestens ein Content-Filter ODER `allow_namespace_wipe: true`
-3. **AND-Semantik**: Alle Filter müssen übereinstimmen (keine OR-Logik)
-4. **Dry-Run-Modus**: Alle Operationen unterstützen `dry_run: true`
-5. **Strukturiertes Logging**: Alle Löschvorgänge werden geloggt
-6. **Keine impliziten Löschungen**: Kein automatisches Vergessen bei Index-Rebuilds
+3. **Namespace-Pflicht bei Wipe**: `allow_namespace_wipe` erfordert `namespace` (verhindert globale Löschung)
+4. **AND-Semantik**: Alle Filter müssen übereinstimmen (keine OR-Logik)
+5. **Dry-Run-Modus**: Alle Operationen unterstützen `dry_run: true`
+6. **Strukturiertes Logging**: Alle Löschvorgänge werden geloggt
+7. **Keine impliziten Löschungen**: Kein automatisches Vergessen bei Index-Rebuilds
+8. **Defense-in-Depth**: Validierung sowohl im Handler als auch in der `forget()` Methode
 
 ## Tests
 
-26 Tests decken alle Funktionen ab:
+28 Tests decken alle Funktionen ab:
 
 - **6 Unit-Tests**: Bestehende Funktionalität
-- **11 Decay/Forget-Tests**: Neue Vergessenslogik (inkl. AND-Semantik & Safety)
-- **6 API-Tests**: HTTP-Endpunkte (inkl. Filter-Validierung)
+- **13 Decay/Forget-Tests**: Neue Vergessenslogik (inkl. AND-Semantik, Safety & Global-Wipe-Schutz)
+- **7 API-Tests**: HTTP-Endpunkte (inkl. Filter-Validierung & Global-Wipe-Prävention)
 - **3 Integration-Tests**: Bestehende Integration
 
 Alle Tests: `cargo test --package hauski-indexd`

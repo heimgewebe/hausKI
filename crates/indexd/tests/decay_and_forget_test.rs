@@ -819,3 +819,53 @@ async fn test_future_timestamp_handling() {
     assert!(results[0].score > 0.0);
     assert!(results[0].score <= 1.0);
 }
+
+/// Test defense-in-depth: forget() method itself rejects global wipe
+#[tokio::test]
+async fn test_forget_method_blocks_global_wipe() {
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    
+    // Add documents in multiple namespaces
+    for ns in &["ns1", "ns2", "ns3"] {
+        for i in 1..=2 {
+            state
+                .upsert(UpsertRequest {
+                    doc_id: format!("doc-{}", i),
+                    namespace: ns.to_string(),
+                    chunks: vec![ChunkPayload {
+                        chunk_id: Some(format!("doc-{}#0", i)),
+                        text: Some(format!("Content {} in {}", i, ns)),
+                        embedding: Vec::new(),
+                        meta: json!({}),
+                    }],
+                    meta: json!({}),
+                    source_ref: None,
+                })
+                .await;
+        }
+    }
+
+    // Attempt: allow_namespace_wipe WITHOUT namespace
+    let result = state
+        .forget(
+            ForgetFilter {
+                namespace: None, // No namespace specified
+                older_than: None,
+                source_ref_origin: None,
+                doc_id: None,
+                allow_namespace_wipe: true, // But wipe flag is set
+            },
+            false,
+        )
+        .await;
+
+    // Should be blocked: forget count must be 0
+    assert_eq!(
+        result.forgotten_count, 0,
+        "allow_namespace_wipe without namespace should be blocked"
+    );
+
+    // Verify all documents still exist
+    let stats = state.stats().await;
+    assert_eq!(stats.total_documents, 6, "All 6 documents should still exist");
+}

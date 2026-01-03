@@ -388,11 +388,25 @@ impl IndexState {
     /// - At least one content filter (older_than, source_ref_origin, doc_id) must be specified,
     ///   OR namespace must be set with allow_namespace_wipe=true
     /// - Without content filters and allow_namespace_wipe=false, no documents are forgotten
+    /// - allow_namespace_wipe requires namespace to be specified (prevents cross-namespace deletion)
     /// - This prevents accidental global or namespace-wide deletion
     pub async fn forget(&self, filter: ForgetFilter, dry_run: bool) -> ForgetResult {
         let mut store = self.inner.store.write().await;
         let mut forgotten_count = 0;
         let mut forgotten_docs = Vec::new();
+
+        // Critical safety check: allow_namespace_wipe without namespace is forbidden
+        // This prevents global deletion across all namespaces
+        if filter.allow_namespace_wipe && filter.namespace.is_none() {
+            tracing::warn!(
+                "Blocked forget operation: allow_namespace_wipe=true without namespace specified"
+            );
+            return ForgetResult {
+                forgotten_count: 0,
+                forgotten_docs: Vec::new(),
+                dry_run,
+            };
+        }
 
         // Determine which namespaces to process
         let namespaces_to_check: Vec<String> = if let Some(ref filter_ns) = filter.namespace {
@@ -677,6 +691,25 @@ async fn forget_handler(
             Json(serde_json::json!({
                 "error": "At least one content filter must be specified (older_than, source_ref_origin, doc_id), or set 'allow_namespace_wipe: true' to delete entire namespace",
                 "hint": "This safety check prevents accidental deletion of all documents"
+            })),
+        )
+            .into_response();
+    }
+
+    // Critical safety check: allow_namespace_wipe requires namespace to be specified
+    // This prevents global deletion across ALL namespaces
+    if payload.filter.allow_namespace_wipe && payload.filter.namespace.is_none() {
+        state.record(
+            Method::POST,
+            "/index/forget",
+            StatusCode::BAD_REQUEST,
+            started,
+        );
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "allow_namespace_wipe requires namespace to be specified",
+                "hint": "To prevent global deletion, namespace must be set when using allow_namespace_wipe"
             })),
         )
             .into_response();

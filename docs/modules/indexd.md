@@ -223,6 +223,9 @@ Content-Type: application/json
 **Sicherheitsgeländer:**
 - Erfordert `confirm: true` im Request-Body (nicht bei dry_run)
 - Mindestens ein Content-Filter ODER `allow_namespace_wipe: true` erforderlich
+- **KRITISCH:** `allow_namespace_wipe` erfordert `namespace` im Filter (verhindert globale Löschung)
+- Kein ungefiltertes Löschen möglich – schützt vor versehentlichem Datenverlust
+- Strukturierte Logs für jede Forget-Operation (Audit-Trail)
 - Verhindert versehentliches Löschen aller Dokumente
 - Erzeugt strukturierte Logs + Metriken
 - Dry-Run via `"dry_run": true` im Request-Body
