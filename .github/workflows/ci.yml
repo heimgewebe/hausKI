@@ -64,6 +64,16 @@ jobs:
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
           fetch-depth: 0
+      - name: Fetch main ref explicitly
+        # Explicitly fetch origin/main to ensure merge-base operations work correctly.
+        # This prevents "fatal: origin/main...HEAD: no merge base" errors in PR contexts.
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          echo "Fetched main ref successfully:"
+          git show -s --oneline origin/main
+          echo "Current HEAD:"
+          git show -s --oneline HEAD
       - name: Validate required toolchain input
         run: |
           set -euo pipefail

@@ -117,6 +117,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Fetch main ref explicitly
+        # Explicitly fetch origin/main to ensure merge-base operations work correctly.
+        # This prevents "fatal: origin/main...HEAD: no merge base" errors in PR contexts.
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main || true
+          if git rev-parse origin/main &>/dev/null; then
+            echo "Fetched main ref successfully:"
+            git show -s --oneline origin/main
+          fi
+          echo "Current HEAD:"
+          git show -s --oneline HEAD
+
       - name: Enforce guard policy
         run: |
           set -euo pipefail
