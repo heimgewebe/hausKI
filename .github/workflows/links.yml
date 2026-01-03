@@ -61,8 +61,6 @@ jobs:
             --no-progress
             --verbose
             --max-concurrency 4
-            --retry-wait-time 2
-            --max-retries 3
             --format markdown
             --output lychee/out.md
             "./**/*.md" "./**/*.html"
