@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import secrets
+
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -86,7 +88,10 @@ _latest_metrics: dict[str, Any] = {}
 
 def require_token(x_auth: str | None = Header(default=None)) -> None:
     expected = os.getenv(TOKEN_ENV)
-    if expected and x_auth != expected:
+    expected = expected.strip() if expected else None
+    x_auth = x_auth.strip() if x_auth else None
+
+    if not expected or not x_auth or not secrets.compare_digest(x_auth, expected):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid or missing x-auth token",
