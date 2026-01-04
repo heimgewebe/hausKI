@@ -53,7 +53,7 @@ jobs:
 
       - name: Check links with Lychee
         id: lychee
-        uses: lycheeverse/lychee-action@v1.10.0 # official release tag
+        uses: lycheeverse/lychee-action@v2.0.2 # official release tag
         continue-on-error: ${{ github.event_name == 'pull_request' }}
         with:
           args: >
@@ -61,9 +61,6 @@ jobs:
             --no-progress
             --verbose
             --max-concurrency 4
-            --retry-wait-time 2
-            --max-retries 3
-            --exclude-mail
             --format markdown
             --output lychee/out.md
             "./**/*.md" "./**/*.html"

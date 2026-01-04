@@ -2,13 +2,13 @@
 
 # Caching
 cache = true
-max_cache_age = "1d"
+max_cache_age = "1d"  # duration format: 1d, 2h, 30m, etc.
 cache_path = ".lycheecache"
 
 # Networking & robustness
-timeout = "10s"
+timeout = 10  # timeout in seconds
 max_retries = 2
-retry_wait_time = "2s"
+retry_wait_time = 2  # wait time in seconds between retries
 max_redirects = 5
 accept = ["200..399"]
 user_agent = "heimgewebe-lychee-ci"
