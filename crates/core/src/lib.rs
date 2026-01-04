@@ -891,7 +891,12 @@ mod tests {
             "chunks": [
                 {"chunk_id": "doc-42#0", "text": "Hallo Welt", "embedding": []}
             ],
-            "meta": {"kind": "markdown"}
+            "meta": {"kind": "markdown"},
+            "source_ref": {
+                "origin": "test",
+                "id": "test-doc-42",
+                "trust_level": "high"
+            }
         });
 
         let upsert_res = app
@@ -933,7 +938,12 @@ mod tests {
             "chunks": [
                 {"chunk_id": "ask-doc#0", "text": "Hallo Hauski", "embedding": []}
             ],
-            "meta": {"kind": "markdown"}
+            "meta": {"kind": "markdown"},
+            "source_ref": {
+                "origin": "test",
+                "id": "test-ask-doc",
+                "trust_level": "high"
+            }
         });
 
         let upsert_res = app
@@ -984,7 +994,12 @@ mod tests {
             "chunks": [
                 {"chunk_id": "ask-doc-large#0", "text": "Hallo Hauski", "embedding": []}
             ],
-            "meta": {"kind": "markdown"}
+            "meta": {"kind": "markdown"},
+            "source_ref": {
+                "origin": "test",
+                "id": "test-ask-doc-large",
+                "trust_level": "high"
+            }
         });
 
         let upsert_res = app
@@ -1029,7 +1044,12 @@ mod tests {
             "chunks": [
                 {"chunk_id": "ask-doc-min#0", "text": "Hallo Hauski", "embedding": []}
             ],
-            "meta": {"kind": "markdown"}
+            "meta": {"kind": "markdown"},
+            "source_ref": {
+                "origin": "test",
+                "id": "test-ask-doc-min",
+                "trust_level": "high"
+            }
         });
 
         let upsert_res = app
@@ -1078,7 +1098,12 @@ mod tests {
             "chunks": [
                 {"chunk_id": "metrics-demo#0", "text": "Metrics Demo", "embedding": []}
             ],
-            "meta": {"kind": "markdown"}
+            "meta": {"kind": "markdown"},
+            "source_ref": {
+                "origin": "test",
+                "id": "test-metrics-demo",
+                "trust_level": "high"
+            }
         });
 
         let _ = app

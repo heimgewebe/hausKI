@@ -1,6 +1,6 @@
 mod common;
-use common::test_source_ref;
 use chrono::{Duration, Utc};
+use common::test_source_ref;
 use hauski_indexd::{
     ChunkPayload, ForgetFilter, IndexState, PurgeStrategy, RetentionConfig, SearchRequest,
     SourceRef, UpsertRequest,
@@ -720,7 +720,7 @@ async fn test_future_timestamp_handling() {
     // age_seconds is u64, so always >= 0, but we verify it's reasonable
     // (not a huge value from negative i64 cast)
     assert!(preview.previews[0].age_seconds < 10); // Should be very fresh (< 10 seconds)
-    // Decay factor should be <= 1.0, never amplify scores
+                                                   // Decay factor should be <= 1.0, never amplify scores
     assert!(preview.previews[0].decay_factor <= 1.0);
     assert!(preview.previews[0].decay_factor > 0.0);
     // Search should also not amplify scores

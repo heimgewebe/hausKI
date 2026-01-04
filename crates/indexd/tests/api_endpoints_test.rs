@@ -1,7 +1,7 @@
 mod common;
-use common::test_source_ref;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
+use common::test_source_ref;
 use hauski_indexd::{router, IndexState, PurgeStrategy, RetentionConfig};
 use serde_json::json;
 use std::sync::Arc;
@@ -612,9 +612,8 @@ async fn test_upsert_missing_source_ref_returns_error() {
         .await
         .unwrap();
     let error: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-    
+
     assert_eq!(error.get("code").unwrap(), "missing_source_ref");
     assert!(error.get("error").is_some());
     assert!(error.get("details").is_some());
 }
-

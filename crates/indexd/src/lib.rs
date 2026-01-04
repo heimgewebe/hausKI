@@ -104,7 +104,7 @@ fn detect_injection_patterns(text: &str) -> Vec<ContentFlag> {
         "disregard",
         "forget everything",
     ];
-    
+
     for pattern in &imperative_patterns {
         if text_lower.contains(pattern) {
             flags.push(ContentFlag::ImperativeLanguage);
@@ -122,7 +122,7 @@ fn detect_injection_patterns(text: &str) -> Vec<ContentFlag> {
         "admin mode",
         "bypass",
     ];
-    
+
     for pattern in &system_patterns {
         if text_lower.contains(pattern) {
             flags.push(ContentFlag::SystemClaim);
@@ -139,7 +139,7 @@ fn detect_injection_patterns(text: &str) -> Vec<ContentFlag> {
         "assistant mode",
         "system role",
     ];
-    
+
     for pattern in &meta_patterns {
         if text_lower.contains(pattern) {
             flags.push(ContentFlag::MetaPromptMarker);
@@ -156,7 +156,7 @@ fn detect_injection_patterns(text: &str) -> Vec<ContentFlag> {
 }
 
 /// Determine if a document should be quarantined based on flags and trust level
-/// 
+///
 /// Quarantine policy:
 /// - High trust: Never auto-quarantine (only flag for visibility)
 /// - Medium trust: Quarantine only if PossiblePromptInjection flag is present
@@ -335,10 +335,10 @@ impl IndexState {
             meta,
             source_ref,
         } = payload;
-        
+
         // Enforce source_ref requirement for semantic security
         let source_ref = source_ref.ok_or_else(IndexError::missing_source_ref)?;
-        
+
         // Detect injection patterns in all chunk text
         let mut flags = Vec::new();
         for chunk in &chunks {
@@ -351,7 +351,7 @@ impl IndexState {
                 }
             }
         }
-        
+
         // Trust-gated auto-quarantine
         let mut target_namespace = normalize_namespace(&namespace);
         if should_quarantine(&flags, source_ref.trust_level) {
@@ -365,11 +365,13 @@ impl IndexState {
             );
             target_namespace = QUARANTINE_NAMESPACE.to_string();
         }
-        
+
         let mut store = self.inner.store.write().await;
-        let namespace_store = store.entry(target_namespace.clone()).or_insert_with(HashMap::new);
+        let namespace_store = store
+            .entry(target_namespace.clone())
+            .or_insert_with(HashMap::new);
         let ingested = chunks.len();
-        
+
         // Log flag detection (even if not quarantined)
         if !flags.is_empty() {
             tracing::info!(
@@ -380,7 +382,7 @@ impl IndexState {
                 "Document flagged during upsert"
             );
         }
-        
+
         namespace_store.insert(
             doc_id.clone(),
             DocumentRecord {
@@ -416,7 +418,7 @@ impl IndexState {
 
         // Get retention config for namespace (if any)
         let retention_config = retention_configs.get(namespace.as_ref());
-        
+
         // Prepare filter criteria (use typed enums, not strings)
         let exclude_flags_set = request.effective_exclude_flags();
         let min_trust = request.min_trust_level;
@@ -424,7 +426,7 @@ impl IndexState {
 
         let mut matches: Vec<SearchMatch> = Vec::new();
         let mut filtered_count = 0;
-        
+
         for doc in namespace_store.values() {
             // Apply trust level filter
             if let Some(min_trust_level) = min_trust {
@@ -435,7 +437,7 @@ impl IndexState {
                     }
                 }
             }
-            
+
             // Apply origin filter
             if !exclude_origins_set.is_empty() {
                 if let Some(ref source_ref) = doc.source_ref {
@@ -445,16 +447,17 @@ impl IndexState {
                     }
                 }
             }
-            
+
             // Apply flag filter (now using enum comparison)
-            let has_excluded_flag = doc.flags.iter().any(|flag| {
-                exclude_flags_set.contains(flag)
-            });
+            let has_excluded_flag = doc
+                .flags
+                .iter()
+                .any(|flag| exclude_flags_set.contains(flag));
             if has_excluded_flag {
                 filtered_count += 1;
                 continue;
             }
-            
+
             for (idx, chunk) in doc.chunks.iter().enumerate() {
                 let Some(text) = chunk.text.as_ref() else {
                     continue;
@@ -496,7 +499,7 @@ impl IndexState {
                 });
             }
         }
-        
+
         // Log filter statistics
         if filtered_count > 0 {
             tracing::debug!(
@@ -841,7 +844,7 @@ async fn upsert_handler(
     Json(payload): Json<UpsertRequest>,
 ) -> Response {
     let started = Instant::now();
-    
+
     match state.upsert(payload).await {
         Ok(ingested) => {
             state.record(Method::POST, "/index/upsert", StatusCode::OK, started);
@@ -855,7 +858,12 @@ async fn upsert_handler(
                 .into_response()
         }
         Err(error) => {
-            state.record(Method::POST, "/index/upsert", StatusCode::UNPROCESSABLE_ENTITY, started);
+            state.record(
+                Method::POST,
+                "/index/upsert",
+                StatusCode::UNPROCESSABLE_ENTITY,
+                started,
+            );
             (StatusCode::UNPROCESSABLE_ENTITY, Json(error)).into_response()
         }
     }
@@ -1067,7 +1075,7 @@ impl SearchRequest {
             exclude_origins: None,
         }
     }
-    
+
     /// Get the effective exclude_flags with default policy applied
     fn effective_exclude_flags(&self) -> Vec<ContentFlag> {
         match &self.exclude_flags {
@@ -1223,7 +1231,7 @@ mod tests {
     use axum::http::Request;
     use serde_json::json;
     use tower::ServiceExt;
-    
+
     // Helper to create test source refs
     fn test_source_ref(origin: &str, id: &str) -> SourceRef {
         SourceRef {

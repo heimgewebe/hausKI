@@ -1,7 +1,9 @@
 mod common;
 use common::test_source_ref;
 
-use hauski_indexd::{ChunkPayload, IndexState, SearchRequest, SourceRef, TrustLevel, UpsertRequest};
+use hauski_indexd::{
+    ChunkPayload, IndexState, SearchRequest, SourceRef, TrustLevel, UpsertRequest,
+};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -65,7 +67,10 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"event_type": "process_start", "id": i}),
                 }],
                 meta: json!({"severity": "info"}),
-                source_ref: Some(test_source_ref("chronik", &format!("/var/log/events/{}.log", i))),
+                source_ref: Some(test_source_ref(
+                    "chronik",
+                    &format!("/var/log/events/{}.log", i),
+                )),
             })
             .await;
     }

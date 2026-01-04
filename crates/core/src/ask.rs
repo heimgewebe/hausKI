@@ -109,6 +109,9 @@ pub async fn ask_handler(
         query: q.clone(),
         k: Some(limit),
         namespace: Some(ns.clone()),
+        exclude_flags: None,
+        min_trust_level: None,
+        exclude_origins: None,
     };
 
     let matches = state.index().search(&request).await;

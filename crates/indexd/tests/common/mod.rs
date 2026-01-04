@@ -14,7 +14,11 @@ pub fn test_source_ref(origin: &str, id: impl Into<String>) -> SourceRef {
 }
 
 /// Helper to create a basic search request for testing (disables security filtering)
-pub fn test_search_request(query: impl Into<String>, k: Option<usize>, namespace: Option<String>) -> SearchRequest {
+pub fn test_search_request(
+    query: impl Into<String>,
+    k: Option<usize>,
+    namespace: Option<String>,
+) -> SearchRequest {
     SearchRequest {
         query: query.into(),
         k,
