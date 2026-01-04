@@ -574,3 +574,47 @@ async fn test_forget_api_prevents_global_wipe() {
     // Should have 6 total documents (3 namespaces × 2 docs each)
     assert_eq!(stats.get("total_documents").unwrap(), 6);
 }
+
+/// Test that upsert without source_ref returns 422 error instead of panicking
+#[tokio::test]
+async fn test_upsert_missing_source_ref_returns_error() {
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let app = router().with_state(state.clone());
+
+    // Try to upsert without source_ref
+    let upsert_payload = json!({
+        "doc_id": "test-doc",
+        "namespace": "test",
+        "chunks": [
+            {"chunk_id": "test-doc#0", "text": "Test content", "embedding": []}
+        ],
+        "meta": {}
+        // Missing source_ref
+    });
+
+    let res = app
+        .oneshot(
+            Request::builder()
+                .uri("/upsert")
+                .method("POST")
+                .header("content-type", "application/json")
+                .body(Body::from(upsert_payload.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Should return 422 Unprocessable Entity
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    // Check error response structure
+    let body_bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let error: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+    
+    assert_eq!(error.get("code").unwrap(), "missing_source_ref");
+    assert!(error.get("error").is_some());
+    assert!(error.get("details").is_some());
+}
+

@@ -43,7 +43,17 @@ pub enum TrustLevel {
 - `user`, `external`, `tool` → Low
 - Andere → Medium
 
-**Wichtig:** `source_ref` ist ab sofort Pflichtfeld. Einträge ohne `source_ref` werden beim Upsert abgelehnt (panic).
+**Wichtig:** `source_ref` ist ab sofort Pflichtfeld. Einträge ohne `source_ref` werden beim Upsert mit HTTP 422 (Unprocessable Entity) und strukturiertem Fehler abgelehnt:
+
+```json
+{
+  "error": "source_ref is required for all index entries",
+  "code": "missing_source_ref",
+  "details": {
+    "hint": "Every document must have a SourceRef with origin, id, and trust_level for semantic provenance tracking"
+  }
+}
+```
 
 ### 2. Content Flags (Markierung, nicht Blockade)
 
@@ -81,24 +91,32 @@ pub enum ContentFlag {
 - Ein Pattern → spezifischer Flag
 - Zwei oder mehr Flags → zusätzlich `PossiblePromptInjection`
 
-### 3. Quarantäne-Namespace
+### 3. Quarantäne-Namespace (Trust-Gated)
 
-Dokumente mit mehrfachen Injection-Flags oder dem `PossiblePromptInjection`-Flag werden **automatisch** in den `quarantine`-Namespace verschoben:
+Dokumente werden basierend auf **Trust-Level und Flags** automatisch in den `quarantine`-Namespace verschoben:
 
 ```rust
 const QUARANTINE_NAMESPACE: &str = "quarantine";
 ```
 
+**Quarantäne-Policy:**
+- **High Trust (z.B. chronik)**: Nie auto-quarantiniert, nur geflaggt für Sichtbarkeit
+- **Medium Trust (z.B. osctx)**: Quarantiniert nur bei `PossiblePromptInjection`-Flag
+- **Low Trust (z.B. external, user)**: Quarantiniert bei ≥2 Flags ODER `PossiblePromptInjection`-Flag
+
 **Verhalten:**
-- Original-Namespace im Request wird ignoriert
+- Original-Namespace im Request wird ggf. überschrieben
 - Dokument landet in `quarantine`
-- Warnung wird geloggt
+- Warnung wird mit Trust-Level geloggt
 - Dokument bleibt abrufbar, aber niemals entscheidungsrelevant
 
 **Beispiel-Log:**
 ```
-WARN Auto-quarantining document with multiple injection flags
-  doc_id="suspicious-doc" flags=[ImperativeLanguage, SystemClaim, PossiblePromptInjection]
+WARN Auto-quarantining document based on trust level and injection flags
+  doc_id="suspicious-doc" 
+  flags=[ImperativeLanguage, SystemClaim, PossiblePromptInjection]
+  trust_level=Low
+  origin="external"
   original_namespace="production"
 ```
 
@@ -112,8 +130,8 @@ pub struct SearchRequest {
     pub k: Option<usize>,
     pub namespace: Option<String>,
     
-    // Neu: Sicherheitsfilter
-    pub exclude_flags: Option<Vec<String>>,       // Default: ["possible_prompt_injection"]
+    // Neu: Sicherheitsfilter (typisiert, nicht string-basiert)
+    pub exclude_flags: Option<Vec<ContentFlag>>,  // Default: [PossiblePromptInjection]
     pub min_trust_level: Option<TrustLevel>,      // Mindest-Vertrauensstufe
     pub exclude_origins: Option<Vec<String>>,     // Ausgeschlossene Herkünfte
 }
@@ -121,10 +139,13 @@ pub struct SearchRequest {
 
 **Standard-Policy (default):**
 ```rust
-exclude_flags: None  // → filtert automatisch "possible_prompt_injection"
+exclude_flags: None  // → filtert automatisch PossiblePromptInjection
 ```
 
 **Explizite Deaktivierung:**
+```rust
+exclude_flags: Some(vec![])  // Leerer Vec = keine Filterung (für Debug/Audit)
+```
 ```rust
 exclude_flags: Some(vec![])  // Leerer Vec = keine Filterung
 ```
@@ -253,31 +274,45 @@ Dies ermöglicht nachgelagerten Systemen (Policy-Engine, Intent-Resolver) inform
 }
 ```
 
-**Erweitert:**
+**Erweitert (mit typisierten Flags):**
 ```json
 {
   "query": "sensitive data",
   "k": 10,
   "namespace": "production",
-  "exclude_flags": [],  // Explizit: keine Filterung
+  "exclude_flags": ["imperative_language", "system_claim"],  // snake_case enum names
   "min_trust_level": "high",
   "exclude_origins": ["external", "user"]
 }
 ```
 
+**Fehlerbehandlung:**
+Upsert ohne `source_ref` gibt HTTP 422:
+```json
+{
+  "error": "source_ref is required for all index entries",
+  "code": "missing_source_ref",
+  "details": {
+    "hint": "Every document must have a SourceRef with origin, id, and trust_level for semantic provenance tracking"
+  }
+}
+```
+
 ## Sicherheitsgarantien
 
-1. **Kein Eintrag ohne source_ref** → Semantische Herkunft ist immer nachvollziehbar
-2. **Automatische Flag-Detection** → Verdächtige Muster werden markiert
-3. **Default-Policy schützt** → Injection-Artefakte werden standardmäßig gefiltert
-4. **Quarantäne isoliert** → Gefährliche Inhalte werden automatisch separiert
-5. **Explizite Übersteuerung möglich** → Für Debug/Audit-Zwecke
-6. **Keine Löschung** → Markierung statt Zensur (Resilienz durch Wissen)
-7. **Strukturiertes Logging** → Alle Sicherheits-Events sind nachvollziehbar
+1. **Kein Eintrag ohne source_ref** → Semantische Herkunft ist immer nachvollziehbar (HTTP 422 bei Fehlen)
+2. **Kein System-Crash bei ungültigen Daten** → Strukturierte Fehler statt Panics
+3. **Trust-gated Quarantine** → High-Trust-Quellen werden nie automatisch quarantiniert
+4. **Automatische Flag-Detection** → Verdächtige Muster werden markiert
+5. **Default-Policy schützt** → Injection-Artefakte werden standardmäßig gefiltert
+6. **Typisierte Flags** → Enum-basiert, keine String-Drift möglich
+7. **Explizite Übersteuerung möglich** → Für Debug/Audit-Zwecke
+8. **Keine Löschung** → Markierung statt Zensur (Resilienz durch Wissen)
+9. **Strukturiertes Logging** → Alle Sicherheits-Events mit Trust-Level sind nachvollziehbar
 
 ## Tests
 
-**38 Tests insgesamt**, davon 9 neue Contamination-Tests:
+**41 Tests insgesamt** (+3 neue), davon 11 Contamination-Tests:
 
 - `test_prompt_injection_detection_imperative_language`
 - `test_prompt_injection_detection_system_claim`
@@ -287,6 +322,12 @@ Dies ermöglicht nachgelagerten Systemen (Policy-Engine, Intent-Resolver) inform
 - `test_default_policy_filters_prompt_injection`
 - `test_trust_level_filtering`
 - `test_origin_filtering`
+- `test_normal_content_not_flagged`
+- `test_high_trust_not_quarantined` **(NEU)**
+- `test_medium_trust_quarantined_only_with_possible_prompt_injection` **(NEU)**
+
+**Neue API-Tests:**
+- `test_upsert_missing_source_ref_returns_error` - Verifiziert 422 statt Panic
 - `test_normal_content_not_flagged`
 
 **Alle Tests bestehen.**

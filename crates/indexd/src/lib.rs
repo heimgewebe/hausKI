@@ -18,6 +18,27 @@ const WORD_MATCH_SCORE_INCREMENT: f32 = 0.1;
 
 pub type MetricsRecorder = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
 
+/// Error type for index operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndexError {
+    pub error: String,
+    pub code: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<Value>,
+}
+
+impl IndexError {
+    pub fn missing_source_ref() -> Self {
+        Self {
+            error: "source_ref is required for all index entries".into(),
+            code: "missing_source_ref".into(),
+            details: Some(serde_json::json!({
+                "hint": "Every document must have a SourceRef with origin, id, and trust_level for semantic provenance tracking"
+            })),
+        }
+    }
+}
+
 /// Trust level for document sources - indicates how much to trust this content
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
@@ -132,6 +153,22 @@ fn detect_injection_patterns(text: &str) -> Vec<ContentFlag> {
     }
 
     flags
+}
+
+/// Determine if a document should be quarantined based on flags and trust level
+/// 
+/// Quarantine policy:
+/// - High trust: Never auto-quarantine (only flag for visibility)
+/// - Medium trust: Quarantine only if PossiblePromptInjection flag is present
+/// - Low trust: Quarantine if 2+ flags OR PossiblePromptInjection flag
+fn should_quarantine(flags: &[ContentFlag], trust_level: TrustLevel) -> bool {
+    match trust_level {
+        TrustLevel::High => false, // High trust sources are never auto-quarantined
+        TrustLevel::Medium => flags.contains(&ContentFlag::PossiblePromptInjection),
+        TrustLevel::Low => {
+            flags.len() >= 2 || flags.contains(&ContentFlag::PossiblePromptInjection)
+        }
+    }
 }
 
 /// Structured reference to document source for provenance tracking.
@@ -290,7 +327,7 @@ impl IndexState {
         (self.inner.metrics)(method, path, status, started);
     }
 
-    pub async fn upsert(&self, payload: UpsertRequest) -> usize {
+    pub async fn upsert(&self, payload: UpsertRequest) -> Result<usize, IndexError> {
         let UpsertRequest {
             doc_id,
             namespace,
@@ -300,7 +337,7 @@ impl IndexState {
         } = payload;
         
         // Enforce source_ref requirement for semantic security
-        let source_ref = source_ref.expect("source_ref is mandatory for all index entries");
+        let source_ref = source_ref.ok_or_else(IndexError::missing_source_ref)?;
         
         // Detect injection patterns in all chunk text
         let mut flags = Vec::new();
@@ -315,14 +352,16 @@ impl IndexState {
             }
         }
         
-        // Auto-quarantine if multiple injection flags detected
+        // Trust-gated auto-quarantine
         let mut target_namespace = normalize_namespace(&namespace);
-        if flags.len() >= 2 || flags.contains(&ContentFlag::PossiblePromptInjection) {
+        if should_quarantine(&flags, source_ref.trust_level) {
             tracing::warn!(
                 doc_id = %doc_id,
                 flags = ?flags,
+                trust_level = ?source_ref.trust_level,
+                origin = %source_ref.origin,
                 original_namespace = %target_namespace,
-                "Auto-quarantining document with multiple injection flags"
+                "Auto-quarantining document based on trust level and injection flags"
             );
             target_namespace = QUARANTINE_NAMESPACE.to_string();
         }
@@ -331,12 +370,13 @@ impl IndexState {
         let namespace_store = store.entry(target_namespace.clone()).or_insert_with(HashMap::new);
         let ingested = chunks.len();
         
-        // Log flag detection
+        // Log flag detection (even if not quarantined)
         if !flags.is_empty() {
             tracing::info!(
                 doc_id = %doc_id,
                 namespace = %target_namespace,
                 flags = ?flags,
+                trust_level = ?source_ref.trust_level,
                 "Document flagged during upsert"
             );
         }
@@ -353,7 +393,7 @@ impl IndexState {
                 flags,
             },
         );
-        ingested
+        Ok(ingested)
     }
 
     pub async fn search(&self, request: &SearchRequest) -> Vec<SearchMatch> {
@@ -377,11 +417,8 @@ impl IndexState {
         // Get retention config for namespace (if any)
         let retention_config = retention_configs.get(namespace.as_ref());
         
-        // Prepare filter criteria (default policy: exclude possible_prompt_injection)
-        let exclude_flags_set: Vec<String> = request
-            .exclude_flags
-            .clone()
-            .unwrap_or_else(|| vec!["possible_prompt_injection".to_string()]);
+        // Prepare filter criteria (use typed enums, not strings)
+        let exclude_flags_set = request.effective_exclude_flags();
         let min_trust = request.min_trust_level;
         let exclude_origins_set: Vec<String> = request.exclude_origins.clone().unwrap_or_default();
 
@@ -409,9 +446,9 @@ impl IndexState {
                 }
             }
             
-            // Apply flag filter
+            // Apply flag filter (now using enum comparison)
             let has_excluded_flag = doc.flags.iter().any(|flag| {
-                exclude_flags_set.contains(&flag.to_string())
+                exclude_flags_set.contains(flag)
             });
             if has_excluded_flag {
                 filtered_count += 1;
@@ -804,16 +841,24 @@ async fn upsert_handler(
     Json(payload): Json<UpsertRequest>,
 ) -> Response {
     let started = Instant::now();
-    let ingested = state.upsert(payload).await;
-    state.record(Method::POST, "/index/upsert", StatusCode::OK, started);
-    (
-        StatusCode::OK,
-        Json(UpsertResponse {
-            status: "queued".into(),
-            ingested,
-        }),
-    )
-        .into_response()
+    
+    match state.upsert(payload).await {
+        Ok(ingested) => {
+            state.record(Method::POST, "/index/upsert", StatusCode::OK, started);
+            (
+                StatusCode::OK,
+                Json(UpsertResponse {
+                    status: "queued".into(),
+                    ingested,
+                }),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            state.record(Method::POST, "/index/upsert", StatusCode::UNPROCESSABLE_ENTITY, started);
+            (StatusCode::UNPROCESSABLE_ENTITY, Json(error)).into_response()
+        }
+    }
 }
 
 async fn search_handler(
@@ -996,9 +1041,11 @@ pub struct SearchRequest {
     pub k: Option<usize>,
     #[serde(default)]
     pub namespace: Option<String>,
-    /// Exclude documents with any of these flags (default: filters prompt_injection in decision contexts)
+    /// Exclude documents with any of these flags
+    /// Default (None): filters PossiblePromptInjection for safety
+    /// Empty vec (Some(vec![])): explicitly no filtering
     #[serde(default)]
-    pub exclude_flags: Option<Vec<String>>,
+    pub exclude_flags: Option<Vec<ContentFlag>>,
     /// Minimum trust level required (Low, Medium, High)
     #[serde(default)]
     pub min_trust_level: Option<TrustLevel>,
@@ -1018,6 +1065,14 @@ impl SearchRequest {
             exclude_flags: Some(vec![]), // Empty = no filtering
             min_trust_level: None,
             exclude_origins: None,
+        }
+    }
+    
+    /// Get the effective exclude_flags with default policy applied
+    fn effective_exclude_flags(&self) -> Vec<ContentFlag> {
+        match &self.exclude_flags {
+            None => vec![ContentFlag::PossiblePromptInjection], // Default policy
+            Some(flags) => flags.clone(),
         }
     }
 }
