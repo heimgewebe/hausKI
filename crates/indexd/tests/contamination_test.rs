@@ -1,7 +1,7 @@
 //! Tests for semantic contamination detection and prompt-injection resilience
 
 mod common;
-use common::{test_source_ref, test_search_request};
+use common::test_source_ref;
 
 use hauski_indexd::{ChunkPayload, ContentFlag, IndexState, SearchRequest, SourceRef, TrustLevel, UpsertRequest};
 use serde_json::json;

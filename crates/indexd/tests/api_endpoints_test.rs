@@ -1,5 +1,5 @@
 mod common;
-use common::{test_source_ref, test_search_request};
+use common::test_source_ref;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use hauski_indexd::{router, IndexState, PurgeStrategy, RetentionConfig};

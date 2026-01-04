@@ -146,9 +146,6 @@ exclude_flags: None  // → filtert automatisch PossiblePromptInjection
 ```rust
 exclude_flags: Some(vec![])  // Leerer Vec = keine Filterung (für Debug/Audit)
 ```
-```rust
-exclude_flags: Some(vec![])  // Leerer Vec = keine Filterung
-```
 
 **Beispiele:**
 
