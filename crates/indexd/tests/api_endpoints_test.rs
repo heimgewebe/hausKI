@@ -171,7 +171,8 @@ async fn test_decay_preview_api_endpoint() {
                 meta: json!({}),
                 source_ref: Some(test_source_ref("chronik", "test-doc")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
     }
 
     let app = router().with_state(state.clone());
@@ -225,7 +226,8 @@ async fn test_forget_dry_run_api() {
                 meta: json!({}),
                 source_ref: Some(test_source_ref("chronik", "test-doc")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
     }
 
     let app = router().with_state(state.clone());
@@ -316,7 +318,8 @@ async fn test_search_with_decay_applied() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "test-doc")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     let app = router().with_state(state.clone());
 
@@ -409,7 +412,8 @@ async fn test_forget_api_prevents_unfiltered_deletion() {
                 meta: json!({}),
                 source_ref: Some(test_source_ref("chronik", "test-doc")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
     }
 
     let app = router().with_state(state.clone());
