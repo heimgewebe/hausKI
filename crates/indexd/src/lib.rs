@@ -1309,7 +1309,8 @@ mod tests {
                 meta: json!({"doc": "rust"}),
                 source_ref: Some(test_source_ref("code", "test_file.rs")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
 
         state
             .upsert(UpsertRequest {
@@ -1324,7 +1325,8 @@ mod tests {
                 meta: json!({"doc": "cooking"}),
                 source_ref: Some(test_source_ref("user", "recipe-book")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
 
         let results = state
             .search(&SearchRequest {
@@ -1359,7 +1361,8 @@ mod tests {
                 meta: json!({"doc": "trim"}),
                 source_ref: Some(test_source_ref("chronik", "trim-test")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
 
         let results = state
             .search(&SearchRequest {
@@ -1407,7 +1410,8 @@ mod tests {
                 meta: json!({"doc": "empty"}),
                 source_ref: Some(test_source_ref("chronik", "empty-test")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
 
         let results = state
             .search(&SearchRequest {
@@ -1464,7 +1468,8 @@ mod tests {
                 meta: json!({}),
                 source_ref: Some(test_source_ref("chronik", "doc-1")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
 
         state
             .upsert(UpsertRequest {
@@ -1479,7 +1484,8 @@ mod tests {
                 meta: json!({}),
                 source_ref: Some(test_source_ref("chronik", "doc-2")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
 
         let stats = state.stats().await;
         assert_eq!(stats.total_documents, 2);
@@ -1506,7 +1512,8 @@ mod tests {
                 meta: json!({}),
                 source_ref: Some(test_source_ref("code", "rust-doc")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
 
         state
             .upsert(UpsertRequest {
@@ -1521,7 +1528,8 @@ mod tests {
                 meta: json!({}),
                 source_ref: Some(test_source_ref("code", "rust-guide")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
 
         state
             .upsert(UpsertRequest {
@@ -1536,7 +1544,8 @@ mod tests {
                 meta: json!({}),
                 source_ref: Some(test_source_ref("code", "python-doc")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
 
         let related = state
             .related("doc-rust".into(), Some(5), Some("default".into()))
