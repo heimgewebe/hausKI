@@ -3,7 +3,7 @@ use chrono::{Duration, Utc};
 use common::test_source_ref;
 use hauski_indexd::{
     ChunkPayload, ForgetFilter, IndexState, PurgeStrategy, RetentionConfig, SearchRequest,
-    SourceRef, UpsertRequest,
+    UpsertRequest,
 };
 use serde_json::json;
 use std::sync::Arc;

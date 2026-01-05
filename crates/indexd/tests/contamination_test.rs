@@ -4,7 +4,7 @@ mod common;
 use common::test_source_ref;
 
 use hauski_indexd::{
-    ChunkPayload, ContentFlag, IndexState, SearchRequest, SourceRef, TrustLevel, UpsertRequest,
+    ChunkPayload, ContentFlag, IndexState, SearchRequest, TrustLevel, UpsertRequest,
 };
 use serde_json::json;
 use std::sync::Arc;
