@@ -14,14 +14,14 @@ just py-fmt        # Ruff-Formatter ausführen
 Weitere Einstiegspunkte:
 
 - [README](https://github.com/heimgewebe/hausKI/blob/main/README.md) – Gesamtüberblick, Setup und Devcontainer-Workflows
-- [hauski-stack.md](./hauski-stack.md) – Tech-Stack, Architekturrollen und Roadmap
-- [hauski-skizze.md](./hauski-skizze.md) – visuelle Skizze der Systemkomponenten
+<!-- - [hauski-stack.md](./hauski-stack.md) – Tech-Stack, Architekturrollen und Roadmap -->
+<!-- - [hauski-skizze.md](./hauski-skizze.md) – visuelle Skizze der Systemkomponenten -->
 
 ## Inhaltsverzeichnis
 
 | Bereich | Beschreibung |
 | --- | --- |
-| [Architektur](./hauski-stack.md) | Stack-Entscheidungen, Modulzuschnitt und Budgets |
+| Architektur <!-- (./hauski-stack.md) --> | Stack-Entscheidungen, Modulzuschnitt und Budgets |
 | [Module](modules/index.md) | Fokusseiten zu Kern-Crates wie `core`, `memory` und `audio` |
 | [Runbooks](runbooks/index.md) | Schritt-für-Schritt-Anleitungen für Setup und Betrieb |
 | [semantAH](semantah.md) | Deep Dive in Embeddings, KPIs und Deploy |

@@ -6,8 +6,8 @@ Dieses Dokument beschreibt, wie `hausKI` im Heimgewebe-Organismus arbeiten soll:
 - welche Contracts es respektiert,
 - wie Entscheidungen gefällt und protokolliert werden.
 
-Es baut auf dem Organismus-Dokument im Repository `heimgewebe/metarepo` auf
-(`docs/heimgewebe-organismus.md` im Metarepo).
+Es baut auf dem Organismus-Dokument im Repository `heimgewebe/metarepo` auf.
+<!-- (`docs/heimgewebe-organismus.md` im Metarepo). -->
 
 ---
 

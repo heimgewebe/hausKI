@@ -534,8 +534,8 @@ Für eine dauerhafte Installation kann `hauski` als `systemd`-Dienst konfigurier
 
 ## Weiterführende Dokumente
 - [`docs/ist-stand-vs-roadmap.md`](docs/ist-stand-vs-roadmap.md) – **Implementierungsstatus**: Übersicht über alle Features mit klarer Trennung zwischen Ist-Stand (✅) und Roadmap (🔮).
-- [`docs/hauski-skizze.md`](docs/hauski-skizze.md) – Vision, Funktionsumfang, Performance-Budgets, Security-Ansatz (Roadmap-fokussiert).
-- [`docs/hauski-stack.md`](docs/hauski-stack.md) – Technologiewahl, Tooling, CI-Strategie und Testpyramide (inkl. Status-Marker).
+<!-- - [`docs/hauski-skizze.md`](docs/hauski-skizze.md) – Vision, Funktionsumfang, Performance-Budgets, Security-Ansatz (Roadmap-fokussiert). -->
+<!-- - [`docs/hauski-stack.md`](docs/hauski-stack.md) – Technologiewahl, Tooling, CI-Strategie und Testpyramide (inkl. Status-Marker). -->
 - [`docs/inconsistencies.md`](docs/inconsistencies.md) – Dokumentierte Abweichungen zwischen Architektur-Dokumenten und aktueller Implementierung.
 - [`docs/vision/multi-agent-rag.md`](docs/vision/multi-agent-rag.md) – Orchestrierung der spezialisierten Agenten inkl. Contracts.
   Einstieg über `just agents.sync` (Template spiegeln) und `just agents.run` (Dry-Run).
@@ -555,8 +555,8 @@ Ohne aktualisiertes `uv.lock` bricht CI mit einem klaren Hinweis ab.
 Dieses Repository ist Teil des **Heimgewebe-Organismus**.
 
 Die übergeordnete Architektur, Achsen, Rollen und Contracts sind zentral beschrieben im  
-👉 [`metarepo/docs/heimgewebe-organismus.md`](https://github.com/heimgewebe/metarepo/blob/main/docs/heimgewebe-organismus.md)  
-👉 [`metarepo/docs/heimgewebe-zielbild.md`](https://github.com/heimgewebe/metarepo/blob/main/docs/heimgewebe-zielbild.md).
+<!-- 👉 [`metarepo/docs/heimgewebe-organismus.md`](https://github.com/heimgewebe/metarepo/blob/main/docs/heimgewebe-organismus.md) -->
+<!-- 👉 [`metarepo/docs/heimgewebe-zielbild.md`](https://github.com/heimgewebe/metarepo/blob/main/docs/heimgewebe-zielbild.md). -->
 
 Alle Rollen-Definitionen, Datenflüsse und Contract-Zuordnungen dieses Repos
 sind dort verankert.
