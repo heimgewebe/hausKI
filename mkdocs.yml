@@ -16,8 +16,8 @@ theme:
 nav:
   - Start: index.md
   - Architektur:
-      - Vision: hauski-skizze.md
-      - Stack: hauski-stack.md
+      # - Vision: hauski-skizze.md
+      # - Stack: hauski-stack.md
       - Status: ist-stand-vs-roadmap.md
       - Inkonsistenzen: inconsistencies.md
       - Ambient Assistant: ambient-assistant.md

@@ -10,8 +10,8 @@ https://github.com/heimgewebe/hausKI/actions/workflows/coverage.yml?query=branch
 https://github.com/heimgewebe/hausKI/actions/workflows/security.yml?query=branch%3Amain
 
 # Metarepo links may not be publicly accessible yet
-https://github.com/heimgewebe/metarepo/blob/main/docs/heimgewebe-organismus.md
-https://github.com/heimgewebe/metarepo/blob/main/docs/heimgewebe-zielbild.md
+# https://github.com/heimgewebe/metarepo/blob/main/docs/heimgewebe-organismus.md
+# https://github.com/heimgewebe/metarepo/blob/main/docs/heimgewebe-zielbild.md
 
 # External services that may be rate-limited or have connectivity issues in CI
 ^https://img\.shields\.io/.*

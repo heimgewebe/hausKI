@@ -284,6 +284,6 @@ Die folgenden Crates existieren **nicht** unter `crates/`:
 ## Referenzen
 
 - [`docs/inconsistencies.md`](./inconsistencies.md) – Detaillierte Analyse der Abweichungen
-- [`hauski-skizze.md`](./hauski-skizze.md) – Architektur-Vision (Roadmap-fokussiert)
-- [`hauski-stack.md`](./hauski-stack.md) – Technologie-Stack (Mix aus Ist/Roadmap)
+<!-- - [`hauski-skizze.md`](./hauski-skizze.md) – Architektur-Vision (Roadmap-fokussiert) -->
+<!-- - [`hauski-stack.md`](./hauski-stack.md) – Technologie-Stack (Mix aus Ist/Roadmap) -->
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) – Beitragsrichtlinien und DoD
