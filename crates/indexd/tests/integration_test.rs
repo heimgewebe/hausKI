@@ -30,7 +30,8 @@ async fn test_fixture_corpus_indexing_and_search() {
                 meta: json!({"language": "rust"}),
                 source_ref: Some(test_source_ref("docs", &format!("rust-{}.md", i))),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
     }
 
     // Fixture 6-10: Python scripting topics
@@ -48,7 +49,8 @@ async fn test_fixture_corpus_indexing_and_search() {
                 meta: json!({"language": "python"}),
                 source_ref: Some(test_source_ref("docs", &format!("python-{}.md", i))),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
     }
 
     // Fixture 11-15: System events (chronik namespace)
@@ -72,7 +74,8 @@ async fn test_fixture_corpus_indexing_and_search() {
                     &format!("/var/log/events/{}.log", i),
                 )),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
     }
 
     // Fixture 16-20: Documentation snippets
@@ -90,7 +93,8 @@ async fn test_fixture_corpus_indexing_and_search() {
                 meta: json!({"category": "tutorial"}),
                 source_ref: Some(test_source_ref("docs", &format!("page-{}.md", i))),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
     }
 
     // Test 1: Search for Rust in code namespace
@@ -175,7 +179,8 @@ async fn test_namespace_isolation() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "test-doc")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     state
         .upsert(UpsertRequest {
@@ -190,7 +195,8 @@ async fn test_namespace_isolation() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "test-doc")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     // Search in ns1 should only return ns1 results
     let ns1_results = state
@@ -240,7 +246,8 @@ async fn test_source_ref_and_ingested_at_populated() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "event-2024-01-01")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     let results = state
         .search(&SearchRequest {

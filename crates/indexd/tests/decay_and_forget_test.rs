@@ -39,7 +39,8 @@ async fn test_time_decay_reduces_scores() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "test-event")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     // Search immediately - decay should be ~1.0 (no significant time passed)
     let results = state
         .search(&SearchRequest {
@@ -86,7 +87,8 @@ async fn test_decay_preview() {
                 meta: json!({}),
                 source_ref: Some(test_source_ref("chronik", "test-event")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
     }
     // Get decay preview
     let preview = state.preview_decay(Some("test".into())).await;
@@ -117,7 +119,8 @@ async fn test_forget_by_namespace() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "test-event")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     state
         .upsert(UpsertRequest {
             doc_id: "forget-doc".into(),
@@ -131,7 +134,8 @@ async fn test_forget_by_namespace() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "test-event")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     // Dry-run forget
     let dry_result = state
         .forget(
@@ -219,7 +223,8 @@ async fn test_forget_by_source_ref_origin() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "event-123")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     state
         .upsert(UpsertRequest {
             doc_id: "code-doc".into(),
@@ -233,7 +238,8 @@ async fn test_forget_by_source_ref_origin() {
             meta: json!({}),
             source_ref: Some(test_source_ref("code", "main.rs")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     // Forget only chronik documents
     let result = state
         .forget(
@@ -281,7 +287,8 @@ async fn test_forget_older_than() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "test-event")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     // Try to forget documents older than 1 day ago (should find nothing)
     let cutoff = Utc::now() - Duration::days(1);
     let result = state
@@ -334,7 +341,8 @@ async fn test_forget_by_doc_id() {
                 meta: json!({}),
                 source_ref: Some(test_source_ref("chronik", "test-event")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
     }
     // Forget only doc-2
     let result = state
@@ -442,7 +450,8 @@ async fn test_decay_calculation_deterministic() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "test-event")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     // Get preview twice
     let preview1 = state.preview_decay(Some("test".into())).await;
     let preview2 = state.preview_decay(Some("test".into())).await;
@@ -484,7 +493,8 @@ async fn test_decay_affects_search_ranking() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "test-event")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     // Get initial score
     let results1 = state
         .search(&SearchRequest {
@@ -551,7 +561,8 @@ async fn test_forget_uses_and_semantics() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "event-old")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     // Doc 2: old, from code (different origin)
     state
         .upsert(UpsertRequest {
@@ -566,7 +577,8 @@ async fn test_forget_uses_and_semantics() {
             meta: json!({}),
             source_ref: Some(test_source_ref("code", "file.rs")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     // Doc 3: recent, from chronik
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     state
@@ -582,7 +594,8 @@ async fn test_forget_uses_and_semantics() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "event-new")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     // Test: Forget old AND chronik documents (AND semantics)
     let cutoff = Utc::now() - Duration::milliseconds(5);
     let result = state
@@ -640,7 +653,8 @@ async fn test_namespace_wipe_requires_explicit_flag() {
                 meta: json!({}),
                 source_ref: Some(test_source_ref("chronik", "test-event")),
             })
-            .await;
+            .await
+            .expect("upsert should succeed");
     }
     // Try to forget namespace without explicit flag (should delete nothing)
     let result = state
@@ -712,7 +726,8 @@ async fn test_future_timestamp_handling() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "test-event")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
     // Get decay preview
     let preview = state.preview_decay(Some("test".into())).await;
     assert_eq!(preview.total_documents, 1);
@@ -759,7 +774,8 @@ async fn test_forget_method_blocks_global_wipe() {
                     meta: json!({}),
                     source_ref: Some(test_source_ref("chronik", "test-event")),
                 })
-                .await;
+                .await
+                .expect("upsert should succeed");
         }
     }
     // Attempt: allow_namespace_wipe WITHOUT namespace

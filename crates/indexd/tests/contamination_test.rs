@@ -27,7 +27,8 @@ async fn test_prompt_injection_detection_imperative_language() {
             meta: json!({}),
             source_ref: Some(test_source_ref("external", "untrusted-source")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     // Document should be flagged with imperative_language
     let results = state
@@ -63,7 +64,8 @@ async fn test_prompt_injection_detection_system_claim() {
             meta: json!({}),
             source_ref: Some(test_source_ref("external", "untrusted-source")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     // Document should be flagged with system_claim
     let results = state
@@ -99,7 +101,8 @@ async fn test_prompt_injection_detection_meta_prompt_marker() {
             meta: json!({}),
             source_ref: Some(test_source_ref("external", "untrusted-source")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     // Document should be flagged with meta_prompt_marker
     let results = state
@@ -135,7 +138,8 @@ async fn test_multiple_flags_trigger_possible_prompt_injection() {
             meta: json!({}),
             source_ref: Some(test_source_ref("external", "untrusted-source")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     // Document should be auto-quarantined, check quarantine namespace
     let results = state
@@ -176,7 +180,8 @@ async fn test_quarantine_namespace_auto_quarantine() {
             meta: json!({}),
             source_ref: Some(test_source_ref("external", "untrusted-source")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     // Document should NOT appear in production namespace
     let production_results = state
@@ -230,7 +235,8 @@ async fn test_default_policy_filters_prompt_injection() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "normal-event")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     // Insert document with injection
     state
@@ -246,7 +252,8 @@ async fn test_default_policy_filters_prompt_injection() {
             meta: json!({}),
             source_ref: Some(test_source_ref("external", "untrusted")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     // Default search should filter out injection (but it's quarantined anyway)
     let results = state
@@ -295,7 +302,8 @@ async fn test_trust_level_filtering() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "event-123")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     state
         .upsert(UpsertRequest {
@@ -310,7 +318,8 @@ async fn test_trust_level_filtering() {
             meta: json!({}),
             source_ref: Some(test_source_ref("external", "untrusted")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     // Filter for high trust only
     let high_trust_results = state
@@ -360,7 +369,8 @@ async fn test_origin_filtering() {
             meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "event-123")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     state
         .upsert(UpsertRequest {
@@ -375,7 +385,8 @@ async fn test_origin_filtering() {
             meta: json!({}),
             source_ref: Some(test_source_ref("external", "untrusted")),
         })
-        .await;
+        .await
+        .expect("upsert should succeed");
 
     // Exclude external origin
     let filtered_results = state
