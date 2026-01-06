@@ -64,6 +64,8 @@ impl TrustLevel {
 
     /// Returns the weight multiplier for this trust level
     ///
+    /// SOURCE OF TRUTH: Rust hardcodes; policies/trust.yaml mirrors defaults (until policy-loading lands).
+    ///
     /// Based on policies/trust.yaml specification:
     /// - High: 1.0
     /// - Medium: 0.7
@@ -281,6 +283,8 @@ fn calculate_decay_factor(age_seconds: i64, half_life_seconds: Option<u64>) -> f
 
 /// Calculate context weight for a namespace based on the context profile
 /// Returns 1.0 if no profile is specified (balanced weighting)
+///
+/// SOURCE OF TRUTH: Rust hardcodes; policies/context.yaml mirrors defaults (until policy-loading lands).
 ///
 /// NOTE: Currently hardcoded based on policies/context.yaml specification.
 /// Future: Load dynamically from YAML at runtime.

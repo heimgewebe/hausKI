@@ -1,4 +1,10 @@
-# Trust weighting configuration for decision-making
+# Trust weighting SPECIFICATION for decision-making
+#
+# ⚠️ STATUS: This file is a SPECIFICATION, not loaded at runtime.
+# The values below are mirrored in the Rust code (crates/indexd/src/lib.rs).
+# Source of Truth: Rust hardcodes (until policy-loading implementation).
+# Roadmap: Dynamic loading from this file is planned for a future release.
+#
 # Each trust level has a weight multiplier (0.0 - 1.0)
 # Applied to search scores to prioritize trusted sources
 
