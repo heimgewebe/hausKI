@@ -26,7 +26,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"topic": "rust", "id": i}),
                 }],
                 meta: json!({"language": "rust"}),
-                source_ref: Some(test_source_ref("docs", &format!("rust-{}.md", i))),
+                source_ref: Some(test_source_ref("docs", format!("rust-{}.md", i))),
             })
             .await
             .expect("upsert should succeed");
@@ -45,7 +45,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"topic": "python", "id": i}),
                 }],
                 meta: json!({"language": "python"}),
-                source_ref: Some(test_source_ref("docs", &format!("python-{}.md", i))),
+                source_ref: Some(test_source_ref("docs", format!("python-{}.md", i))),
             })
             .await
             .expect("upsert should succeed");
@@ -69,7 +69,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                 meta: json!({"severity": "info"}),
                 source_ref: Some(test_source_ref(
                     "chronik",
-                    &format!("/var/log/events/{}.log", i),
+                    format!("/var/log/events/{}.log", i),
                 )),
             })
             .await
@@ -89,7 +89,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                     meta: json!({"section": "getting-started", "id": i}),
                 }],
                 meta: json!({"category": "tutorial"}),
-                source_ref: Some(test_source_ref("docs", &format!("page-{}.md", i))),
+                source_ref: Some(test_source_ref("docs", format!("page-{}.md", i))),
             })
             .await
             .expect("upsert should succeed");
