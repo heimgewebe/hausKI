@@ -113,7 +113,7 @@ const QUARANTINE_NAMESPACE: &str = "quarantine";
 **Beispiel-Log:**
 ```
 WARN Auto-quarantining document based on trust level and injection flags
-  doc_id="suspicious-doc" 
+  doc_id="suspicious-doc"
   flags=[ImperativeLanguage, SystemClaim, PossiblePromptInjection]
   trust_level=Low
   origin="external"
@@ -129,7 +129,7 @@ pub struct SearchRequest {
     pub query: String,
     pub k: Option<usize>,
     pub namespace: Option<String>,
-    
+
     // Neu: Sicherheitsfilter (typisiert, nicht string-basiert)
     pub exclude_flags: Option<Vec<ContentFlag>>,  // Default: [PossiblePromptInjection]
     pub min_trust_level: Option<TrustLevel>,      // Mindest-Vertrauensstufe
@@ -191,7 +191,7 @@ let results = state.search(&SearchRequest {
 **Beispiel-Logs:**
 ```
 INFO Document flagged during upsert
-  doc_id="doc-123" namespace="production" 
+  doc_id="doc-123" namespace="production"
   flags=[ImperativeLanguage, SystemClaim]
 
 DEBUG Documents filtered during search due to security policies
