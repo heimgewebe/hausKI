@@ -4,7 +4,7 @@ Dieses Dokument verankert die hausKI-Eventwelt explizit in den zentralen Heimgew
 
 ## 1. Zentrale Contracts (metarepo)
 
-Die kanonischen Event- und Insight-Contracts liegen im **metarepo**  
+Die kanonischen Event- und Insight-Contracts liegen im **metarepo**
 im Verzeichnis `contracts/` (JSON Schema Draft 2020-12):
 
 - `contracts/aussen.event.schema.json` – externe Roh-Events (Feeds, News, etc.)
@@ -13,7 +13,7 @@ im Verzeichnis `contracts/` (JSON Schema Draft 2020-12):
 - `contracts/insights.daily.schema.json` – tägliche semantische Zusammenfassungen (semantAH → leitstand → hausKI)
 - `contracts/fleet.health.schema.json` – Fleet-Gesundheitszustand (wgx / Leitstand)
 
-hausKI definiert **keine alternativen Versionen** dieser Schemas,  
+hausKI definiert **keine alternativen Versionen** dieser Schemas,
 sondern arbeitet vollständig auf Basis dieser kanonischen Contracts.
 
 ## 2. hausKI-Events im Kontext von `event.line`

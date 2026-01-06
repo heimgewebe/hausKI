@@ -56,11 +56,11 @@ jobs:
           set -euo pipefail
           # Ensure base ref is available
           git fetch --no-tags origin ${{ github.base_ref }}
-          
+
           # Use merge-base with fallback to two-dot diff
           base_ref="origin/${{ github.base_ref }}"
           MB=$(git merge-base "$base_ref" HEAD 2>/dev/null || true)
-          
+
           if [ -n "$MB" ]; then
             echo "Using merge-base: $MB"
             git diff --unified=0 --minimal --no-color "$MB"..HEAD > pr.diff
@@ -68,7 +68,7 @@ jobs:
             echo "No merge-base found; falling back to two-dot diff"
             git diff --unified=0 --minimal --no-color "$base_ref"..HEAD > pr.diff
           fi
-          
+
           wc -l pr.diff | awk '{print "lines="$1}' >> $GITHUB_OUTPUT
       - name: Run codex (review)
         id: codex

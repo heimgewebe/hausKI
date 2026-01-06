@@ -64,7 +64,7 @@ curl -X POST http://localhost:8080/index/forget \
 
 **Filter-Semantik:** AND-Logik – alle angegebenen Filter müssen übereinstimmen.
 
-**Sicherheit:** 
+**Sicherheit:**
 - Mindestens ein Content-Filter (`older_than`, `source_ref_origin`, `doc_id`) ODER `allow_namespace_wipe: true` erforderlich
 - **KRITISCH:** `allow_namespace_wipe` erfordert `namespace` im Filter (verhindert globale Löschung über alle Namespaces hinweg)
 
