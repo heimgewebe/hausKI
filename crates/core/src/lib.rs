@@ -21,6 +21,7 @@ use prometheus_client::{
 };
 use std::{
     env, fmt,
+    path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -213,7 +214,21 @@ impl AppState {
             })
         };
 
-        let index = IndexState::new(limits.latency.index_topk20_ms, metrics_recorder.clone());
+        let index_registry = Arc::new(Mutex::new(Registry::default()));
+        registry.register_collector(Box::new(prometheus_client::registry::Collector::new(
+            index_registry.clone(),
+        )));
+
+        // Load policies from standard locations
+        let trust_policy_path = PathBuf::from("policies/trust.yaml");
+        let context_policy_path = PathBuf::from("policies/context.yaml");
+
+        let index = IndexState::new(
+            limits.latency.index_topk20_ms,
+            metrics_recorder.clone(),
+            Some(index_registry),
+            Some((trust_policy_path, context_policy_path)),
+        );
 
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(15))

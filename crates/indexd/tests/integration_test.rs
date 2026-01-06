@@ -8,7 +8,7 @@ use std::sync::Arc;
 /// Integration test with a small fixture corpus (20+ events)
 #[tokio::test]
 async fn test_fixture_corpus_indexing_and_search() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Fixture 1-5: Rust programming topics
     for i in 1..=5 {
@@ -165,7 +165,7 @@ async fn test_fixture_corpus_indexing_and_search() {
 
 #[tokio::test]
 async fn test_namespace_isolation() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Same text in different namespaces
     state
@@ -237,7 +237,7 @@ async fn test_namespace_isolation() {
 
 #[tokio::test]
 async fn test_source_ref_and_ingested_at_populated() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     state
         .upsert(UpsertRequest {

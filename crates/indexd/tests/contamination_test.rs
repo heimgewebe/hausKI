@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 #[tokio::test]
 async fn test_prompt_injection_detection_imperative_language() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Insert document with imperative language
     state
@@ -50,7 +50,7 @@ async fn test_prompt_injection_detection_imperative_language() {
 
 #[tokio::test]
 async fn test_prompt_injection_detection_system_claim() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Insert document with system claims
     state
@@ -89,7 +89,7 @@ async fn test_prompt_injection_detection_system_claim() {
 
 #[tokio::test]
 async fn test_prompt_injection_detection_meta_prompt_marker() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Insert document with meta-prompt markers
     state
@@ -128,7 +128,7 @@ async fn test_prompt_injection_detection_meta_prompt_marker() {
 
 #[tokio::test]
 async fn test_multiple_flags_trigger_possible_prompt_injection() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Insert document with multiple suspicious patterns
     state
@@ -170,7 +170,7 @@ async fn test_multiple_flags_trigger_possible_prompt_injection() {
 
 #[tokio::test]
 async fn test_quarantine_namespace_auto_quarantine() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Insert document that should be auto-quarantined
     state
@@ -231,7 +231,7 @@ async fn test_quarantine_namespace_auto_quarantine() {
 
 #[tokio::test]
 async fn test_default_policy_filters_prompt_injection() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Insert normal document
     state
@@ -302,7 +302,7 @@ async fn test_default_policy_filters_prompt_injection() {
 
 #[tokio::test]
 async fn test_trust_level_filtering() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Insert documents with different trust levels
     state
@@ -373,7 +373,7 @@ async fn test_trust_level_filtering() {
 
 #[tokio::test]
 async fn test_origin_filtering() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Insert documents from different origins
     state
@@ -428,7 +428,7 @@ async fn test_origin_filtering() {
 
 #[tokio::test]
 async fn test_normal_content_not_flagged() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Insert normal, benign content
     state
@@ -472,7 +472,7 @@ async fn test_normal_content_not_flagged() {
 
 #[tokio::test]
 async fn test_high_trust_not_quarantined() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Insert document with injection patterns but HIGH trust (e.g., from chronik)
     let mut high_trust_ref = test_source_ref("chronik", "event-123");
@@ -523,7 +523,7 @@ async fn test_high_trust_not_quarantined() {
 
 #[tokio::test]
 async fn test_medium_trust_quarantined_only_with_possible_prompt_injection() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Medium trust with single flag (should NOT quarantine)
     let mut medium_trust_ref = test_source_ref("osctx", "log-123");

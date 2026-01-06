@@ -660,8 +660,13 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
+ "prometheus-client",
  "serde",
  "serde_json",
+ "serde_yaml_ng",
+ "sha2",
+ "tempfile",
+ "thiserror",
  "tokio",
  "tower",
  "tracing",

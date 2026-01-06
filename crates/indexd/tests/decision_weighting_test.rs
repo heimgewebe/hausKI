@@ -3,12 +3,59 @@ use common::test_source_ref;
 
 use hauski_indexd::{ChunkPayload, IndexState, SearchRequest, UpsertRequest};
 use serde_json::json;
+use std::io::Write;
 use std::sync::Arc;
+use tempfile::NamedTempFile;
+
+fn create_test_policy_files() -> (NamedTempFile, NamedTempFile) {
+    let mut trust_file = NamedTempFile::new().unwrap();
+    write!(
+        trust_file,
+        "trust_weights:\n  high: 1.0\n  medium: 0.7\n  low: 0.3\nmin_weight: 0.1\n"
+    )
+    .unwrap();
+
+    let mut context_file = NamedTempFile::new().unwrap();
+    write!(
+        context_file,
+        r#"
+profiles:
+  default:
+    default: 1.0
+  incident_response:
+    chronik: 1.2
+    osctx: 1.0
+    insights: 0.8
+    code: 0.5
+    docs: 0.5
+    default: 0.7
+  code_analysis:
+    docs: 1.2
+    code: 1.2
+    osctx: 0.8
+    chronik: 0.6
+    insights: 0.5
+    default: 0.7
+recency:
+  default_half_life_seconds: 604800
+  min_weight: 0.1
+"#
+    )
+    .unwrap();
+
+    (trust_file, context_file)
+}
 
 /// Test that trust level affects search ranking
 #[tokio::test]
 async fn test_trust_weighting_affects_ranking() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let (trust_file, context_file) = create_test_policy_files();
+    let state = IndexState::new(
+        60,
+        Arc::new(|_, _, _, _| {}),
+        None,
+        Some((trust_file.path().to_path_buf(), context_file.path().to_path_buf())),
+    );
 
     // Insert three documents with identical content but different trust levels
     // High trust (weight: 1.0)
@@ -126,7 +173,13 @@ async fn test_trust_weighting_affects_ranking() {
 /// Test that context profile affects namespace weighting
 #[tokio::test]
 async fn test_context_profile_weighting() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let (trust_file, context_file) = create_test_policy_files();
+    let state = IndexState::new(
+        60,
+        Arc::new(|_, _, _, _| {}),
+        None,
+        Some((trust_file.path().to_path_buf(), context_file.path().to_path_buf())),
+    );
 
     // Insert documents in DIFFERENT namespaces to test context weighting
     // Context weighting is based on document.namespace, not metadata
@@ -246,7 +299,13 @@ async fn test_context_profile_weighting() {
 /// Test combined weighting (trust + recency + context)
 #[tokio::test]
 async fn test_combined_weighting() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let (trust_file, context_file) = create_test_policy_files();
+    let state = IndexState::new(
+        60,
+        Arc::new(|_, _, _, _| {}),
+        None,
+        Some((trust_file.path().to_path_buf(), context_file.path().to_path_buf())),
+    );
 
     // Insert document with high trust in code namespace
     state
@@ -333,7 +392,7 @@ async fn test_combined_weighting() {
 /// Test that include_weights=false omits weight breakdown
 #[tokio::test]
 async fn test_weights_omitted_when_not_requested() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     state
         .upsert(UpsertRequest {
@@ -369,4 +428,70 @@ async fn test_weights_omitted_when_not_requested() {
         results[0].weights.is_none(),
         "Weights should be None when include_weights=false"
     );
+}
+
+#[tokio::test]
+async fn test_invalid_policies_fallback_to_default() {
+    // Create invalid trust policy file
+    let mut invalid_trust = NamedTempFile::new().unwrap();
+    write!(
+        invalid_trust,
+        "trust_weights:\n  high: -1.0\n  medium: 0.7\n  low: 0.3\nmin_weight: 0.1\n"
+    )
+    .unwrap();
+
+    let (_, context_file) = create_test_policy_files();
+
+    // Initialize with invalid policy - should log error and fallback
+    let state = IndexState::new(
+        60,
+        Arc::new(|_, _, _, _| {}),
+        None,
+        Some((
+            invalid_trust.path().to_path_buf(),
+            context_file.path().to_path_buf(),
+        )),
+    );
+
+    // Verify it fell back to default weights (high=1.0) instead of invalid -1.0
+    // We can verify this by checking the policy hash - it should be "default" if load failed,
+    // OR if we implement it such that `new` returns result or logs.
+    // In current impl, `new` handles error by logging and using default.
+    // So the state should have defaults.
+
+    // Let's verify via search ranking or just assume safe defaults if no crash.
+    // Better: check metrics or just use a basic search.
+
+    state
+        .upsert(UpsertRequest {
+            doc_id: "doc-high".into(),
+            namespace: "default".into(),
+            chunks: vec![ChunkPayload {
+                chunk_id: Some("doc-high#0".into()),
+                text: Some("Content".into()),
+                embedding: Vec::new(),
+                meta: json!({}),
+            }],
+            meta: json!({}),
+            source_ref: Some(test_source_ref("chronik", "high")),
+        })
+        .await
+        .expect("upsert should succeed");
+
+    let results = state
+        .search(&SearchRequest {
+            query: "Content".into(),
+            k: Some(1),
+            namespace: Some("default".into()),
+            exclude_flags: None,
+            min_trust_level: None,
+            exclude_origins: None,
+            context_profile: None,
+            include_weights: true,
+        })
+        .await;
+
+    assert_eq!(results.len(), 1);
+    let weights = results[0].weights.as_ref().unwrap();
+    assert_eq!(weights.trust, 1.0, "Should use default 1.0 for high trust despite invalid policy");
 }
