@@ -61,6 +61,19 @@ impl TrustLevel {
             _ => TrustLevel::Medium,
         }
     }
+
+    /// Returns the weight multiplier for this trust level
+    /// Based on policies/trust.yaml defaults:
+    /// - High: 1.0
+    /// - Medium: 0.7
+    /// - Low: 0.3
+    pub fn weight(&self) -> f32 {
+        match self {
+            TrustLevel::High => 1.0,
+            TrustLevel::Medium => 0.7,
+            TrustLevel::Low => 0.3,
+        }
+    }
 }
 
 /// Content flags indicating potential security or quality issues
@@ -259,6 +272,44 @@ fn calculate_decay_factor(age_seconds: i64, half_life_seconds: Option<u64>) -> f
         Some(half_life) => {
             let exponent = age_seconds as f64 / half_life as f64;
             0.5_f64.powf(exponent) as f32
+        }
+    }
+}
+
+/// Calculate context weight for a namespace based on the context profile
+/// Returns 1.0 if no profile is specified (balanced weighting)
+fn calculate_context_weight(namespace: &str, context_profile: Option<&str>) -> f32 {
+    // For now, return 1.0 (balanced) until we implement profile loading
+    // Future implementation will load from policies/context.yaml
+    match context_profile {
+        None => 1.0, // Default: no context weighting
+        Some(profile) => {
+            // Basic hardcoded profiles matching policies/context.yaml
+            match (profile, namespace) {
+                // incident_response profile
+                ("incident_response", "chronik") => 1.2,
+                ("incident_response", "osctx") => 1.0,
+                ("incident_response", "insights") => 0.8,
+                ("incident_response", "code" | "docs") => 0.5,
+                ("incident_response", _) => 0.7,
+                
+                // code_analysis profile
+                ("code_analysis", "docs" | "code") => 1.2,
+                ("code_analysis", "osctx") => 0.8,
+                ("code_analysis", "chronik") => 0.6,
+                ("code_analysis", "insights") => 0.5,
+                ("code_analysis", _) => 0.7,
+                
+                // reflection profile
+                ("reflection", "insights") => 1.2,
+                ("reflection", "chronik") => 1.0,
+                ("reflection", "osctx") => 0.8,
+                ("reflection", "code" | "docs") => 0.5,
+                ("reflection", _) => 0.7,
+                
+                // default profile or unknown profile
+                _ => 1.0,
+            }
         }
     }
 }
@@ -469,15 +520,42 @@ impl IndexState {
                     continue;
                 };
 
-                // Apply time-decay if configured
+                // Calculate trust weight from source_ref
+                let trust_weight = doc
+                    .source_ref
+                    .as_ref()
+                    .map(|sr| sr.trust_level.weight())
+                    .unwrap_or(1.0);
+
+                // Calculate recency weight (time-decay) if configured
                 // Clamp age to 0 to handle future timestamps gracefully (clock skew)
                 let age_seconds = (now - doc.ingested_at).num_seconds().max(0);
-                let decay_factor = if let Some(config) = retention_config {
+                let recency_weight = if let Some(config) = retention_config {
                     calculate_decay_factor(age_seconds, config.half_life_seconds)
                 } else {
                     1.0
                 };
-                let final_score = base_score * decay_factor;
+
+                // Calculate context weight based on namespace and profile
+                let context_weight = calculate_context_weight(
+                    &doc.namespace,
+                    request.context_profile.as_deref(),
+                );
+
+                // Apply decision weighting: final_score = similarity × trust × recency × context
+                let final_score = base_score * trust_weight * recency_weight * context_weight;
+
+                // Optionally include weight breakdown for transparency
+                let weights = if request.include_weights {
+                    Some(WeightBreakdown {
+                        similarity: base_score,
+                        trust: trust_weight,
+                        recency: recency_weight,
+                        context: context_weight,
+                    })
+                } else {
+                    None
+                };
 
                 matches.push(SearchMatch {
                     doc_id: doc.doc_id.clone(),
@@ -496,6 +574,7 @@ impl IndexState {
                     source_ref: doc.source_ref.clone(),
                     ingested_at: doc.ingested_at.to_rfc3339(),
                     flags: doc.flags.clone(),
+                    weights,
                 });
             }
         }
@@ -608,6 +687,7 @@ impl IndexState {
                         source_ref: other_doc.source_ref.clone(),
                         ingested_at: other_doc.ingested_at.to_rfc3339(),
                         flags: other_doc.flags.clone(),
+                        weights: None, // related() doesn't use decision weighting
                     });
                 }
             }
@@ -1060,6 +1140,13 @@ pub struct SearchRequest {
     /// Exclude documents from these origins
     #[serde(default)]
     pub exclude_origins: Option<Vec<String>>,
+    /// Context profile for weighting (e.g., "incident_response", "code_analysis", "reflection")
+    /// If None, uses default balanced weighting (1.0 for all namespaces)
+    #[serde(default)]
+    pub context_profile: Option<String>,
+    /// Include weight breakdown in response for transparency
+    #[serde(default)]
+    pub include_weights: bool,
 }
 
 impl SearchRequest {
@@ -1073,6 +1160,8 @@ impl SearchRequest {
             exclude_flags: Some(vec![]), // Empty = no filtering
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         }
     }
 
@@ -1122,11 +1211,25 @@ pub struct StatsResponse {
     pub budget_ms: u64,
 }
 
+/// Weight breakdown for decision-making transparency
+#[derive(Debug, Serialize, Clone)]
+pub struct WeightBreakdown {
+    /// Base similarity score (0.0 - 1.0)
+    pub similarity: f32,
+    /// Trust weight multiplier based on source trust level
+    pub trust: f32,
+    /// Recency weight based on document age (exponential decay)
+    pub recency: f32,
+    /// Context weight based on namespace and intent
+    pub context: f32,
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct SearchMatch {
     pub doc_id: String,
     pub namespace: String,
     pub chunk_id: String,
+    /// Final weighted score (similarity × trust × recency × context)
     pub score: f32,
     pub text: String,
     pub meta: Value,
@@ -1136,6 +1239,9 @@ pub struct SearchMatch {
     /// Content flags indicating potential security or quality issues
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub flags: Vec<ContentFlag>,
+    /// Optional weight breakdown for transparency (only included when requested)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weights: Option<WeightBreakdown>,
 }
 
 fn default_namespace() -> String {
@@ -1336,6 +1442,8 @@ mod tests {
                 exclude_flags: None,
                 min_trust_level: None,
                 exclude_origins: None,
+                context_profile: None,
+                include_weights: false,
             })
             .await;
 
@@ -1372,6 +1480,8 @@ mod tests {
                 exclude_flags: None,
                 min_trust_level: None,
                 exclude_origins: None,
+                context_profile: None,
+                include_weights: false,
             })
             .await;
 
@@ -1386,6 +1496,8 @@ mod tests {
                 exclude_flags: None,
                 min_trust_level: None,
                 exclude_origins: None,
+                context_profile: None,
+                include_weights: false,
             })
             .await;
 
@@ -1421,6 +1533,8 @@ mod tests {
                 exclude_flags: None,
                 min_trust_level: None,
                 exclude_origins: None,
+                context_profile: None,
+                include_weights: false,
             })
             .await;
 
@@ -1435,6 +1549,8 @@ mod tests {
                 exclude_flags: None,
                 min_trust_level: None,
                 exclude_origins: None,
+                context_profile: None,
+                include_weights: false,
             })
             .await;
 

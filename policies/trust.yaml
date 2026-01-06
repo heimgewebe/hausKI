@@ -1,0 +1,12 @@
+# Trust weighting configuration for decision-making
+# Each trust level has a weight multiplier (0.0 - 1.0)
+# Applied to search scores to prioritize trusted sources
+
+trust_weights:
+  high: 1.0    # Chronik events, verified internal sources
+  medium: 0.7  # OS context, application logs
+  low: 0.3     # External sources, user input, tool output
+
+# Optional: minimum weight to prevent complete suppression
+# If not specified, weights can go to 0.0
+min_weight: 0.1

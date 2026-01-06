@@ -39,6 +39,8 @@ async fn test_prompt_injection_detection_imperative_language() {
             exclude_flags: Some(vec![]), // Empty to see all results
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -76,6 +78,8 @@ async fn test_prompt_injection_detection_system_claim() {
             exclude_flags: Some(vec![]), // Empty to see all results
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -113,6 +117,8 @@ async fn test_prompt_injection_detection_meta_prompt_marker() {
             exclude_flags: Some(vec![]), // Empty to see all results
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -150,6 +156,8 @@ async fn test_multiple_flags_trigger_possible_prompt_injection() {
             exclude_flags: Some(vec![]), // Empty to see all results
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -192,6 +200,8 @@ async fn test_quarantine_namespace_auto_quarantine() {
             exclude_flags: Some(vec![]), // Empty to see all results
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -210,6 +220,8 @@ async fn test_quarantine_namespace_auto_quarantine() {
             exclude_flags: Some(vec![]), // Empty to see all results
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -264,6 +276,8 @@ async fn test_default_policy_filters_prompt_injection() {
             exclude_flags: None, // Default policy applies
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -278,6 +292,8 @@ async fn test_default_policy_filters_prompt_injection() {
             exclude_flags: Some(vec![]), // Empty = no filtering
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -330,6 +346,8 @@ async fn test_trust_level_filtering() {
             exclude_flags: Some(vec![]), // No flag filtering
             min_trust_level: Some(TrustLevel::High),
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -345,6 +363,8 @@ async fn test_trust_level_filtering() {
             exclude_flags: Some(vec![]), // No flag filtering
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -397,6 +417,8 @@ async fn test_origin_filtering() {
             exclude_flags: Some(vec![]),
             min_trust_level: None,
             exclude_origins: Some(vec!["external".to_string()]),
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -436,6 +458,8 @@ async fn test_normal_content_not_flagged() {
             exclude_flags: Some(vec![]), // Empty to see all
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -479,6 +503,8 @@ async fn test_high_trust_not_quarantined() {
             exclude_flags: Some(vec![]), // No filtering to see everything
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -528,6 +554,8 @@ async fn test_medium_trust_quarantined_only_with_possible_prompt_injection() {
             exclude_flags: Some(vec![]),
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -564,6 +592,8 @@ async fn test_medium_trust_quarantined_only_with_possible_prompt_injection() {
             exclude_flags: Some(vec![]),
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
