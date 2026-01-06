@@ -14,6 +14,11 @@ Statt Treffer nur nach Ähnlichkeit zu sortieren, berücksichtigt hausKI drei Fa
 final_score = similarity × trust_weight × recency_weight × context_weight
 ```
 
+> **⚠️ Hinweis zum aktuellen Status:**  
+> Die Gewichtungslogik ist derzeit **hardcoded** in `crates/indexd/src/lib.rs`.  
+> Die YAML-Dateien (`policies/trust.yaml`, `policies/context.yaml`) dienen als **Spezifikation** und dokumentieren die aktuell implementierten Werte.  
+> **Roadmap:** Dynamisches Laden der Policies aus YAML-Dateien folgt in einem zukünftigen Release.
+
 ## Trust-Gewichtung
 
 Basiert auf dem `TrustLevel` der Quelle (definiert in `policies/trust.yaml`):
@@ -238,6 +243,8 @@ source_ref: Some(SourceRef {
     ...
 })
 ```
+
+**Hinweis:** Falls `source_ref` fehlt (z.B. bei Legacy-Daten), wird ein **Medium Trust (0.7)** als sicherer Default angenommen.
 
 ### 2. Falsche Context-Profile-Namen
 ❌ **Falsch:**

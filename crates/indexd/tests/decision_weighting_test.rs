@@ -128,19 +128,19 @@ async fn test_trust_weighting_affects_ranking() {
 async fn test_context_profile_weighting() {
     let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
 
-    // Insert documents in the default namespace with different source origins
-    // to simulate different "logical" namespaces via metadata
+    // Insert documents in DIFFERENT namespaces to test context weighting
+    // Context weighting is based on document.namespace, not metadata
     state
         .upsert(UpsertRequest {
             doc_id: "doc-chronik".into(),
-            namespace: "default".into(),
+            namespace: "chronik".into(), // Actually in chronik namespace
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-chronik#0".into()),
                 text: Some("System event occurred".into()),
                 embedding: Vec::new(),
-                meta: json!({"logical_namespace": "chronik"}),
+                meta: json!({}),
             }],
-            meta: json!({"logical_namespace": "chronik"}),
+            meta: json!({}),
             source_ref: Some(test_source_ref("chronik", "event-1")),
         })
         .await
@@ -149,14 +149,14 @@ async fn test_context_profile_weighting() {
     state
         .upsert(UpsertRequest {
             doc_id: "doc-code".into(),
-            namespace: "default".into(),
+            namespace: "code".into(), // Actually in code namespace
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-code#0".into()),
                 text: Some("System event occurred".into()),
                 embedding: Vec::new(),
-                meta: json!({"logical_namespace": "code"}),
+                meta: json!({}),
             }],
-            meta: json!({"logical_namespace": "code"}),
+            meta: json!({}),
             source_ref: Some(test_source_ref("code", "code-file")),
         })
         .await
@@ -164,28 +164,27 @@ async fn test_context_profile_weighting() {
 
     state
         .upsert(UpsertRequest {
-            doc_id: "doc-docs".into(),
-            namespace: "default".into(),
+            doc_id: "doc-insights".into(),
+            namespace: "insights".into(), // Actually in insights namespace
             chunks: vec![ChunkPayload {
-                chunk_id: Some("doc-docs#0".into()),
+                chunk_id: Some("doc-insights#0".into()),
                 text: Some("System event occurred".into()),
                 embedding: Vec::new(),
-                meta: json!({"logical_namespace": "docs"}),
+                meta: json!({}),
             }],
-            meta: json!({"logical_namespace": "docs"}),
-            source_ref: Some(test_source_ref("docs", "doc-file")),
+            meta: json!({}),
+            source_ref: Some(test_source_ref("chronik", "insight-1")), // Same trust as doc-chronik
         })
         .await
         .expect("upsert should succeed");
 
-    // Note: Context weighting is currently based on the document's namespace field,
-    // not metadata. Since all documents are in "default" namespace, they all get
-    // the same context weight. This test demonstrates the API works correctly.
-    let results = state
+    // Test incident_response profile on chronik namespace
+    // chronik gets 1.2 boost, insights gets 0.8, code gets 0.5
+    let results_chronik = state
         .search(&SearchRequest {
             query: "system event".into(),
             k: Some(10),
-            namespace: Some("default".into()),
+            namespace: Some("chronik".into()),
             exclude_flags: Some(vec![]),
             min_trust_level: None,
             exclude_origins: None,
@@ -194,24 +193,54 @@ async fn test_context_profile_weighting() {
         })
         .await;
 
-    assert_eq!(results.len(), 3, "Should return all three documents");
-
-    // Since all are in "default" namespace, they get default context weight (0.7) for incident_response
-    // Trust levels differ: chronik (High=1.0), code (Medium=0.7), docs (Medium=0.7)
-    // So ranking should be: chronik > code/docs
-    assert_eq!(
-        results[0].doc_id, "doc-chronik",
-        "Chronik should rank first due to higher trust"
+    assert_eq!(results_chronik.len(), 1);
+    let chronik_weights = results_chronik[0].weights.as_ref().unwrap();
+    assert!(
+        (chronik_weights.context - 1.2).abs() < 0.01,
+        "Chronik namespace should have context weight 1.2 for incident_response"
     );
 
-    // Verify all have same context weight since they're all in "default" namespace
-    for result in &results {
-        let weights = result.weights.as_ref().unwrap();
-        assert!(
-            (weights.context - 0.7).abs() < 0.01,
-            "All documents in default namespace should have context weight 0.7 for incident_response profile"
-        );
-    }
+    // Test incident_response profile on code namespace
+    let results_code = state
+        .search(&SearchRequest {
+            query: "system event".into(),
+            k: Some(10),
+            namespace: Some("code".into()),
+            exclude_flags: Some(vec![]),
+            min_trust_level: None,
+            exclude_origins: None,
+            context_profile: Some("incident_response".into()),
+            include_weights: true,
+        })
+        .await;
+
+    assert_eq!(results_code.len(), 1);
+    let code_weights = results_code[0].weights.as_ref().unwrap();
+    assert!(
+        (code_weights.context - 0.5).abs() < 0.01,
+        "Code namespace should have context weight 0.5 for incident_response"
+    );
+
+    // Test code_analysis profile on code namespace
+    let results_code_analysis = state
+        .search(&SearchRequest {
+            query: "system event".into(),
+            k: Some(10),
+            namespace: Some("code".into()),
+            exclude_flags: Some(vec![]),
+            min_trust_level: None,
+            exclude_origins: None,
+            context_profile: Some("code_analysis".into()),
+            include_weights: true,
+        })
+        .await;
+
+    assert_eq!(results_code_analysis.len(), 1);
+    let code_analysis_weights = results_code_analysis[0].weights.as_ref().unwrap();
+    assert!(
+        (code_analysis_weights.context - 1.2).abs() < 0.01,
+        "Code namespace should have context weight 1.2 for code_analysis profile"
+    );
 }
 
 /// Test combined weighting (trust + recency + context)

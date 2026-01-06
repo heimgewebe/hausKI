@@ -63,10 +63,13 @@ impl TrustLevel {
     }
 
     /// Returns the weight multiplier for this trust level
-    /// Based on policies/trust.yaml defaults:
+    ///
+    /// Based on policies/trust.yaml specification:
     /// - High: 1.0
     /// - Medium: 0.7
     /// - Low: 0.3
+    ///
+    /// NOTE: Currently hardcoded. Future: Load from policies/trust.yaml at runtime.
     pub fn weight(&self) -> f32 {
         match self {
             TrustLevel::High => 1.0,
@@ -278,9 +281,10 @@ fn calculate_decay_factor(age_seconds: i64, half_life_seconds: Option<u64>) -> f
 
 /// Calculate context weight for a namespace based on the context profile
 /// Returns 1.0 if no profile is specified (balanced weighting)
+///
+/// NOTE: Currently hardcoded based on policies/context.yaml specification.
+/// Future: Load dynamically from YAML at runtime.
 fn calculate_context_weight(namespace: &str, context_profile: Option<&str>) -> f32 {
-    // For now, return 1.0 (balanced) until we implement profile loading
-    // Future implementation will load from policies/context.yaml
     match context_profile {
         None => 1.0, // Default: no context weighting
         Some(profile) => {
@@ -521,11 +525,12 @@ impl IndexState {
                 };
 
                 // Calculate trust weight from source_ref
+                // Default to Medium trust (0.7) if source_ref is missing for safety
                 let trust_weight = doc
                     .source_ref
                     .as_ref()
                     .map(|sr| sr.trust_level.weight())
-                    .unwrap_or(1.0);
+                    .unwrap_or(TrustLevel::Medium.weight());
 
                 // Calculate recency weight (time-decay) if configured
                 // Clamp age to 0 to handle future timestamps gracefully (clock skew)
