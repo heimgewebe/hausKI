@@ -40,7 +40,7 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Für diesen Step PATH sofort setzen und auf aktuelle stabile Version pinnen
+          # Für diesen Step PATH sofort setzen und aktuelle stabile Version verwenden
           export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
           uv --version || true
           # Version 0.7.6 ist nicht mehr verfügbar, nutze aktuelle stabile Version
