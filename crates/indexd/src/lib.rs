@@ -292,21 +292,21 @@ fn calculate_context_weight(namespace: &str, context_profile: Option<&str>) -> f
                 ("incident_response", "insights") => 0.8,
                 ("incident_response", "code" | "docs") => 0.5,
                 ("incident_response", _) => 0.7,
-                
+
                 // code_analysis profile
                 ("code_analysis", "docs" | "code") => 1.2,
                 ("code_analysis", "osctx") => 0.8,
                 ("code_analysis", "chronik") => 0.6,
                 ("code_analysis", "insights") => 0.5,
                 ("code_analysis", _) => 0.7,
-                
+
                 // reflection profile
                 ("reflection", "insights") => 1.2,
                 ("reflection", "chronik") => 1.0,
                 ("reflection", "osctx") => 0.8,
                 ("reflection", "code" | "docs") => 0.5,
                 ("reflection", _) => 0.7,
-                
+
                 // default profile or unknown profile
                 _ => 1.0,
             }
@@ -537,10 +537,8 @@ impl IndexState {
                 };
 
                 // Calculate context weight based on namespace and profile
-                let context_weight = calculate_context_weight(
-                    &doc.namespace,
-                    request.context_profile.as_deref(),
-                );
+                let context_weight =
+                    calculate_context_weight(&doc.namespace, request.context_profile.as_deref());
 
                 // Apply decision weighting: final_score = similarity × trust × recency × context
                 let final_score = base_score * trust_weight * recency_weight * context_weight;
