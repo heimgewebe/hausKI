@@ -554,7 +554,7 @@ Ohne aktualisiertes `uv.lock` bricht CI mit einem klaren Hinweis ab.
 
 Dieses Repository ist Teil des **Heimgewebe-Organismus**.
 
-Die übergeordnete Architektur, Achsen, Rollen und Contracts sind zentral beschrieben im  
+Die übergeordnete Architektur, Achsen, Rollen und Contracts sind zentral beschrieben im
 👉 [`metarepo/docs/system/heimgewebe-organismus.md`](https://github.com/heimgewebe/metarepo/blob/main/docs/system/heimgewebe-organismus.md)
 👉 [`metarepo/docs/system/heimgewebe-zielbild.md`](https://github.com/heimgewebe/metarepo/blob/main/docs/system/heimgewebe-zielbild.md).
 
