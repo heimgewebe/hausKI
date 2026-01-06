@@ -40,19 +40,19 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Für diesen Step PATH sofort setzen und auf exakt 0.7.6 pinnen
+          # Für diesen Step PATH sofort setzen und aktuelle stabile Version verwenden
           export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
           uv --version || true
-          uv self update 0.7.6
+          # Version 0.7.6 ist nicht mehr verfügbar, nutze aktuelle stabile Version
+          uv self update
 
-      - name: Ensure uv version (expect 0.7.6)
+      - name: Ensure uv version (current stable)
         if: ${{ hashFiles('pyproject.toml') != '' }}
         run: |
           set -euo pipefail
           export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
           version="$(uv --version)"
-          echo "$version"
-          grep -E '^uv 0\.7\.6$' <<<"$version"
+          echo "Using uv version: $version"
 
       # --- Sanity check: lock must exist and be in sync for dev extra ----------
       - name: Sanity - require uv.lock when schema sources exist

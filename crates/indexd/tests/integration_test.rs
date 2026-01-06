@@ -104,6 +104,8 @@ async fn test_fixture_corpus_indexing_and_search() {
             exclude_flags: None,
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -125,6 +127,8 @@ async fn test_fixture_corpus_indexing_and_search() {
             exclude_flags: None,
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -205,6 +209,8 @@ async fn test_namespace_isolation() {
             exclude_flags: None,
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -220,6 +226,8 @@ async fn test_namespace_isolation() {
             exclude_flags: None,
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 
@@ -255,6 +263,8 @@ async fn test_source_ref_and_ingested_at_populated() {
             exclude_flags: None,
             min_trust_level: None,
             exclude_origins: None,
+            context_profile: None,
+            include_weights: false,
         })
         .await;
 

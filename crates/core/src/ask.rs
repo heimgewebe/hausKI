@@ -112,6 +112,8 @@ pub async fn ask_handler(
         exclude_flags: None,
         min_trust_level: None,
         exclude_origins: None,
+        context_profile: None,
+        include_weights: false,
     };
 
     let matches = state.index().search(&request).await;

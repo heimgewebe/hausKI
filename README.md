@@ -13,6 +13,7 @@ HausKI ist ein lokaler KI-Orchestrator für Pop!_OS-Workstations mit NVIDIA-RTX-
 - **Rust-basiert**: Der Kern des Orchestrators ist in Rust implementiert und nutzt `axum` und `tokio` für hohe Performance und Sicherheit.
 - **Offline-First**: Entwickelt für den lokalen Betrieb ohne ständige Internetverbindung.
 - **In-Memory-Indexierung**: Substring-basierte Suche mit Namespace-Support (Vektorsuche geplant für P2).
+- **Decision-Weighting**: Intelligente Gewichtung von Suchtreffern nach Trust, Recency und Context (siehe [`docs/decision-weighting.md`](docs/decision-weighting.md)).
 - **Memory-System**: SQLite-basierter Key-Value-Store mit TTL und Pin/Unpin-Mechanismus.
 - **Policy-Engine**: Ein regelbasiertes System zur Steuerung von Routing, Speicher und Systemgrenzen.
 - **Egress-Guard**: Whitelist-basierte Kontrolle ausgehender HTTP-Requests.

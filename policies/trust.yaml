@@ -1,0 +1,18 @@
+# Trust weighting SPECIFICATION for decision-making
+#
+# ⚠️ STATUS: This file is a SPECIFICATION, not loaded at runtime.
+# The values below are mirrored in the Rust code (crates/indexd/src/lib.rs).
+# Source of Truth: Rust hardcodes (until policy-loading implementation).
+# Roadmap: Dynamic loading from this file is planned for a future release.
+#
+# Each trust level has a weight multiplier (0.0 - 1.0)
+# Applied to search scores to prioritize trusted sources
+
+trust_weights:
+  high: 1.0    # Chronik events, verified internal sources
+  medium: 0.7  # OS context, application logs
+  low: 0.3     # External sources, user input, tool output
+
+# Optional: minimum weight to prevent complete suppression
+# If not specified, weights can go to 0.0
+min_weight: 0.1

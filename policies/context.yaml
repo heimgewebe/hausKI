@@ -1,0 +1,54 @@
+# Context-based weighting profiles SPECIFICATION
+#
+# ⚠️ STATUS: This file is a SPECIFICATION, not loaded at runtime.
+# The values below are mirrored in the Rust code (crates/indexd/src/lib.rs).
+# Source of Truth: Rust hardcodes (until policy-loading implementation).
+# Roadmap: Dynamic loading from this file is planned for a future release.
+#
+# Different intents/tasks prioritize different namespaces differently
+
+profiles:
+  # Default profile: balanced weighting
+  default:
+    default: 1.0
+    chronik: 1.0
+    osctx: 1.0
+    insights: 1.0
+    code: 1.0
+    docs: 1.0
+    
+  # Incident response: prioritize fresh chronik events
+  incident_response:
+    chronik: 1.2
+    osctx: 1.0
+    insights: 0.8
+    code: 0.5
+    docs: 0.5
+    default: 0.7
+    
+  # Code analysis: prioritize docs and code
+  code_analysis:
+    docs: 1.2
+    code: 1.2
+    osctx: 0.8
+    chronik: 0.6
+    insights: 0.5
+    default: 0.7
+    
+  # Reflection: prioritize insights and chronik
+  reflection:
+    insights: 1.2
+    chronik: 1.0
+    osctx: 0.8
+    code: 0.5
+    docs: 0.5
+    default: 0.7
+
+# Recency weighting configuration
+recency:
+  # Default half-life for time decay (in seconds)
+  # 7 days = 604800 seconds
+  default_half_life_seconds: 604800
+  
+  # Minimum weight after decay (prevents complete suppression of old content)
+  min_weight: 0.1
