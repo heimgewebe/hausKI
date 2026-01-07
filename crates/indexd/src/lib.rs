@@ -572,10 +572,18 @@ impl IndexState {
     }
 
     /// Helper to get context weight from policy
-    fn get_context_weight(&self, namespace: &str, profile_name: Option<&str>) -> f32 {
+    ///
+    /// Strategy:
+    /// 1. Look up weight by `namespace`.
+    /// 2. If result is 1.0 (default/neutral), look up by `source_ref.origin`.
+    /// 3. Fallback to profile default or 1.0.
+    fn get_context_weight(
+        &self,
+        namespace: &str,
+        source_ref: Option<&SourceRef>,
+        profile_name: Option<&str>,
+    ) -> f32 {
         let profile_name = profile_name.unwrap_or("default");
-        // Fallback to "default" profile if requested profile not found
-        // But we should log this if it's not "default" and missing
         let profile = match self.inner.policies.context.profiles.get(profile_name) {
             Some(p) => p,
             None => {
@@ -584,14 +592,46 @@ impl IndexState {
                 }
                 match self.inner.policies.context.profiles.get("default") {
                     Some(p) => p,
-                    None => return 1.0, // Should happen only if default is missing (validation should prevent)
+                    None => return 1.0,
                 }
             }
         };
 
-        // Look for specific namespace weight, then "default" in profile, then 1.0
-        *profile
-            .get(namespace)
+        // 1. Check namespace
+        let ns_weight = profile.get(namespace);
+
+        // 2. Check origin if namespace didn't yield a specific weight
+        let origin_weight = if let Some(sr) = source_ref {
+            profile.get(&sr.origin)
+        } else {
+            None
+        };
+
+        // Decision logic:
+        // - If namespace is "default" (generic) and we have a specific origin weight, use origin (semantic override).
+        // - Else if namespace has explicit weight != 1.0, use it (topology override).
+        // - Else if origin has explicit weight, use it.
+        // - Else use profile default.
+
+        // Special case: "default" namespace is generic, so semantic origin should take precedence if present
+        if namespace == "default" {
+            if let Some(&w) = origin_weight {
+                return w;
+            }
+        }
+
+        if let Some(&w) = ns_weight {
+            if (w - 1.0).abs() > f32::EPSILON {
+                return w;
+            }
+        }
+
+        if let Some(&w) = origin_weight {
+            return w;
+        }
+
+        // Fallback
+        *ns_weight
             .or_else(|| profile.get("default"))
             .unwrap_or(&1.0)
     }
@@ -775,8 +815,11 @@ impl IndexState {
                     calculate_decay_factor(age_seconds, Some(half_life)).max(recency_policy.min_weight);
 
                 // Calculate context weight based on namespace and profile
-                let context_weight =
-                    self.get_context_weight(&doc.namespace, request.context_profile.as_deref());
+                let context_weight = self.get_context_weight(
+                    &doc.namespace,
+                    doc.source_ref.as_ref(),
+                    request.context_profile.as_deref(),
+                );
 
                 // Apply decision weighting: final_score = similarity × trust × recency × context
                 let final_score = base_score * trust_weight * recency_weight * context_weight;

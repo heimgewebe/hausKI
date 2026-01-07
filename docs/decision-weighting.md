@@ -86,8 +86,13 @@ Alte Wahrheiten bleiben sichtbar, aber leise.
 
 ## Context-Gewichtung
 
-Passt Gewichtung basierend auf Namespace und Intent-Profil an.
+Passt Gewichtung basierend auf Namespace, Origin und Intent-Profil an.
 Diese Logik wird nun dynamisch aus `policies/context.yaml` geladen.
+
+**Logik:**
+1. Prüfe Gewichtung für **Namespace**.
+2. Wenn Namespace `default` ist, prüfe Gewichtung für **Origin** (semantische Quelle).
+3. Fallback auf Profile-Default.
 
 **Profile** sind in `policies/context.yaml` definiert:
 

@@ -495,3 +495,53 @@ async fn test_invalid_policies_fallback_to_default() {
     let weights = results[0].weights.as_ref().unwrap();
     assert_eq!(weights.trust, 1.0, "Should use default 1.0 for high trust despite invalid policy");
 }
+
+#[tokio::test]
+async fn test_context_weighting_falls_back_to_origin() {
+    let (trust_file, context_file) = create_test_policy_files();
+    let state = IndexState::new(
+        60,
+        Arc::new(|_, _, _, _| {}),
+        None,
+        Some((trust_file.path().to_path_buf(), context_file.path().to_path_buf())),
+    );
+
+    // Document in "default" namespace (so no namespace weight) but origin "chronik"
+    state
+        .upsert(UpsertRequest {
+            doc_id: "doc-chronik-default".into(),
+            namespace: "default".into(),
+            chunks: vec![ChunkPayload {
+                chunk_id: Some("doc-chronik-default#0".into()),
+                text: Some("Event content".into()),
+                embedding: Vec::new(),
+                meta: json!({}),
+            }],
+            meta: json!({}),
+            source_ref: Some(test_source_ref("chronik", "evt-1")),
+        })
+        .await
+        .expect("upsert should succeed");
+
+    // "incident_response" gives 1.2 to "chronik".
+    // Since namespace is "default" (weight 1.0), it should fallback to check origin "chronik".
+    let results = state
+        .search(&SearchRequest {
+            query: "Event".into(),
+            k: Some(1),
+            namespace: Some("default".into()),
+            context_profile: Some("incident_response".into()),
+            include_weights: true,
+            exclude_flags: None,
+            min_trust_level: None,
+            exclude_origins: None,
+        })
+        .await;
+
+    assert_eq!(results.len(), 1);
+    let weights = results[0].weights.as_ref().unwrap();
+    assert!(
+        (weights.context - 1.2).abs() < 0.01,
+        "Context weight should be 1.2 (chronik) even in default namespace"
+    );
+}
