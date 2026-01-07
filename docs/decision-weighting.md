@@ -15,14 +15,14 @@ final_score = similarity × trust_weight × recency_weight × context_weight
 ```
 
 > **Hinweis zum Status:**
-> Die Gewichtungslogik lädt Policies beim Start aus `policies/trust.yaml` und `policies/context.yaml`.
+> Die Gewichtungslogik lädt Policies beim Start aus `../policies/trust.yaml` und `../policies/context.yaml`.
 > **Validierung:** Beim Laden werden Gewichte ≤ 0.0 und fehlende Pflichtfelder (z. B. "high", "default") abgelehnt.
 > **Fallback:** Bei Validierungsfehlern oder fehlenden Dateien werden **sichere harte Defaults** verwendet.
 > **Hash-Prüfung:** Der Hash der geladenen Policies wird in `/index/stats` als `policy_hash` zurückgegeben, um Drift zu erkennen.
 
 ## Trust-Gewichtung
 
-Basiert auf dem `TrustLevel` der Quelle (konfigurierbar in `policies/trust.yaml`):
+Basiert auf dem `TrustLevel` der Quelle (konfigurierbar in `../policies/trust.yaml`):
 
 | Trust Level | Weight | Typische Quellen |
 |-------------|--------|------------------|
@@ -71,7 +71,7 @@ RetentionConfig {
 recency_weight = 0.5^(age_seconds / half_life_seconds)
 ```
 
-> **Priorität:** Eine über die API gesetzte `RetentionConfig` (via `/index/retention`) überschreibt die Defaults aus `policies/context.yaml`.
+> **Priorität:** Eine über die API gesetzte `RetentionConfig` (via `/index/retention`) überschreibt die Defaults aus `../policies/context.yaml`.
 
 ### Beispiel
 
@@ -89,14 +89,14 @@ Alte Wahrheiten bleiben sichtbar, aber leise.
 ## Context-Gewichtung
 
 Passt Gewichtung basierend auf Namespace, Origin und Intent-Profil an.
-Diese Logik wird nun dynamisch aus `policies/context.yaml` geladen.
+Diese Logik wird nun dynamisch aus `../policies/context.yaml` geladen.
 
 **Logik & Priorität:**
 1. **Namespace-Explizit:** Wenn der Namespace im Profil einen expliziten Wert (!= 1.0) hat, gewinnt dieser (Topologie schlägt Semantik).
 2. **Origin-Fallback:** Wenn Namespace `default` ist (oder Gewicht 1.0), wird `source_ref.origin` geprüft (Semantik füllt Lücke).
 3. **Profile-Default:** Fallback auf den Default-Wert des Profils (Key: `_default`).
 
-**Profile** sind in `policies/context.yaml` definiert (Pfade via `HAUSKI_TRUST_POLICY_PATH` / `HAUSKI_CONTEXT_POLICY_PATH` konfigurierbar):
+**Profile** sind in `../policies/context.yaml` definiert (Pfade via `HAUSKI_TRUST_POLICY_PATH` / `HAUSKI_CONTEXT_POLICY_PATH` konfigurierbar):
 
 ### Profile
 
@@ -289,7 +289,7 @@ namespace: "chronik".into()
 
 ## Erweiterung: Neue Profile
 
-Neue Profile können in `policies/context.yaml` hinzugefügt werden.
+Neue Profile können in `../policies/context.yaml` hinzugefügt werden.
 
 ## Observability & Audit
 
@@ -324,7 +324,7 @@ Um Drift zu erkennen, gibt `/index/stats` einen SHA-256 Hash der **effektiv gela
 
 ## Testing
 
-Tests unter `crates/indexd/tests/decision_weighting_test.rs`:
+Tests unter `../crates/indexd/tests/decision_weighting_test.rs`:
 
 ```bash
 cargo test --package hauski-indexd decision_weighting
@@ -339,6 +339,6 @@ cargo test --package hauski-indexd decision_weighting
 ## Referenzen
 
 - Issue: "indexd ↔ policy – Decision-Weighting nach Trust, Recency & Kontext"
-- Code: `crates/indexd/src/lib.rs`
-- Policies: `policies/trust.yaml`, `policies/context.yaml`
-- Tests: `crates/indexd/tests/decision_weighting_test.rs`
+- Code: `../crates/indexd/src/lib.rs`
+- Policies: `../policies/trust.yaml`, `../policies/context.yaml`
+- Tests: `../crates/indexd/tests/decision_weighting_test.rs`

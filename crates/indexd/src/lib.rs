@@ -18,10 +18,12 @@ use std::{
     borrow::Cow,
     cmp::Ordering,
     collections::{BTreeMap, HashMap},
+    io,
     path::{Path, PathBuf},
     sync::Arc,
     time::Instant,
 };
+use thiserror::Error;
 use tokio::sync::RwLock;
 
 const DEFAULT_NAMESPACE: &str = "default";
@@ -34,6 +36,16 @@ pub type MetricsRecorder = dyn Fn(Method, &'static str, StatusCode, Instant) + S
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
 struct WeightFactorLabels {
     factor: String, // "trust", "recency", "context"
+}
+
+#[derive(Debug, Error)]
+enum PolicyLoadError {
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
+    #[error("YAML error: {0}")]
+    Yaml(#[from] serde_yaml_ng::Error),
+    #[error("Validation error: {0}")]
+    Validation(String),
 }
 
 /// Error type for index operations
@@ -592,10 +604,10 @@ impl IndexState {
 
     fn load_policy<T: for<'de> Deserialize<'de> + Default + ValidatePolicy>(
         path: &Path,
-    ) -> Result<T, Box<dyn std::error::Error>> {
-        let content = std::fs::read_to_string(path)?;
-        let policy: T = serde_yaml_ng::from_str(&content)?;
-        policy.validate().map_err(|e| Box::<dyn std::error::Error>::from(e))?;
+    ) -> Result<T, PolicyLoadError> {
+        let content = std::fs::read_to_string(path).map_err(PolicyLoadError::Io)?;
+        let policy: T = serde_yaml_ng::from_str(&content).map_err(PolicyLoadError::Yaml)?;
+        policy.validate().map_err(PolicyLoadError::Validation)?;
         Ok(policy)
     }
 
