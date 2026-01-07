@@ -214,10 +214,9 @@ impl AppState {
             })
         };
 
-        let index_registry = Arc::new(Mutex::new(Registry::default()));
-        registry.register_collector(Box::new(prometheus_client::registry::Collector::new(
-            index_registry.clone(),
-        )));
+        // Create a sub-registry for indexd metrics
+        // This ensures they are properly namespaced and collected
+        let mut index_sub_registry = registry.sub_registry_with_prefix("index");
 
         // Load policies from standard locations
         let trust_policy_path = PathBuf::from("policies/trust.yaml");
@@ -226,7 +225,7 @@ impl AppState {
         let index = IndexState::new(
             limits.latency.index_topk20_ms,
             metrics_recorder.clone(),
-            Some(index_registry),
+            Some(&mut index_sub_registry),
             Some((trust_policy_path, context_policy_path)),
         );
 

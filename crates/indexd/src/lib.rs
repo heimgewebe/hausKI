@@ -19,7 +19,7 @@ use std::{
     cmp::Ordering,
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::Instant,
 };
 use tokio::sync::RwLock;
@@ -317,9 +317,12 @@ pub trait ValidatePolicy {
     fn validate(&self) -> Result<(), String>;
 }
 
+/// Policy defining trust levels and their weights.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrustPolicy {
-    pub trust_weights: BTreeMap<String, f32>, // high, medium, low (BTreeMap for stable hash)
+    /// Mapping of trust levels ("high", "medium", "low") to weight multipliers.
+    pub trust_weights: BTreeMap<String, f32>, // BTreeMap for stable hash
+    /// Minimum weight floor to prevent total suppression.
     #[serde(default = "default_min_weight")]
     pub min_weight: f32,
 }
@@ -361,9 +364,12 @@ fn default_min_weight() -> f32 {
     0.1
 }
 
+/// Policy defining context-based weighting profiles.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextPolicy {
+    /// Profiles defining namespace/origin weights.
     pub profiles: BTreeMap<String, HashMap<String, f32>>, // BTreeMap for stable hash
+    /// Recency decay configuration.
     pub recency: RecencyPolicy,
 }
 
@@ -408,9 +414,12 @@ impl Default for ContextPolicy {
     }
 }
 
+/// Configuration for time-based decay.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecencyPolicy {
+    /// Half-life in seconds for exponential decay.
     pub default_half_life_seconds: u64,
+    /// Minimum weight after decay.
     #[serde(default = "default_min_weight")]
     pub min_weight: f32,
 }
@@ -434,10 +443,12 @@ impl Default for RecencyPolicy {
     }
 }
 
+/// Aggregated policy configuration loaded at runtime.
 #[derive(Clone)]
 pub struct PolicyConfig {
     pub trust: TrustPolicy,
     pub context: ContextPolicy,
+    /// Stable hash of the loaded policies for drift detection.
     pub hash: String,
 }
 
@@ -472,7 +483,7 @@ impl IndexState {
     pub fn new(
         budget_ms: u64,
         metrics: Arc<MetricsRecorder>,
-        registry: Option<Arc<Mutex<Registry>>>,
+        registry: Option<&mut Registry>,
         policy_paths: Option<(PathBuf, PathBuf)>, // (trust_path, context_path)
     ) -> Self {
         // Load policies or use defaults
@@ -490,8 +501,8 @@ impl IndexState {
 
                 // Compute stable hash of policies
                 let mut hasher = Sha256::new();
-                hasher.update(serde_json::to_vec(&trust).unwrap_or_default());
-                hasher.update(serde_json::to_vec(&context).unwrap_or_default());
+                hasher.update(serde_json::to_vec(&trust).expect("Failed to serialize trust policy for hashing"));
+                hasher.update(serde_json::to_vec(&context).expect("Failed to serialize context policy for hashing"));
                 let hash = format!("{:x}", hasher.finalize());
 
                 (trust, context, hash)
@@ -514,13 +525,12 @@ impl IndexState {
         );
 
         if let Some(registry) = registry {
-            let mut reg = registry.lock().unwrap();
-            reg.register(
+            registry.register(
                 "decision_weight_applied",
                 "Total number of times a decision weight factor was applied",
                 prom_weight_applied.clone(),
             );
-            reg.register(
+            registry.register(
                 "decision_final_score",
                 "Distribution of final weighted scores",
                 prom_score_bucket.clone(),
@@ -824,12 +834,6 @@ impl IndexState {
                 // Apply decision weighting: final_score = similarity × trust × recency × context
                 let final_score = base_score * trust_weight * recency_weight * context_weight;
 
-                // Update metrics
-                self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "trust".into() }).inc();
-                self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "recency".into() }).inc();
-                self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "context".into() }).inc();
-                self.inner.prom_score_bucket.observe(final_score.into());
-
                 // Optionally include weight breakdown for transparency
                 let weights = if request.include_weights {
                     Some(WeightBreakdown {
@@ -878,6 +882,17 @@ impl IndexState {
             matches.truncate(limit);
         }
 
+        // Update metrics (per search, not per match, to reduce volume)
+        if !matches.is_empty() {
+            // Count factors once per search where they were applied (always applied in this model)
+            self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "trust".into() }).inc();
+            self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "recency".into() }).inc();
+            self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "context".into() }).inc();
+
+            // Observe distribution only for top result to keep histogram volume manageable
+            self.inner.prom_score_bucket.observe(matches[0].score.into());
+        }
+
         // Audit Logging (Debug level, structured)
         if tracing::enabled!(tracing::Level::DEBUG) {
             // Log full breakdown if explicitly requested
@@ -890,28 +905,26 @@ impl IndexState {
             }
 
             // Check for ranking changes
-            // Sort by base similarity to see what the "raw" ranking would have been
-            // Note: This is expensive, so only done if debug logging is enabled
-             let mut raw_matches = matches.clone();
-             raw_matches.sort_by(|a, b| {
-                // Approximate raw score from weights if available, or just re-calculate?
-                // Re-calculating or un-weighting is complex.
-                // Best effort: Sort by similarity if weights are present, otherwise skip audit
+            // Find "raw top" (max similarity) without cloning/sorting
+            // This is O(N) and allocation-free
+            let raw_top = matches.iter().max_by(|a, b| {
                 match (&a.weights, &b.weights) {
-                    (Some(wa), Some(wb)) => wb.similarity.partial_cmp(&wa.similarity).unwrap_or(Ordering::Equal),
-                    _ => Ordering::Equal
+                    (Some(wa), Some(wb)) => wa.similarity.partial_cmp(&wb.similarity).unwrap_or(Ordering::Equal),
+                    _ => Ordering::Equal,
                 }
-             });
+            });
 
-             // Simple check: Did top result change?
-             if !matches.is_empty() && !raw_matches.is_empty() && matches[0].doc_id != raw_matches[0].doc_id {
-                 tracing::debug!(
-                     query = %request.query,
-                     original_top = %raw_matches[0].doc_id,
-                     weighted_top = %matches[0].doc_id,
-                     "Decision weighting changed top result"
-                 );
-             }
+            if let Some(top) = raw_top {
+                // matches is sorted by final score, so matches[0] is weighted_top
+                if !matches.is_empty() && top.doc_id != matches[0].doc_id {
+                    tracing::debug!(
+                        query = %request.query,
+                        original_top = %top.doc_id,
+                        weighted_top = %matches[0].doc_id,
+                        "Decision weighting changed top result"
+                    );
+                }
+            }
         }
 
         matches
