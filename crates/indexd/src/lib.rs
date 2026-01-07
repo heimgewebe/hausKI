@@ -6,13 +6,13 @@ use axum::{
     Json, Router,
 };
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use prometheus_client::encoding::EncodeLabelSet;
 use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::family::Family;
 use prometheus_client::metrics::histogram::Histogram;
 use prometheus_client::registry::Registry;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
@@ -511,49 +511,58 @@ impl IndexState {
         policy_paths: Option<(PathBuf, PathBuf)>, // (trust_path, context_path)
     ) -> Self {
         // Load policies or use defaults
-        let (trust_policy, context_policy, policy_hash, policy_source) =
-            if let Some((trust_path, context_path)) = policy_paths {
-                // Attempt to load trust policy
-                let (trust, trust_source) = match Self::load_policy::<TrustPolicy>(&trust_path) {
-                    Ok(p) => (p, "file"),
-                    Err(e) => {
-                        tracing::error!(path = %trust_path.display(), error = %e, "Failed to load trust policy, falling back to default");
-                        (TrustPolicy::default(), "fallback")
-                    }
-                };
-
-                // Attempt to load context policy
-                let (context, context_source) = match Self::load_policy::<ContextPolicy>(&context_path) {
-                    Ok(p) => (p, "file"),
-                    Err(e) => {
-                        tracing::error!(path = %context_path.display(), error = %e, "Failed to load context policy, falling back to default");
-                        (ContextPolicy::default(), "fallback")
-                    }
-                };
-
-                // Compute stable hash of policies
-                let mut hasher = Sha256::new();
-                hasher.update(serde_json::to_vec(&trust).expect("Failed to serialize trust policy for hashing"));
-                hasher.update(serde_json::to_vec(&context).expect("Failed to serialize context policy for hashing"));
-                let hash = format!("{:x}", hasher.finalize());
-
-                let source = if trust_source == "file" && context_source == "file" {
-                    "loaded_from_disk".to_string()
-                } else if trust_source == "fallback" && context_source == "fallback" {
-                    "fallback_defaults".to_string()
-                } else {
-                    "partial_fallback".to_string()
-                };
-
-                (trust, context, hash, source)
-            } else {
-                (
-                    TrustPolicy::default(),
-                    ContextPolicy::default(),
-                    "default".to_string(),
-                    "defaults_no_config".to_string(),
-                )
+        let (trust_policy, context_policy, policy_hash, policy_source) = if let Some((
+            trust_path,
+            context_path,
+        )) = policy_paths
+        {
+            // Attempt to load trust policy
+            let (trust, trust_source) = match Self::load_policy::<TrustPolicy>(&trust_path) {
+                Ok(p) => (p, "file"),
+                Err(e) => {
+                    tracing::error!(path = %trust_path.display(), error = %e, "Failed to load trust policy, falling back to default");
+                    (TrustPolicy::default(), "fallback")
+                }
             };
+
+            // Attempt to load context policy
+            let (context, context_source) = match Self::load_policy::<ContextPolicy>(&context_path)
+            {
+                Ok(p) => (p, "file"),
+                Err(e) => {
+                    tracing::error!(path = %context_path.display(), error = %e, "Failed to load context policy, falling back to default");
+                    (ContextPolicy::default(), "fallback")
+                }
+            };
+
+            // Compute stable hash of policies
+            let mut hasher = Sha256::new();
+            hasher.update(
+                serde_json::to_vec(&trust).expect("Failed to serialize trust policy for hashing"),
+            );
+            hasher.update(
+                serde_json::to_vec(&context)
+                    .expect("Failed to serialize context policy for hashing"),
+            );
+            let hash = format!("{:x}", hasher.finalize());
+
+            let source = if trust_source == "file" && context_source == "file" {
+                "loaded_from_disk".to_string()
+            } else if trust_source == "fallback" && context_source == "fallback" {
+                "fallback_defaults".to_string()
+            } else {
+                "partial_fallback".to_string()
+            };
+
+            (trust, context, hash, source)
+        } else {
+            (
+                TrustPolicy::default(),
+                ContextPolicy::default(),
+                "default".to_string(),
+                "defaults_no_config".to_string(),
+            )
+        };
 
         tracing::info!(
             policy_hash = %policy_hash,
@@ -618,7 +627,8 @@ impl IndexState {
 
         // Policy validation ensures all keys exist.
         // If not found (shouldn't happen with valid policy), fallback to hardcoded default for safety.
-        let weight = self.inner
+        let weight = self
+            .inner
             .policies
             .trust
             .trust_weights
@@ -661,11 +671,15 @@ impl IndexState {
         };
 
         // 1. Check namespace
-        let ns_weight = profile.get(namespace).filter(|&&w| (w - 1.0).abs() > f32::EPSILON);
+        let ns_weight = profile
+            .get(namespace)
+            .filter(|&&w| (w - 1.0).abs() > f32::EPSILON);
 
         // 2. Check origin
         let origin_weight = if let Some(sr) = source_ref {
-            profile.get(&sr.origin).filter(|&&w| (w - 1.0).abs() > f32::EPSILON)
+            profile
+                .get(&sr.origin)
+                .filter(|&&w| (w - 1.0).abs() > f32::EPSILON)
         } else {
             None
         };
@@ -866,8 +880,8 @@ impl IndexState {
                     .and_then(|c| c.half_life_seconds)
                     .unwrap_or(recency_policy.default_half_life_seconds);
 
-                let recency_weight =
-                    calculate_decay_factor(age_seconds, Some(half_life)).max(recency_policy.min_weight);
+                let recency_weight = calculate_decay_factor(age_seconds, Some(half_life))
+                    .max(recency_policy.min_weight);
 
                 // Calculate context weight based on namespace and profile
                 let context_weight = self.get_context_weight(
@@ -942,17 +956,34 @@ impl IndexState {
         if !matches.is_empty() {
             // Count factors once per search ONLY if they were actually applied (non-neutral)
             if trust_applied {
-                self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "trust".into() }).inc();
+                self.inner
+                    .prom_weight_applied
+                    .get_or_create(&WeightFactorLabels {
+                        factor: "trust".into(),
+                    })
+                    .inc();
             }
             if recency_applied {
-                self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "recency".into() }).inc();
+                self.inner
+                    .prom_weight_applied
+                    .get_or_create(&WeightFactorLabels {
+                        factor: "recency".into(),
+                    })
+                    .inc();
             }
             if context_applied {
-                self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "context".into() }).inc();
+                self.inner
+                    .prom_weight_applied
+                    .get_or_create(&WeightFactorLabels {
+                        factor: "context".into(),
+                    })
+                    .inc();
             }
 
             // Observe distribution only for top result to keep histogram volume manageable
-            self.inner.prom_score_bucket.observe(matches[0].score.into());
+            self.inner
+                .prom_score_bucket
+                .observe(matches[0].score.into());
         }
 
         // Audit Logging (Debug level, structured)
@@ -968,12 +999,15 @@ impl IndexState {
                 // Check for ranking changes
                 // Find "raw top" (max similarity) without cloning/sorting
                 // This is O(N) and allocation-free
-                let raw_top = matches.iter().max_by(|a, b| {
-                    match (&a.weights, &b.weights) {
-                        (Some(wa), Some(wb)) => wa.similarity.partial_cmp(&wb.similarity).unwrap_or(Ordering::Equal),
+                let raw_top = matches
+                    .iter()
+                    .max_by(|a, b| match (&a.weights, &b.weights) {
+                        (Some(wa), Some(wb)) => wa
+                            .similarity
+                            .partial_cmp(&wb.similarity)
+                            .unwrap_or(Ordering::Equal),
                         _ => Ordering::Equal,
-                    }
-                });
+                    });
 
                 if let Some(top) = raw_top {
                     // matches is sorted by final score, so matches[0] is weighted_top

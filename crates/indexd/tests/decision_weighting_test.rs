@@ -54,7 +54,10 @@ async fn test_trust_weighting_affects_ranking() {
         60,
         Arc::new(|_, _, _, _| {}),
         None,
-        Some((trust_file.path().to_path_buf(), context_file.path().to_path_buf())),
+        Some((
+            trust_file.path().to_path_buf(),
+            context_file.path().to_path_buf(),
+        )),
     );
 
     // Insert three documents with identical content but different trust levels
@@ -178,7 +181,10 @@ async fn test_context_profile_weighting() {
         60,
         Arc::new(|_, _, _, _| {}),
         None,
-        Some((trust_file.path().to_path_buf(), context_file.path().to_path_buf())),
+        Some((
+            trust_file.path().to_path_buf(),
+            context_file.path().to_path_buf(),
+        )),
     );
 
     // Insert documents in DIFFERENT namespaces to test context weighting
@@ -304,7 +310,10 @@ async fn test_combined_weighting() {
         60,
         Arc::new(|_, _, _, _| {}),
         None,
-        Some((trust_file.path().to_path_buf(), context_file.path().to_path_buf())),
+        Some((
+            trust_file.path().to_path_buf(),
+            context_file.path().to_path_buf(),
+        )),
     );
 
     // Insert document with high trust in code namespace
@@ -493,7 +502,10 @@ async fn test_invalid_policies_fallback_to_default() {
 
     assert_eq!(results.len(), 1);
     let weights = results[0].weights.as_ref().unwrap();
-    assert_eq!(weights.trust, 1.0, "Should use default 1.0 for high trust despite invalid policy");
+    assert_eq!(
+        weights.trust, 1.0,
+        "Should use default 1.0 for high trust despite invalid policy"
+    );
 
     // Case 2: min_weight > configured weight (should also trigger validation failure and fallback)
     let mut invalid_min_trust = NamedTempFile::new().unwrap();
@@ -546,7 +558,10 @@ async fn test_invalid_policies_fallback_to_default() {
 
     assert_eq!(results_min.len(), 1);
     let weights_min = results_min[0].weights.as_ref().unwrap();
-    assert_eq!(weights_min.trust, 0.3, "Should use default 0.3 because min_weight > low caused validation failure");
+    assert_eq!(
+        weights_min.trust, 0.3,
+        "Should use default 0.3 because min_weight > low caused validation failure"
+    );
 }
 
 #[tokio::test]
@@ -556,7 +571,10 @@ async fn test_context_weighting_falls_back_to_origin() {
         60,
         Arc::new(|_, _, _, _| {}),
         None,
-        Some((trust_file.path().to_path_buf(), context_file.path().to_path_buf())),
+        Some((
+            trust_file.path().to_path_buf(),
+            context_file.path().to_path_buf(),
+        )),
     );
 
     // Document in "default" namespace (so no namespace weight) but origin "chronik"
@@ -630,7 +648,10 @@ recency:
         60,
         Arc::new(|_, _, _, _| {}),
         None,
-        Some((trust_file.path().to_path_buf(), context_file.path().to_path_buf())),
+        Some((
+            trust_file.path().to_path_buf(),
+            context_file.path().to_path_buf(),
+        )),
     );
 
     // Document in "chronik" namespace
@@ -679,5 +700,8 @@ recency:
 
     // So my current logic implements: "Neutral 1.0 acts as 'not set'".
     // So result should be 0.7.
-    assert_eq!(weights.context, 0.7, "Explicit 1.0 should be treated as neutral and fallback to _default");
+    assert_eq!(
+        weights.context, 0.7,
+        "Explicit 1.0 should be treated as neutral and fallback to _default"
+    );
 }
