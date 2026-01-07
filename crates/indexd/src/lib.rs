@@ -368,7 +368,7 @@ fn default_min_weight() -> f32 {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextPolicy {
     /// Profiles defining namespace/origin weights.
-    pub profiles: BTreeMap<String, HashMap<String, f32>>, // BTreeMap for stable hash
+    pub profiles: BTreeMap<String, BTreeMap<String, f32>>, // BTreeMap for stable hash (outer and inner)
     /// Recency decay configuration.
     pub recency: RecencyPolicy,
 }
@@ -401,7 +401,7 @@ impl ValidatePolicy for ContextPolicy {
 
 impl Default for ContextPolicy {
     fn default() -> Self {
-        let mut default_profile = HashMap::new();
+        let mut default_profile = BTreeMap::new();
         default_profile.insert("default".to_string(), 1.0);
 
         let mut profiles = BTreeMap::new();
@@ -516,10 +516,10 @@ impl IndexState {
 
         // Initialize Prometheus metrics
         let prom_weight_applied = Family::<WeightFactorLabels, Counter>::default();
-        // Custom buckets for score distribution (0.0 to 1.0, weighted towards top)
+        // Custom buckets for score distribution (0.0 to 2.0+, weighted towards top)
         let prom_score_bucket = Histogram::new(
             [
-                0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.99, 1.0,
+                0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.99, 1.0, 1.2, 1.5, 2.0,
             ]
             .into_iter(),
         );
@@ -559,16 +559,18 @@ impl IndexState {
     ) -> Result<T, Box<dyn std::error::Error>> {
         let content = std::fs::read_to_string(path)?;
         let policy: T = serde_yaml_ng::from_str(&content)?;
-        policy.validate()?;
+        policy.validate().map_err(|e| Box::<dyn std::error::Error>::from(e))?;
         Ok(policy)
     }
 
     /// Helper to get weight for a trust level from policy
     fn get_trust_weight(&self, trust_level: TrustLevel) -> f32 {
         let key = trust_level.to_string();
+        let min_weight = self.inner.policies.trust.min_weight;
+
         // Policy validation ensures all keys exist.
         // If not found (shouldn't happen with valid policy), fallback to hardcoded default for safety.
-        self.inner
+        let weight = self.inner
             .policies
             .trust
             .trust_weights
@@ -578,7 +580,10 @@ impl IndexState {
                 TrustLevel::High => 1.0,
                 TrustLevel::Medium => 0.7,
                 TrustLevel::Low => 0.3,
-            })
+            });
+
+        // Apply minimum floor defined in policy
+        weight.max(min_weight)
     }
 
     /// Helper to get context weight from policy
