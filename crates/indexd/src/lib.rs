@@ -17,7 +17,7 @@ use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Instant,
@@ -319,7 +319,7 @@ pub trait ValidatePolicy {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrustPolicy {
-    pub trust_weights: HashMap<String, f32>, // high, medium, low
+    pub trust_weights: BTreeMap<String, f32>, // high, medium, low (BTreeMap for stable hash)
     #[serde(default = "default_min_weight")]
     pub min_weight: f32,
 }
@@ -346,7 +346,7 @@ impl ValidatePolicy for TrustPolicy {
 
 impl Default for TrustPolicy {
     fn default() -> Self {
-        let mut trust_weights = HashMap::new();
+        let mut trust_weights = BTreeMap::new();
         trust_weights.insert("high".to_string(), 1.0);
         trust_weights.insert("medium".to_string(), 0.7);
         trust_weights.insert("low".to_string(), 0.3);
@@ -363,7 +363,7 @@ fn default_min_weight() -> f32 {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextPolicy {
-    pub profiles: HashMap<String, HashMap<String, f32>>,
+    pub profiles: BTreeMap<String, HashMap<String, f32>>, // BTreeMap for stable hash
     pub recency: RecencyPolicy,
 }
 
@@ -398,7 +398,7 @@ impl Default for ContextPolicy {
         let mut default_profile = HashMap::new();
         default_profile.insert("default".to_string(), 1.0);
 
-        let mut profiles = HashMap::new();
+        let mut profiles = BTreeMap::new();
         profiles.insert("default".to_string(), default_profile);
 
         Self {
@@ -836,8 +836,17 @@ impl IndexState {
         }
 
         // Audit Logging (Debug level, structured)
-        // Log changes in ranking if enabled (implied by debug level)
         if tracing::enabled!(tracing::Level::DEBUG) {
+            // Log full breakdown if explicitly requested
+            if request.include_weights {
+                tracing::debug!(
+                    query = %request.query,
+                    matches = ?matches.iter().take(3).map(|m| (&m.doc_id, m.score, &m.weights)).collect::<Vec<_>>(),
+                    "Decision weighting breakdown"
+                );
+            }
+
+            // Check for ranking changes
             // Sort by base similarity to see what the "raw" ranking would have been
             // Note: This is expensive, so only done if debug logging is enabled
              let mut raw_matches = matches.clone();
