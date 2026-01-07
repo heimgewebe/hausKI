@@ -18,12 +18,12 @@ https://github.com/heimgewebe/hausKI/actions/workflows/security.yml?query=branch
 ^https://schemas\.heimgewebe\.(de|org)/.*
 ^https://heimgewebe\.github\.io/hausKI/.*
 
-# Example domains (RFC 2606)
-^https?://.*\.example(/.*)?$
-^https?://.*\.invalid(/.*)?$
-^https?://.*\.localhost(/.*)?$
-^https?://.*\.test(/.*)?$
+# Example domains (RFC 2606 / RFC 6761) - Strict matching
+^https?://([^/]+\.)?example\.(com|net|org)(/.*)?$
+^https?://([^/]+\.)?invalid(/.*)?$
+^https?://([^/]+\.)?localhost(/.*)?$
+^https?://([^/]+\.)?test(/.*)?$
 
 # Specific test domains and placeholders
 ^http://insecure\.com/?$
-^http://from-.*$
+^http://from-(file|env)/?$
