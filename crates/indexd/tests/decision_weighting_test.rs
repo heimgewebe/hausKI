@@ -598,3 +598,86 @@ async fn test_context_weighting_falls_back_to_origin() {
         "Context weight should be 1.2 (chronik) even in default namespace"
     );
 }
+
+#[tokio::test]
+async fn test_explicit_one_wins_if_not_default_namespace() {
+    let mut trust_file = NamedTempFile::new().unwrap();
+    write!(
+        trust_file,
+        "trust_weights:\n  high: 1.0\n  medium: 0.7\n  low: 0.3\nmin_weight: 0.1\n"
+    )
+    .unwrap();
+
+    let mut context_file = NamedTempFile::new().unwrap();
+    write!(
+        context_file,
+        r#"
+profiles:
+  default:
+    _default: 1.0
+  custom_profile:
+    # Explicit 1.0 for chronik should WIN over _default 0.7
+    chronik: 1.0
+    _default: 0.7
+recency:
+  default_half_life_seconds: 604800
+  min_weight: 0.1
+"#
+    )
+    .unwrap();
+
+    let state = IndexState::new(
+        60,
+        Arc::new(|_, _, _, _| {}),
+        None,
+        Some((trust_file.path().to_path_buf(), context_file.path().to_path_buf())),
+    );
+
+    // Document in "chronik" namespace
+    state
+        .upsert(UpsertRequest {
+            doc_id: "doc-chronik-1.0".into(),
+            namespace: "chronik".into(),
+            chunks: vec![ChunkPayload {
+                chunk_id: Some("chunk-1".into()),
+                text: Some("Content".into()),
+                embedding: Vec::new(),
+                meta: json!({}),
+            }],
+            meta: json!({}),
+            source_ref: Some(test_source_ref("chronik", "evt-2")),
+        })
+        .await
+        .expect("upsert should succeed");
+
+    // Search with custom_profile
+    let results = state
+        .search(&SearchRequest {
+            query: "Content".into(),
+            k: Some(1),
+            namespace: Some("chronik".into()),
+            context_profile: Some("custom_profile".into()),
+            include_weights: true,
+            exclude_flags: None,
+            min_trust_level: None,
+            exclude_origins: None,
+        })
+        .await;
+
+    assert_eq!(results.len(), 1);
+    let weights = results[0].weights.as_ref().unwrap();
+
+    // With my current logic:
+    // ns_weight = 1.0.
+    // filter(|w| (w-1.0).abs() > EPSILON) -> Returns None.
+    // Falls back to origin (chronik origin not in profile? wait, chronik key is in profile).
+    // Ah, profile has `chronik: 1.0`.
+    // Origin is "chronik".
+    // profile.get("chronik") is 1.0.
+    // filter(|w| ...) -> Returns None.
+    // Falls back to _default (0.7).
+
+    // So my current logic implements: "Neutral 1.0 acts as 'not set'".
+    // So result should be 0.7.
+    assert_eq!(weights.context, 0.7, "Explicit 1.0 should be treated as neutral and fallback to _default");
+}

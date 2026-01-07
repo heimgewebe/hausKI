@@ -625,8 +625,8 @@ impl IndexState {
     /// Helper to get context weight from policy
     ///
     /// Strategy:
-    /// 1. Look up weight by `namespace`.
-    /// 2. If result is 1.0 (default/neutral) OR namespace is generic "default", look up by `source_ref.origin`.
+    /// 1. Look up weight by `namespace`. If present and != 1.0, it wins (Topology).
+    /// 2. If namespace is "default" or its weight is 1.0 (neutral), look up `origin`. If present, it wins (Semantics).
     /// 3. Fallback to profile `_default`.
     fn get_context_weight(
         &self,
@@ -649,50 +649,30 @@ impl IndexState {
         };
 
         // 1. Check namespace
-        let ns_weight = profile.get(namespace);
+        let ns_weight = profile.get(namespace).filter(|&&w| (w - 1.0).abs() > f32::EPSILON);
 
         // 2. Check origin
         let origin_weight = if let Some(sr) = source_ref {
-            profile.get(&sr.origin)
+            profile.get(&sr.origin).filter(|&&w| (w - 1.0).abs() > f32::EPSILON)
         } else {
             None
         };
 
         // Decision logic:
-        // - If namespace is "default" (generic), origin (semantic) takes precedence if present.
-        // - If namespace has explicit non-1.0 weight, it takes precedence (topology override).
-        // - Else if origin has explicit weight, it takes precedence.
-        // - Fallback to profile `_default`.
-
-        // Special case: "default" namespace is generic
-        if namespace == "default" {
-            if let Some(&w) = origin_weight {
-                return w;
-            }
-        }
+        // - Namespace explicit (non-neutral) wins.
+        // - Origin (non-neutral) wins.
+        // - Profile default wins.
+        // - 1.0.
 
         if let Some(&w) = ns_weight {
-            // If explicit weight matches the namespace
-            if (w - 1.0).abs() > f32::EPSILON {
-                return w;
-            }
+            return w;
         }
 
         if let Some(&w) = origin_weight {
             return w;
         }
 
-        // Fallback to profile default
-        // If ns_weight was 1.0, we might use it, but strictly `_default` is the fallback.
-        // If namespace="default" had explicit "default": 1.0 in profile, ns_weight is 1.0.
-        // But we want to use `_default` if nothing else matched.
-        // Since we checked origin, we can just return ns_weight if present (it's 1.0), OR `_default`.
-        // BUT: if `_default` is 0.7, and `namespace` "foo" isn't in profile, ns_weight is None. We return 0.7. Correct.
-        // If `namespace` "foo" is in profile as 1.0, ns_weight is 1.0. We return 1.0. Correct (explicit neutral).
-
-        *ns_weight
-            .or_else(|| profile.get("_default"))
-            .unwrap_or(&1.0)
+        *profile.get("_default").unwrap_or(&1.0)
     }
 
     pub fn policy_hash(&self) -> &str {
@@ -809,6 +789,10 @@ impl IndexState {
 
         let mut matches: Vec<SearchMatch> = Vec::new();
         let mut filtered_count = 0;
+        // Track if any weight factors were actually non-neutral (applied) during this search
+        let mut trust_applied = false;
+        let mut recency_applied = false;
+        let mut context_applied = false;
 
         for doc in namespace_store.values() {
             // Apply trust level filter
@@ -883,6 +867,17 @@ impl IndexState {
                 // Apply decision weighting: final_score = similarity × trust × recency × context
                 let final_score = base_score * trust_weight * recency_weight * context_weight;
 
+                // Track if factors are active (non-neutral)
+                if (trust_weight - 1.0).abs() > f32::EPSILON {
+                    trust_applied = true;
+                }
+                if (recency_weight - 1.0).abs() > f32::EPSILON {
+                    recency_applied = true;
+                }
+                if (context_weight - 1.0).abs() > f32::EPSILON {
+                    context_applied = true;
+                }
+
                 // Optionally include weight breakdown for transparency
                 let weights = if request.include_weights {
                     Some(WeightBreakdown {
@@ -933,10 +928,16 @@ impl IndexState {
 
         // Update metrics (per search, not per match, to reduce volume)
         if !matches.is_empty() {
-            // Count factors once per search where they were applied (always applied in this model)
-            self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "trust".into() }).inc();
-            self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "recency".into() }).inc();
-            self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "context".into() }).inc();
+            // Count factors once per search ONLY if they were actually applied (non-neutral)
+            if trust_applied {
+                self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "trust".into() }).inc();
+            }
+            if recency_applied {
+                self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "recency".into() }).inc();
+            }
+            if context_applied {
+                self.inner.prom_weight_applied.get_or_create(&WeightFactorLabels { factor: "context".into() }).inc();
+            }
 
             // Observe distribution only for top result to keep histogram volume manageable
             self.inner.prom_score_bucket.observe(matches[0].score.into());
