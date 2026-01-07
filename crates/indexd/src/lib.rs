@@ -395,9 +395,9 @@ impl ValidatePolicy for ContextPolicy {
                     ));
                 }
             }
-            if !weights.contains_key("default") {
+            if !weights.contains_key("_default") {
                 return Err(format!(
-                    "Profile '{}' is missing required 'default' key",
+                    "Profile '{}' is missing required '_default' key (fallback weight)",
                     profile_name
                 ));
             }
@@ -412,7 +412,7 @@ impl ValidatePolicy for ContextPolicy {
 impl Default for ContextPolicy {
     fn default() -> Self {
         let mut default_profile = BTreeMap::new();
-        default_profile.insert("default".to_string(), 1.0);
+        default_profile.insert("_default".to_string(), 1.0);
 
         let mut profiles = BTreeMap::new();
         profiles.insert("default".to_string(), default_profile);
@@ -626,8 +626,8 @@ impl IndexState {
     ///
     /// Strategy:
     /// 1. Look up weight by `namespace`.
-    /// 2. If result is 1.0 (default/neutral), look up by `source_ref.origin`.
-    /// 3. Fallback to profile default or 1.0.
+    /// 2. If result is 1.0 (default/neutral) OR namespace is generic "default", look up by `source_ref.origin`.
+    /// 3. Fallback to profile `_default`.
     fn get_context_weight(
         &self,
         namespace: &str,
@@ -651,7 +651,7 @@ impl IndexState {
         // 1. Check namespace
         let ns_weight = profile.get(namespace);
 
-        // 2. Check origin if namespace didn't yield a specific weight
+        // 2. Check origin
         let origin_weight = if let Some(sr) = source_ref {
             profile.get(&sr.origin)
         } else {
@@ -659,12 +659,12 @@ impl IndexState {
         };
 
         // Decision logic:
-        // - If namespace is "default" (generic) and we have a specific origin weight, use origin (semantic override).
-        // - Else if namespace has explicit weight != 1.0, use it (topology override).
-        // - Else if origin has explicit weight, use it.
-        // - Else use profile default.
+        // - If namespace is "default" (generic), origin (semantic) takes precedence if present.
+        // - If namespace has explicit non-1.0 weight, it takes precedence (topology override).
+        // - Else if origin has explicit weight, it takes precedence.
+        // - Fallback to profile `_default`.
 
-        // Special case: "default" namespace is generic, so semantic origin should take precedence if present
+        // Special case: "default" namespace is generic
         if namespace == "default" {
             if let Some(&w) = origin_weight {
                 return w;
@@ -672,6 +672,7 @@ impl IndexState {
         }
 
         if let Some(&w) = ns_weight {
+            // If explicit weight matches the namespace
             if (w - 1.0).abs() > f32::EPSILON {
                 return w;
             }
@@ -681,9 +682,16 @@ impl IndexState {
             return w;
         }
 
-        // Fallback
+        // Fallback to profile default
+        // If ns_weight was 1.0, we might use it, but strictly `_default` is the fallback.
+        // If namespace="default" had explicit "default": 1.0 in profile, ns_weight is 1.0.
+        // But we want to use `_default` if nothing else matched.
+        // Since we checked origin, we can just return ns_weight if present (it's 1.0), OR `_default`.
+        // BUT: if `_default` is 0.7, and `namespace` "foo" isn't in profile, ns_weight is None. We return 0.7. Correct.
+        // If `namespace` "foo" is in profile as 1.0, ns_weight is 1.0. We return 1.0. Correct (explicit neutral).
+
         *ns_weight
-            .or_else(|| profile.get("default"))
+            .or_else(|| profile.get("_default"))
             .unwrap_or(&1.0)
     }
 

@@ -21,21 +21,21 @@ fn create_test_policy_files() -> (NamedTempFile, NamedTempFile) {
         r#"
 profiles:
   default:
-    default: 1.0
+    _default: 1.0
   incident_response:
     chronik: 1.2
     osctx: 1.0
     insights: 0.8
     code: 0.5
     docs: 0.5
-    default: 0.7
+    _default: 0.7
   code_analysis:
     docs: 1.2
     code: 1.2
     osctx: 0.8
     chronik: 0.6
     insights: 0.5
-    default: 0.7
+    _default: 0.7
 recency:
   default_half_life_seconds: 604800
   min_weight: 0.1

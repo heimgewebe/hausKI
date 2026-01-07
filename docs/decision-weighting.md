@@ -94,9 +94,9 @@ Diese Logik wird nun dynamisch aus `policies/context.yaml` geladen.
 **Logik & Priorität:**
 1. **Namespace-Explizit:** Wenn der Namespace im Profil einen expliziten Wert (!= 1.0) hat, gewinnt dieser (Topologie schlägt Semantik).
 2. **Origin-Fallback:** Wenn Namespace `default` ist (oder Gewicht 1.0), wird `source_ref.origin` geprüft (Semantik füllt Lücke).
-3. **Profile-Default:** Fallback auf den Default-Wert des Profils.
+3. **Profile-Default:** Fallback auf den Default-Wert des Profils (Key: `_default`).
 
-**Profile** sind in `policies/context.yaml` definiert:
+**Profile** sind in `policies/context.yaml` definiert (Pfade via `HAUSKI_TRUST_POLICY_PATH` / `HAUSKI_CONTEXT_POLICY_PATH` konfigurierbar):
 
 ### Profile
 
