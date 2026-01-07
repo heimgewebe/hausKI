@@ -71,6 +71,8 @@ RetentionConfig {
 recency_weight = 0.5^(age_seconds / half_life_seconds)
 ```
 
+> **Priorität:** Eine über die API gesetzte `RetentionConfig` (via `/index/retention`) überschreibt die Defaults aus `policies/context.yaml`.
+
 ### Beispiel
 
 Mit `half_life_seconds = 604800` (7 Tage):
@@ -89,10 +91,10 @@ Alte Wahrheiten bleiben sichtbar, aber leise.
 Passt Gewichtung basierend auf Namespace, Origin und Intent-Profil an.
 Diese Logik wird nun dynamisch aus `policies/context.yaml` geladen.
 
-**Logik:**
-1. Prüfe Gewichtung für **Namespace**.
-2. Wenn Namespace `default` ist, prüfe Gewichtung für **Origin** (semantische Quelle).
-3. Fallback auf Profile-Default.
+**Logik & Priorität:**
+1. **Namespace-Explizit:** Wenn der Namespace im Profil einen expliziten Wert (!= 1.0) hat, gewinnt dieser (Topologie schlägt Semantik).
+2. **Origin-Fallback:** Wenn Namespace `default` ist (oder Gewicht 1.0), wird `source_ref.origin` geprüft (Semantik füllt Lücke).
+3. **Profile-Default:** Fallback auf den Default-Wert des Profils.
 
 **Profile** sind in `policies/context.yaml` definiert:
 
@@ -308,7 +310,7 @@ Decision weighting changed top result query="security update" original_top="doc-
 
 ### Policy Hash
 
-Um sicherzustellen, dass die erwartete Policy aktiv ist, gibt `/index/stats` einen Hash zurück:
+Um Drift zu erkennen, gibt `/index/stats` einen SHA-256 Hash der **effektiv geladenen** Policy-Struktur zurück:
 
 ```json
 {
@@ -316,6 +318,9 @@ Um sicherzustellen, dass die erwartete Policy aktiv ist, gibt `/index/stats` ein
   "policy_hash": "a1b2c3d4..."
 }
 ```
+
+*   Ändert sich der Hash, hat sich die Policy geändert (Datei-Update oder Fallback-Wechsel).
+*   Der Hash ist stabil (sortierte Keys), unabhängig von Restart-Reihenfolge.
 
 ## Testing
 
