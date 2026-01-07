@@ -343,6 +343,16 @@ impl ValidatePolicy for TrustPolicy {
                 return Err(format!("Missing required trust level: {}", required));
             }
         }
+
+        // Ensure min_weight doesn't accidentally suppress configured weights
+        for (level, weight) in &self.trust_weights {
+            if *weight < self.min_weight {
+                return Err(format!(
+                    "Trust weight for '{}' ({}) is less than min_weight ({}). This would be silently clamped.",
+                    level, weight, self.min_weight
+                ));
+            }
+        }
         Ok(())
     }
 }
@@ -450,6 +460,8 @@ pub struct PolicyConfig {
     pub context: ContextPolicy,
     /// Stable hash of the loaded policies for drift detection.
     pub hash: String,
+    /// Source of the policy configuration (e.g. "loaded_from_disk", "fallback_defaults").
+    pub source: String,
 }
 
 struct IndexInner {
@@ -487,17 +499,25 @@ impl IndexState {
         policy_paths: Option<(PathBuf, PathBuf)>, // (trust_path, context_path)
     ) -> Self {
         // Load policies or use defaults
-        let (trust_policy, context_policy, policy_hash) =
+        let (trust_policy, context_policy, policy_hash, policy_source) =
             if let Some((trust_path, context_path)) = policy_paths {
-                let trust = Self::load_policy::<TrustPolicy>(&trust_path).unwrap_or_else(|e| {
-                    tracing::error!(path = %trust_path.display(), error = %e, "Failed to load trust policy, falling back to default");
-                    TrustPolicy::default()
-                });
+                // Attempt to load trust policy
+                let (trust, trust_source) = match Self::load_policy::<TrustPolicy>(&trust_path) {
+                    Ok(p) => (p, "file"),
+                    Err(e) => {
+                        tracing::error!(path = %trust_path.display(), error = %e, "Failed to load trust policy, falling back to default");
+                        (TrustPolicy::default(), "fallback")
+                    }
+                };
 
-                let context = Self::load_policy::<ContextPolicy>(&context_path).unwrap_or_else(|e| {
-                    tracing::error!(path = %context_path.display(), error = %e, "Failed to load context policy, falling back to default");
-                    ContextPolicy::default()
-                });
+                // Attempt to load context policy
+                let (context, context_source) = match Self::load_policy::<ContextPolicy>(&context_path) {
+                    Ok(p) => (p, "file"),
+                    Err(e) => {
+                        tracing::error!(path = %context_path.display(), error = %e, "Failed to load context policy, falling back to default");
+                        (ContextPolicy::default(), "fallback")
+                    }
+                };
 
                 // Compute stable hash of policies
                 let mut hasher = Sha256::new();
@@ -505,14 +525,29 @@ impl IndexState {
                 hasher.update(serde_json::to_vec(&context).expect("Failed to serialize context policy for hashing"));
                 let hash = format!("{:x}", hasher.finalize());
 
-                (trust, context, hash)
+                let source = if trust_source == "file" && context_source == "file" {
+                    "loaded_from_disk".to_string()
+                } else if trust_source == "fallback" && context_source == "fallback" {
+                    "fallback_defaults".to_string()
+                } else {
+                    "partial_fallback".to_string()
+                };
+
+                (trust, context, hash, source)
             } else {
                 (
                     TrustPolicy::default(),
                     ContextPolicy::default(),
                     "default".to_string(),
+                    "defaults_no_config".to_string(),
                 )
             };
+
+        tracing::info!(
+            policy_hash = %policy_hash,
+            policy_source = %policy_source,
+            "Decision weighting policies initialized"
+        );
 
         // Initialize Prometheus metrics
         let prom_weight_applied = Family::<WeightFactorLabels, Counter>::default();
@@ -547,6 +582,7 @@ impl IndexState {
                     trust: trust_policy,
                     context: context_policy,
                     hash: policy_hash,
+                    source: policy_source,
                 },
                 prom_weight_applied,
                 prom_score_bucket,
@@ -956,6 +992,7 @@ impl IndexState {
             namespaces: namespace_counts,
             budget_ms: self.inner.budget_ms,
             policy_hash: Some(self.inner.policies.hash.clone()),
+            policy_source: Some(self.inner.policies.source.clone()),
         }
     }
 
@@ -1552,6 +1589,8 @@ pub struct StatsResponse {
     pub budget_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub policy_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_source: Option<String>,
 }
 
 /// Weight breakdown for decision-making transparency

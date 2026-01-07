@@ -432,7 +432,7 @@ async fn test_weights_omitted_when_not_requested() {
 
 #[tokio::test]
 async fn test_invalid_policies_fallback_to_default() {
-    // Create invalid trust policy file
+    // Case 1: Negative weight
     let mut invalid_trust = NamedTempFile::new().unwrap();
     write!(
         invalid_trust,
@@ -494,6 +494,59 @@ async fn test_invalid_policies_fallback_to_default() {
     assert_eq!(results.len(), 1);
     let weights = results[0].weights.as_ref().unwrap();
     assert_eq!(weights.trust, 1.0, "Should use default 1.0 for high trust despite invalid policy");
+
+    // Case 2: min_weight > configured weight (should also trigger validation failure and fallback)
+    let mut invalid_min_trust = NamedTempFile::new().unwrap();
+    write!(
+        invalid_min_trust,
+        "trust_weights:\n  high: 1.0\n  medium: 0.7\n  low: 0.05\nmin_weight: 0.1\n"
+    )
+    .unwrap();
+
+    let state_min = IndexState::new(
+        60,
+        Arc::new(|_, _, _, _| {}),
+        None,
+        Some((
+            invalid_min_trust.path().to_path_buf(),
+            context_file.path().to_path_buf(),
+        )),
+    );
+
+    // Verify fallback (low trust should be default 0.3, not clamped 0.1 or config 0.05)
+    // The policy load fails, so we get DEFAULTS. Default low is 0.3.
+    state_min
+        .upsert(UpsertRequest {
+            doc_id: "doc-low-min".into(),
+            namespace: "default".into(),
+            chunks: vec![ChunkPayload {
+                chunk_id: Some("doc-low-min#0".into()),
+                text: Some("Content".into()),
+                embedding: Vec::new(),
+                meta: json!({}),
+            }],
+            meta: json!({}),
+            source_ref: Some(test_source_ref("external", "low-min")), // trust: low
+        })
+        .await
+        .expect("upsert should succeed");
+
+    let results_min = state_min
+        .search(&SearchRequest {
+            query: "Content".into(),
+            k: Some(1),
+            namespace: Some("default".into()),
+            include_weights: true,
+            exclude_flags: None,
+            min_trust_level: None,
+            exclude_origins: None,
+            context_profile: None,
+        })
+        .await;
+
+    assert_eq!(results_min.len(), 1);
+    let weights_min = results_min[0].weights.as_ref().unwrap();
+    assert_eq!(weights_min.trust, 0.3, "Should use default 0.3 because min_weight > low caused validation failure");
 }
 
 #[tokio::test]
