@@ -895,34 +895,34 @@ impl IndexState {
 
         // Audit Logging (Debug level, structured)
         if tracing::enabled!(tracing::Level::DEBUG) {
-            // Log full breakdown if explicitly requested
+            // Log full breakdown and check for ranking changes ONLY if weights are available
             if request.include_weights {
                 tracing::debug!(
                     query = %request.query,
                     matches = ?matches.iter().take(3).map(|m| (&m.doc_id, m.score, &m.weights)).collect::<Vec<_>>(),
                     "Decision weighting breakdown"
                 );
-            }
 
-            // Check for ranking changes
-            // Find "raw top" (max similarity) without cloning/sorting
-            // This is O(N) and allocation-free
-            let raw_top = matches.iter().max_by(|a, b| {
-                match (&a.weights, &b.weights) {
-                    (Some(wa), Some(wb)) => wa.similarity.partial_cmp(&wb.similarity).unwrap_or(Ordering::Equal),
-                    _ => Ordering::Equal,
-                }
-            });
+                // Check for ranking changes
+                // Find "raw top" (max similarity) without cloning/sorting
+                // This is O(N) and allocation-free
+                let raw_top = matches.iter().max_by(|a, b| {
+                    match (&a.weights, &b.weights) {
+                        (Some(wa), Some(wb)) => wa.similarity.partial_cmp(&wb.similarity).unwrap_or(Ordering::Equal),
+                        _ => Ordering::Equal,
+                    }
+                });
 
-            if let Some(top) = raw_top {
-                // matches is sorted by final score, so matches[0] is weighted_top
-                if !matches.is_empty() && top.doc_id != matches[0].doc_id {
-                    tracing::debug!(
-                        query = %request.query,
-                        original_top = %top.doc_id,
-                        weighted_top = %matches[0].doc_id,
-                        "Decision weighting changed top result"
-                    );
+                if let Some(top) = raw_top {
+                    // matches is sorted by final score, so matches[0] is weighted_top
+                    if !matches.is_empty() && top.doc_id != matches[0].doc_id {
+                        tracing::debug!(
+                            query = %request.query,
+                            original_top = %top.doc_id,
+                            weighted_top = %matches[0].doc_id,
+                            "Decision weighting changed top result"
+                        );
+                    }
                 }
             }
         }
