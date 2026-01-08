@@ -1435,13 +1435,18 @@ impl IndexState {
         // Store outcome with capacity management
         let mut outcomes = self.inner.decision_outcomes.write().await;
 
-        // If at capacity, remove oldest outcome (ULID is time-sortable)
+        // If at capacity, remove oldest outcome based on feedback timestamp
+        // (not decision_id, since outcomes can be recorded long after the decision)
         if outcomes.len() >= MAX_DECISION_OUTCOMES {
-            if let Some(oldest_id) = outcomes.keys().min().cloned() {
+            if let Some(oldest_id) = outcomes
+                .iter()
+                .min_by_key(|(_, outcome)| &outcome.timestamp)
+                .map(|(id, _)| id.clone())
+            {
                 outcomes.remove(&oldest_id);
                 tracing::debug!(
                     oldest_id = %oldest_id,
-                    "Removed oldest decision outcome (capacity limit reached)"
+                    "Removed oldest decision outcome by feedback timestamp (capacity limit reached)"
                 );
             }
         }
@@ -1473,11 +1478,11 @@ impl IndexState {
     }
 
     /// List all decision outcomes (for heimlern consumption)
-    /// Returns outcomes sorted by decision_id (which is ULID, so time-ordered)
+    /// Returns outcomes sorted by feedback timestamp (when outcome was recorded)
     pub async fn list_decision_outcomes(&self) -> Vec<DecisionOutcome> {
         let outcomes = self.inner.decision_outcomes.read().await;
         let mut outcomes_vec: Vec<DecisionOutcome> = outcomes.values().cloned().collect();
-        outcomes_vec.sort_by(|a, b| a.decision_id.cmp(&b.decision_id));
+        outcomes_vec.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
         outcomes_vec
     }
 }
