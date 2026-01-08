@@ -14,14 +14,15 @@ Statt Treffer nur nach Ähnlichkeit zu sortieren, berücksichtigt hausKI drei Fa
 final_score = similarity × trust_weight × recency_weight × context_weight
 ```
 
-> **⚠️ Hinweis zum aktuellen Status:**  
-> Die Gewichtungslogik ist derzeit **hardcoded** in `crates/indexd/src/lib.rs`.  
-> Die YAML-Dateien (`policies/trust.yaml`, `policies/context.yaml`) dienen als **Spezifikation** und dokumentieren die aktuell implementierten Werte.  
-> **Roadmap:** Dynamisches Laden der Policies aus YAML-Dateien folgt in einem zukünftigen Release.
+> **Hinweis zum Status:**
+> Die Gewichtungslogik lädt Policies beim Start aus `../policies/trust.yaml` und `../policies/context.yaml`.
+> **Validierung:** Beim Laden werden Gewichte ≤ 0.0 und fehlende Pflichtfelder (z. B. "high", "default") abgelehnt.
+> **Fallback:** Bei Validierungsfehlern oder fehlenden Dateien werden **sichere harte Defaults** verwendet.
+> **Hash-Prüfung:** Der Hash der geladenen Policies wird in `/index/stats` als `policy_hash` zurückgegeben, um Drift zu erkennen.
 
 ## Trust-Gewichtung
 
-Basiert auf dem `TrustLevel` der Quelle (definiert in `policies/trust.yaml`):
+Basiert auf dem `TrustLevel` der Quelle (konfigurierbar in `../policies/trust.yaml`):
 
 | Trust Level | Weight | Typische Quellen |
 |-------------|--------|------------------|
@@ -70,6 +71,8 @@ RetentionConfig {
 recency_weight = 0.5^(age_seconds / half_life_seconds)
 ```
 
+> **Priorität:** Eine über die API gesetzte `RetentionConfig` (via `/index/retention`) überschreibt die Defaults aus `../policies/context.yaml`.
+
 ### Beispiel
 
 Mit `half_life_seconds = 604800` (7 Tage):
@@ -85,9 +88,15 @@ Alte Wahrheiten bleiben sichtbar, aber leise.
 
 ## Context-Gewichtung
 
-Passt Gewichtung basierend auf Namespace und Intent-Profil an.
+Passt Gewichtung basierend auf Namespace, Origin und Intent-Profil an.
+Diese Logik wird nun dynamisch aus `../policies/context.yaml` geladen.
 
-**Profile** sind in `policies/context.yaml` definiert:
+**Logik & Priorität:**
+1. **Namespace-Explizit:** Wenn der Namespace im Profil einen expliziten Wert (!= 1.0) hat, gewinnt dieser (Topologie schlägt Semantik).
+2. **Origin-Fallback:** Wenn Namespace `default` ist (oder Gewicht 1.0), wird `source_ref.origin` geprüft (Semantik füllt Lücke).
+3. **Profile-Default:** Fallback auf den Default-Wert des Profils (Key: `_default`).
+
+**Profile** sind in `../policies/context.yaml` definiert (Pfade via `HAUSKI_TRUST_POLICY_PATH` / `HAUSKI_CONTEXT_POLICY_PATH` konfigurierbar):
 
 ### Profile
 
@@ -280,31 +289,42 @@ namespace: "chronik".into()
 
 ## Erweiterung: Neue Profile
 
-Neue Profile können in `policies/context.yaml` hinzugefügt werden:
+Neue Profile können in `../policies/context.yaml` hinzugefügt werden.
 
-```yaml
-profiles:
-  my_custom_profile:
-    namespace_a: 1.5
-    namespace_b: 0.8
-    default: 1.0
+## Observability & Audit
+
+### Metriken
+
+Folgende Prometheus-Metriken werden erhoben:
+
+* `decision_weight_applied_total{factor}`: Zählt, wie oft ein Gewichtungsfaktor (trust, recency, context) angewendet wurde.
+* `decision_final_score_bucket`: Histogramm der finalen Scores zur Analyse der Verteilung.
+
+### Audit-Logs
+
+Bei aktiviertem DEBUG-Logging protokolliert das System, wenn sich das Top-Ranking durch Gewichtung ändert:
+
+```text
+Decision weighting changed top result query="security update" original_top="doc-low-trust" weighted_top="doc-high-trust"
 ```
 
-Dann in `calculate_context_weight()` ergänzen:
+### Policy Hash
 
-```rust
-fn calculate_context_weight(namespace: &str, context_profile: Option<&str>) -> f32 {
-    match (profile, namespace) {
-        ("my_custom_profile", "namespace_a") => 1.5,
-        ("my_custom_profile", "namespace_b") => 0.8,
-        ...
-    }
+Um Drift zu erkennen, gibt `/index/stats` einen SHA-256 Hash der **effektiv geladenen** Policy-Struktur zurück:
+
+```json
+{
+  "total_documents": 150,
+  "policy_hash": "a1b2c3d4..."
 }
 ```
 
+*   Ändert sich der Hash, hat sich die Policy geändert (Datei-Update oder Fallback-Wechsel).
+*   Der Hash ist stabil (sortierte Keys), unabhängig von Restart-Reihenfolge.
+
 ## Testing
 
-Tests unter `crates/indexd/tests/decision_weighting_test.rs`:
+Tests unter `../crates/indexd/tests/decision_weighting_test.rs`:
 
 ```bash
 cargo test --package hauski-indexd decision_weighting
@@ -316,17 +336,9 @@ cargo test --package hauski-indexd decision_weighting
 - Kombinierte Gewichtung (Trust × Recency × Context)
 - Weight Transparency (include_weights)
 
-## Nächste Schritte
-
-Folgende Erweiterungen sind geplant (siehe Issue 5/…):
-
-1. **Policy-Loading:** YAML-Dateien dynamisch laden (aktuell hardcoded)
-2. **Metrics:** `decision_weight_applied_total{factor}`, `decision_score_distribution_bucket`
-3. **Feedback-Loop:** Lernen aus Entscheidungen (heimlern-Integration)
-
 ## Referenzen
 
 - Issue: "indexd ↔ policy – Decision-Weighting nach Trust, Recency & Kontext"
-- Code: `crates/indexd/src/lib.rs`
-- Policies: `policies/trust.yaml`, `policies/context.yaml`
-- Tests: `crates/indexd/tests/decision_weighting_test.rs`
+- Code: `../crates/indexd/src/lib.rs`
+- Policies: `../policies/trust.yaml`, `../policies/context.yaml`
+- Tests: `../crates/indexd/tests/decision_weighting_test.rs`

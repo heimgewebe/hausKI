@@ -21,6 +21,7 @@ use prometheus_client::{
 };
 use std::{
     env, fmt,
+    path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -213,7 +214,24 @@ impl AppState {
             })
         };
 
-        let index = IndexState::new(limits.latency.index_topk20_ms, metrics_recorder.clone());
+        // Create a sub-registry for indexd metrics
+        // This ensures they are properly namespaced and collected
+        let mut index_sub_registry = registry.sub_registry_with_prefix("index");
+
+        // Load policies from standard locations or environment override
+        let trust_policy_path = env::var("HAUSKI_TRUST_POLICY_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("policies/trust.yaml"));
+        let context_policy_path = env::var("HAUSKI_CONTEXT_POLICY_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("policies/context.yaml"));
+
+        let index = IndexState::new(
+            limits.latency.index_topk20_ms,
+            metrics_recorder.clone(),
+            Some(&mut index_sub_registry),
+            Some((trust_policy_path, context_policy_path)),
+        );
 
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(15))

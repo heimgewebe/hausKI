@@ -10,7 +10,7 @@ use std::sync::Arc;
 /// Test that time-decay reduces scores over time
 #[tokio::test]
 async fn test_time_decay_reduces_scores() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Configure decay for namespace with 1-day half-life
     state
         .set_retention_config(
@@ -61,7 +61,7 @@ async fn test_time_decay_reduces_scores() {
 /// Test that decay preview shows correct decay factors
 #[tokio::test]
 async fn test_decay_preview() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Configure decay for namespace
     state
         .set_retention_config(
@@ -106,7 +106,7 @@ async fn test_decay_preview() {
 /// Test intentional forget with namespace filter
 #[tokio::test]
 async fn test_forget_by_namespace() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Add documents to different namespaces
     state
         .upsert(UpsertRequest {
@@ -216,7 +216,7 @@ async fn test_forget_by_namespace() {
 /// Test forget with source_ref filter
 #[tokio::test]
 async fn test_forget_by_source_ref_origin() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Add documents with different source origins
     state
         .upsert(UpsertRequest {
@@ -282,7 +282,7 @@ async fn test_forget_by_source_ref_origin() {
 /// Test forget with older_than filter
 #[tokio::test]
 async fn test_forget_older_than() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Add a document
     state
         .upsert(UpsertRequest {
@@ -335,7 +335,7 @@ async fn test_forget_older_than() {
 /// Test forget with specific doc_id
 #[tokio::test]
 async fn test_forget_by_doc_id() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Add multiple documents
     for i in 1..=3 {
         state
@@ -394,7 +394,7 @@ async fn test_forget_by_doc_id() {
 /// Test retention config retrieval
 #[tokio::test]
 async fn test_get_retention_configs() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Set multiple retention configs
     state
         .set_retention_config(
@@ -435,7 +435,7 @@ async fn test_get_retention_configs() {
 /// Test that decay calculation is deterministic
 #[tokio::test]
 async fn test_decay_calculation_deterministic() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Configure decay
     state
         .set_retention_config(
@@ -478,7 +478,7 @@ async fn test_decay_calculation_deterministic() {
 /// Integration test: decay affects search ranking
 #[tokio::test]
 async fn test_decay_affects_search_ranking() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Configure very aggressive decay for testing (1 second half-life)
     state
         .set_retention_config(
@@ -561,7 +561,7 @@ async fn test_decay_affects_search_ranking() {
 /// Test that filter semantics use AND logic (all filters must match)
 #[tokio::test]
 async fn test_forget_uses_and_semantics() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Add documents with different characteristics
     // Doc 1: old, from chronik
     state
@@ -655,7 +655,7 @@ async fn test_forget_uses_and_semantics() {
 /// Test that namespace wipe without allow_namespace_wipe flag doesn't delete anything
 #[tokio::test]
 async fn test_namespace_wipe_requires_explicit_flag() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Add documents
     for i in 1..=3 {
         state
@@ -714,7 +714,7 @@ async fn test_namespace_wipe_requires_explicit_flag() {
 /// Test that future timestamps (clock skew) are handled gracefully
 #[tokio::test]
 async fn test_future_timestamp_handling() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Configure decay
     state
         .set_retention_config(
@@ -777,7 +777,7 @@ async fn test_future_timestamp_handling() {
 /// Test defense-in-depth: forget() method itself rejects global wipe
 #[tokio::test]
 async fn test_forget_method_blocks_global_wipe() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     // Add documents in multiple namespaces
     for ns in &["ns1", "ns2", "ns3"] {
         for i in 1..=2 {

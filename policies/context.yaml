@@ -10,7 +10,7 @@
 profiles:
   # Default profile: balanced weighting
   default:
-    default: 1.0
+    _default: 1.0
     chronik: 1.0
     osctx: 1.0
     insights: 1.0
@@ -24,7 +24,7 @@ profiles:
     insights: 0.8
     code: 0.5
     docs: 0.5
-    default: 0.7
+    _default: 0.7
     
   # Code analysis: prioritize docs and code
   code_analysis:
@@ -33,7 +33,7 @@ profiles:
     osctx: 0.8
     chronik: 0.6
     insights: 0.5
-    default: 0.7
+    _default: 0.7
     
   # Reflection: prioritize insights and chronik
   reflection:
@@ -42,7 +42,7 @@ profiles:
     osctx: 0.8
     code: 0.5
     docs: 0.5
-    default: 0.7
+    _default: 0.7
 
 # Recency weighting configuration
 recency:

@@ -6,9 +6,24 @@ use axum::{
     Json, Router,
 };
 use chrono::{DateTime, Utc};
+use prometheus_client::encoding::EncodeLabelSet;
+use prometheus_client::metrics::counter::Counter;
+use prometheus_client::metrics::family::Family;
+use prometheus_client::metrics::histogram::Histogram;
+use prometheus_client::registry::Registry;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{borrow::Cow, cmp::Ordering, collections::HashMap, sync::Arc, time::Instant};
+use sha2::{Digest, Sha256};
+use std::{
+    borrow::Cow,
+    cmp::Ordering,
+    collections::{BTreeMap, HashMap},
+    io,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Instant,
+};
+use thiserror::Error;
 use tokio::sync::RwLock;
 
 const DEFAULT_NAMESPACE: &str = "default";
@@ -17,6 +32,21 @@ const MIN_WORD_LENGTH_FOR_SIMILARITY: usize = 3;
 const WORD_MATCH_SCORE_INCREMENT: f32 = 0.1;
 
 pub type MetricsRecorder = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
+struct WeightFactorLabels {
+    factor: String, // "trust", "recency", "context"
+}
+
+#[derive(Debug, Error)]
+enum PolicyLoadError {
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
+    #[error("YAML error: {0}")]
+    Yaml(#[from] serde_yaml_ng::Error),
+    #[error("Validation error: {0}")]
+    Validation(String),
+}
 
 /// Error type for index operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,7 +70,7 @@ impl IndexError {
 }
 
 /// Trust level for document sources - indicates how much to trust this content
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum TrustLevel {
     /// Low trust - external sources, user input, tool output
@@ -51,6 +81,16 @@ pub enum TrustLevel {
     High,
 }
 
+impl std::fmt::Display for TrustLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TrustLevel::Low => write!(f, "low"),
+            TrustLevel::Medium => write!(f, "medium"),
+            TrustLevel::High => write!(f, "high"),
+        }
+    }
+}
+
 impl TrustLevel {
     /// Returns the default trust level for a given origin
     pub fn default_for_origin(origin: &str) -> Self {
@@ -59,24 +99,6 @@ impl TrustLevel {
             "osctx" => TrustLevel::Medium,
             "user" | "external" | "tool" => TrustLevel::Low,
             _ => TrustLevel::Medium,
-        }
-    }
-
-    /// Returns the weight multiplier for this trust level
-    ///
-    /// SOURCE OF TRUTH: Rust hardcodes; policies/trust.yaml mirrors defaults (until policy-loading lands).
-    ///
-    /// Based on policies/trust.yaml specification:
-    /// - High: 1.0
-    /// - Medium: 0.7
-    /// - Low: 0.3
-    ///
-    /// NOTE: Currently hardcoded. Future: Load from policies/trust.yaml at runtime.
-    pub fn weight(&self) -> f32 {
-        match self {
-            TrustLevel::High => 1.0,
-            TrustLevel::Medium => 0.7,
-            TrustLevel::Low => 0.3,
         }
     }
 }
@@ -281,47 +303,6 @@ fn calculate_decay_factor(age_seconds: i64, half_life_seconds: Option<u64>) -> f
     }
 }
 
-/// Calculate context weight for a namespace based on the context profile
-/// Returns 1.0 if no profile is specified (balanced weighting)
-///
-/// SOURCE OF TRUTH: Rust hardcodes; policies/context.yaml mirrors defaults (until policy-loading lands).
-///
-/// NOTE: Currently hardcoded based on policies/context.yaml specification.
-/// Future: Load dynamically from YAML at runtime.
-fn calculate_context_weight(namespace: &str, context_profile: Option<&str>) -> f32 {
-    match context_profile {
-        None => 1.0, // Default: no context weighting
-        Some(profile) => {
-            // Basic hardcoded profiles matching policies/context.yaml
-            match (profile, namespace) {
-                // incident_response profile
-                ("incident_response", "chronik") => 1.2,
-                ("incident_response", "osctx") => 1.0,
-                ("incident_response", "insights") => 0.8,
-                ("incident_response", "code" | "docs") => 0.5,
-                ("incident_response", _) => 0.7,
-
-                // code_analysis profile
-                ("code_analysis", "docs" | "code") => 1.2,
-                ("code_analysis", "osctx") => 0.8,
-                ("code_analysis", "chronik") => 0.6,
-                ("code_analysis", "insights") => 0.5,
-                ("code_analysis", _) => 0.7,
-
-                // reflection profile
-                ("reflection", "insights") => 1.2,
-                ("reflection", "chronik") => 1.0,
-                ("reflection", "osctx") => 0.8,
-                ("reflection", "code" | "docs") => 0.5,
-                ("reflection", _) => 0.7,
-
-                // default profile or unknown profile
-                _ => 1.0,
-            }
-        }
-    }
-}
-
 fn normalize_namespace(input: &str) -> String {
     let trimmed = input.trim();
     if trimmed.is_empty() {
@@ -343,11 +324,167 @@ pub struct IndexState {
     inner: Arc<IndexInner>,
 }
 
+// Policy definitions
+pub trait ValidatePolicy {
+    fn validate(&self) -> Result<(), String>;
+}
+
+/// Policy defining trust levels and their weights.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrustPolicy {
+    /// Mapping of trust levels ("high", "medium", "low") to weight multipliers.
+    pub trust_weights: BTreeMap<String, f32>, // BTreeMap for stable hash
+    /// Minimum weight floor to prevent total suppression.
+    #[serde(default = "default_min_weight")]
+    pub min_weight: f32,
+}
+
+impl ValidatePolicy for TrustPolicy {
+    fn validate(&self) -> Result<(), String> {
+        if self.min_weight <= 0.0 {
+            return Err("min_weight must be > 0".to_string());
+        }
+        for (level, weight) in &self.trust_weights {
+            if *weight <= 0.0 {
+                return Err(format!("Trust weight for '{}' must be > 0", level));
+            }
+        }
+        // Ensure required keys exist
+        for required in &["high", "medium", "low"] {
+            if !self.trust_weights.contains_key(*required) {
+                return Err(format!("Missing required trust level: {}", required));
+            }
+        }
+
+        // Ensure min_weight doesn't accidentally suppress configured weights
+        for (level, weight) in &self.trust_weights {
+            if *weight < self.min_weight {
+                return Err(format!(
+                    "Trust weight for '{}' ({}) is less than min_weight ({}). This would be silently clamped.",
+                    level, weight, self.min_weight
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Default for TrustPolicy {
+    fn default() -> Self {
+        let mut trust_weights = BTreeMap::new();
+        trust_weights.insert("high".to_string(), 1.0);
+        trust_weights.insert("medium".to_string(), 0.7);
+        trust_weights.insert("low".to_string(), 0.3);
+        Self {
+            trust_weights,
+            min_weight: 0.1,
+        }
+    }
+}
+
+fn default_min_weight() -> f32 {
+    0.1
+}
+
+/// Policy defining context-based weighting profiles.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextPolicy {
+    /// Profiles defining namespace/origin weights.
+    pub profiles: BTreeMap<String, BTreeMap<String, f32>>, // BTreeMap for stable hash (outer and inner)
+    /// Recency decay configuration.
+    pub recency: RecencyPolicy,
+}
+
+impl ValidatePolicy for ContextPolicy {
+    fn validate(&self) -> Result<(), String> {
+        self.recency.validate()?;
+        for (profile_name, weights) in &self.profiles {
+            for (namespace, weight) in weights {
+                if *weight <= 0.0 {
+                    return Err(format!(
+                        "Context weight for '{}/{}' must be > 0",
+                        profile_name, namespace
+                    ));
+                }
+            }
+            if !weights.contains_key("_default") {
+                return Err(format!(
+                    "Profile '{}' is missing required '_default' key (fallback weight)",
+                    profile_name
+                ));
+            }
+        }
+        if !self.profiles.contains_key("default") {
+            return Err("Missing required 'default' profile".to_string());
+        }
+        Ok(())
+    }
+}
+
+impl Default for ContextPolicy {
+    fn default() -> Self {
+        let mut default_profile = BTreeMap::new();
+        default_profile.insert("_default".to_string(), 1.0);
+
+        let mut profiles = BTreeMap::new();
+        profiles.insert("default".to_string(), default_profile);
+
+        Self {
+            profiles,
+            recency: RecencyPolicy::default(),
+        }
+    }
+}
+
+/// Configuration for time-based decay.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecencyPolicy {
+    /// Half-life in seconds for exponential decay.
+    pub default_half_life_seconds: u64,
+    /// Minimum weight after decay.
+    #[serde(default = "default_min_weight")]
+    pub min_weight: f32,
+}
+
+impl ValidatePolicy for RecencyPolicy {
+    fn validate(&self) -> Result<(), String> {
+        if self.min_weight <= 0.0 {
+            return Err("recency.min_weight must be > 0".to_string());
+        }
+        // half_life can be 0 (no decay), but usually > 0
+        Ok(())
+    }
+}
+
+impl Default for RecencyPolicy {
+    fn default() -> Self {
+        Self {
+            default_half_life_seconds: 604800, // 7 days
+            min_weight: 0.1,
+        }
+    }
+}
+
+/// Aggregated policy configuration loaded at runtime.
+#[derive(Clone)]
+pub struct PolicyConfig {
+    pub trust: TrustPolicy,
+    pub context: ContextPolicy,
+    /// Stable hash of the loaded policies for drift detection.
+    pub hash: String,
+    /// Source of the policy configuration (e.g. "loaded_from_disk", "fallback_defaults").
+    pub source: String,
+}
+
 struct IndexInner {
     store: RwLock<HashMap<String, NamespaceStore>>,
     metrics: Arc<MetricsRecorder>,
     budget_ms: u64,
     retention_configs: RwLock<HashMap<String, RetentionConfig>>,
+    policies: PolicyConfig,
+    // Prometheus metrics
+    prom_weight_applied: Family<WeightFactorLabels, Counter>,
+    prom_score_bucket: Histogram,
 }
 
 type NamespaceStore = HashMap<String, DocumentRecord>;
@@ -367,15 +504,202 @@ struct DocumentRecord {
 }
 
 impl IndexState {
-    pub fn new(budget_ms: u64, metrics: Arc<MetricsRecorder>) -> Self {
+    pub fn new(
+        budget_ms: u64,
+        metrics: Arc<MetricsRecorder>,
+        registry: Option<&mut Registry>,
+        policy_paths: Option<(PathBuf, PathBuf)>, // (trust_path, context_path)
+    ) -> Self {
+        // Load policies or use defaults
+        let (trust_policy, context_policy, policy_hash, policy_source) = if let Some((
+            trust_path,
+            context_path,
+        )) = policy_paths
+        {
+            // Attempt to load trust policy
+            let (trust, trust_source) = match Self::load_policy::<TrustPolicy>(&trust_path) {
+                Ok(p) => (p, "file"),
+                Err(e) => {
+                    tracing::error!(path = %trust_path.display(), error = %e, "Failed to load trust policy, falling back to default");
+                    (TrustPolicy::default(), "fallback")
+                }
+            };
+
+            // Attempt to load context policy
+            let (context, context_source) = match Self::load_policy::<ContextPolicy>(&context_path)
+            {
+                Ok(p) => (p, "file"),
+                Err(e) => {
+                    tracing::error!(path = %context_path.display(), error = %e, "Failed to load context policy, falling back to default");
+                    (ContextPolicy::default(), "fallback")
+                }
+            };
+
+            // Compute stable hash of policies
+            let mut hasher = Sha256::new();
+            hasher.update(
+                serde_json::to_vec(&trust).expect("Failed to serialize trust policy for hashing"),
+            );
+            hasher.update(
+                serde_json::to_vec(&context)
+                    .expect("Failed to serialize context policy for hashing"),
+            );
+            let hash = format!("{:x}", hasher.finalize());
+
+            let source = if trust_source == "file" && context_source == "file" {
+                "loaded_from_disk".to_string()
+            } else if trust_source == "fallback" && context_source == "fallback" {
+                "fallback_defaults".to_string()
+            } else {
+                "partial_fallback".to_string()
+            };
+
+            (trust, context, hash, source)
+        } else {
+            (
+                TrustPolicy::default(),
+                ContextPolicy::default(),
+                "default".to_string(),
+                "defaults_no_config".to_string(),
+            )
+        };
+
+        tracing::info!(
+            policy_hash = %policy_hash,
+            policy_source = %policy_source,
+            "Decision weighting policies initialized"
+        );
+
+        // Initialize Prometheus metrics
+        let prom_weight_applied = Family::<WeightFactorLabels, Counter>::default();
+        // Custom buckets for score distribution (0.0 to 2.0+, weighted towards top)
+        let prom_score_bucket = Histogram::new([
+            0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.99, 1.0, 1.2, 1.5, 2.0,
+        ]);
+
+        if let Some(registry) = registry {
+            registry.register(
+                "decision_weight_applied",
+                "Total number of times a decision weight factor was applied",
+                prom_weight_applied.clone(),
+            );
+            registry.register(
+                "decision_final_score",
+                "Distribution of final weighted scores",
+                prom_score_bucket.clone(),
+            );
+        }
+
         Self {
             inner: Arc::new(IndexInner {
                 store: RwLock::new(HashMap::new()),
                 metrics,
                 budget_ms,
                 retention_configs: RwLock::new(HashMap::new()),
+                policies: PolicyConfig {
+                    trust: trust_policy,
+                    context: context_policy,
+                    hash: policy_hash,
+                    source: policy_source,
+                },
+                prom_weight_applied,
+                prom_score_bucket,
             }),
         }
+    }
+
+    fn load_policy<T: for<'de> Deserialize<'de> + Default + ValidatePolicy>(
+        path: &Path,
+    ) -> Result<T, PolicyLoadError> {
+        let content = std::fs::read_to_string(path).map_err(PolicyLoadError::Io)?;
+        let policy: T = serde_yaml_ng::from_str(&content).map_err(PolicyLoadError::Yaml)?;
+        policy.validate().map_err(PolicyLoadError::Validation)?;
+        Ok(policy)
+    }
+
+    /// Helper to get weight for a trust level from policy
+    fn get_trust_weight(&self, trust_level: TrustLevel) -> f32 {
+        let key = trust_level.to_string();
+        let min_weight = self.inner.policies.trust.min_weight;
+
+        // Policy validation ensures all keys exist.
+        // If not found (shouldn't happen with valid policy), fallback to hardcoded default for safety.
+        let weight = self
+            .inner
+            .policies
+            .trust
+            .trust_weights
+            .get(&key)
+            .cloned()
+            .unwrap_or(match trust_level {
+                TrustLevel::High => 1.0,
+                TrustLevel::Medium => 0.7,
+                TrustLevel::Low => 0.3,
+            });
+
+        // Apply minimum floor defined in policy
+        weight.max(min_weight)
+    }
+
+    /// Helper to get context weight from policy
+    ///
+    /// Strategy:
+    /// 1. Look up weight by `namespace`. If present and != 1.0, it wins (Topology).
+    /// 2. If namespace is "default" or its weight is 1.0 (neutral), look up `origin`. If present, it wins (Semantics).
+    /// 3. Fallback to profile `_default`.
+    fn get_context_weight(
+        &self,
+        namespace: &str,
+        source_ref: Option<&SourceRef>,
+        profile_name: Option<&str>,
+    ) -> f32 {
+        let profile_name = profile_name.unwrap_or("default");
+        let profile = match self.inner.policies.context.profiles.get(profile_name) {
+            Some(p) => p,
+            None => {
+                if profile_name != "default" {
+                    tracing::warn!(profile = %profile_name, "Requested context profile not found, falling back to default");
+                }
+                match self.inner.policies.context.profiles.get("default") {
+                    Some(p) => p,
+                    None => return 1.0,
+                }
+            }
+        };
+
+        // 1. Check namespace
+        let ns_weight = profile
+            .get(namespace)
+            .filter(|&&w| (w - 1.0).abs() > f32::EPSILON);
+
+        // 2. Check origin
+        let origin_weight = if let Some(sr) = source_ref {
+            profile
+                .get(&sr.origin)
+                .filter(|&&w| (w - 1.0).abs() > f32::EPSILON)
+        } else {
+            None
+        };
+
+        // Decision logic:
+        // - Namespace explicit (non-neutral) wins.
+        // - Origin (non-neutral) wins.
+        // - Profile default wins.
+        // - 1.0.
+
+        if let Some(&w) = ns_weight {
+            return w;
+        }
+
+        if let Some(&w) = origin_weight {
+            return w;
+        }
+
+        *profile.get("_default").unwrap_or(&1.0)
+    }
+
+    pub fn policy_hash(&self) -> &str {
+        &self.inner.policies.hash
     }
 
     pub fn budget_ms(&self) -> u64 {
@@ -478,6 +802,9 @@ impl IndexState {
         // Get retention config for namespace (if any)
         let retention_config = retention_configs.get(namespace.as_ref());
 
+        // Use recency policy default if no specific retention config
+        let recency_policy = &self.inner.policies.context.recency;
+
         // Prepare filter criteria (use typed enums, not strings)
         let exclude_flags_set = request.effective_exclude_flags();
         let min_trust = request.min_trust_level;
@@ -485,6 +812,10 @@ impl IndexState {
 
         let mut matches: Vec<SearchMatch> = Vec::new();
         let mut filtered_count = 0;
+        // Track if any weight factors were actually non-neutral (applied) during this search
+        let mut trust_applied = false;
+        let mut recency_applied = false;
+        let mut context_applied = false;
 
         for doc in namespace_store.values() {
             // Apply trust level filter
@@ -529,28 +860,46 @@ impl IndexState {
                 };
 
                 // Calculate trust weight from source_ref
-                // Default to Medium trust (0.7) if source_ref is missing for safety
-                let trust_weight = doc
+                // Default to Medium trust if source_ref is missing for safety
+                let trust_level = doc
                     .source_ref
                     .as_ref()
-                    .map(|sr| sr.trust_level.weight())
-                    .unwrap_or(TrustLevel::Medium.weight());
+                    .map(|sr| sr.trust_level)
+                    .unwrap_or(TrustLevel::Medium);
+
+                let trust_weight = self.get_trust_weight(trust_level);
 
                 // Calculate recency weight (time-decay) if configured
                 // Clamp age to 0 to handle future timestamps gracefully (clock skew)
+                // Use retention config if available, otherwise policy default
                 let age_seconds = (now - doc.ingested_at).num_seconds().max(0);
-                let recency_weight = if let Some(config) = retention_config {
-                    calculate_decay_factor(age_seconds, config.half_life_seconds)
-                } else {
-                    1.0
-                };
+                let half_life = retention_config
+                    .and_then(|c| c.half_life_seconds)
+                    .unwrap_or(recency_policy.default_half_life_seconds);
+
+                let recency_weight = calculate_decay_factor(age_seconds, Some(half_life))
+                    .max(recency_policy.min_weight);
 
                 // Calculate context weight based on namespace and profile
-                let context_weight =
-                    calculate_context_weight(&doc.namespace, request.context_profile.as_deref());
+                let context_weight = self.get_context_weight(
+                    &doc.namespace,
+                    doc.source_ref.as_ref(),
+                    request.context_profile.as_deref(),
+                );
 
                 // Apply decision weighting: final_score = similarity × trust × recency × context
                 let final_score = base_score * trust_weight * recency_weight * context_weight;
+
+                // Track if factors are active (non-neutral)
+                if (trust_weight - 1.0).abs() > f32::EPSILON {
+                    trust_applied = true;
+                }
+                if (recency_weight - 1.0).abs() > f32::EPSILON {
+                    recency_applied = true;
+                }
+                if (context_weight - 1.0).abs() > f32::EPSILON {
+                    context_applied = true;
+                }
 
                 // Optionally include weight breakdown for transparency
                 let weights = if request.include_weights {
@@ -599,6 +948,78 @@ impl IndexState {
         if matches.len() > limit {
             matches.truncate(limit);
         }
+
+        // Update metrics (per search, not per match, to reduce volume)
+        if !matches.is_empty() {
+            // Count factors once per search ONLY if they were actually applied (non-neutral)
+            if trust_applied {
+                self.inner
+                    .prom_weight_applied
+                    .get_or_create(&WeightFactorLabels {
+                        factor: "trust".into(),
+                    })
+                    .inc();
+            }
+            if recency_applied {
+                self.inner
+                    .prom_weight_applied
+                    .get_or_create(&WeightFactorLabels {
+                        factor: "recency".into(),
+                    })
+                    .inc();
+            }
+            if context_applied {
+                self.inner
+                    .prom_weight_applied
+                    .get_or_create(&WeightFactorLabels {
+                        factor: "context".into(),
+                    })
+                    .inc();
+            }
+
+            // Observe distribution only for top result to keep histogram volume manageable
+            self.inner
+                .prom_score_bucket
+                .observe(matches[0].score.into());
+        }
+
+        // Audit Logging (Debug level, structured)
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            // Log full breakdown and check for ranking changes ONLY if weights are available
+            if request.include_weights {
+                tracing::debug!(
+                    query = %request.query,
+                    matches = ?matches.iter().take(3).map(|m| (&m.doc_id, m.score, &m.weights)).collect::<Vec<_>>(),
+                    "Decision weighting breakdown"
+                );
+
+                // Check for ranking changes
+                // Find "raw top" (max similarity) without cloning/sorting
+                // This is O(N) and allocation-free
+                let raw_top = matches
+                    .iter()
+                    .max_by(|a, b| match (&a.weights, &b.weights) {
+                        (Some(wa), Some(wb)) => wa
+                            .similarity
+                            .partial_cmp(&wb.similarity)
+                            .unwrap_or(Ordering::Equal),
+                        _ => Ordering::Equal,
+                    });
+
+                if let Some(top) = raw_top {
+                    // matches is sorted by final score, so matches[0] is weighted_top
+                    if !matches.is_empty() && top.doc_id != matches[0].doc_id {
+                        tracing::debug!(
+                            query = %request.query,
+                            original_top = %top.doc_id,
+                            weighted_top = %matches[0].doc_id,
+                            "Decision weighting changed top result"
+                        );
+                    }
+                }
+            }
+        }
+
         matches
     }
 
@@ -622,6 +1043,8 @@ impl IndexState {
             total_chunks,
             namespaces: namespace_counts,
             budget_ms: self.inner.budget_ms,
+            policy_hash: Some(self.inner.policies.hash.clone()),
+            policy_source: Some(self.inner.policies.source.clone()),
         }
     }
 
@@ -1216,6 +1639,10 @@ pub struct StatsResponse {
     pub total_chunks: usize,
     pub namespaces: HashMap<String, usize>,
     pub budget_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_source: Option<String>,
 }
 
 /// Weight breakdown for decision-making transparency
@@ -1358,7 +1785,7 @@ mod tests {
 
     #[tokio::test]
     async fn upsert_and_search_return_ok() {
-        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
         let app = router().with_state(state);
 
         let payload = serde_json::json!({
@@ -1407,7 +1834,7 @@ mod tests {
 
     #[tokio::test]
     async fn search_filters_results_by_query() {
-        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
         state
             .upsert(UpsertRequest {
@@ -1461,7 +1888,7 @@ mod tests {
 
     #[tokio::test]
     async fn trims_namespace_whitespace_on_upsert_and_search() {
-        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
         state
             .upsert(UpsertRequest {
@@ -1514,7 +1941,7 @@ mod tests {
 
     #[tokio::test]
     async fn empty_namespace_defaults_to_default_namespace() {
-        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
         state
             .upsert(UpsertRequest {
@@ -1568,7 +1995,7 @@ mod tests {
 
     #[tokio::test]
     async fn stats_returns_correct_counts() {
-        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
         state
             .upsert(UpsertRequest {
@@ -1620,7 +2047,7 @@ mod tests {
 
     #[tokio::test]
     async fn related_finds_similar_documents() {
-        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+        let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
         state
             .upsert(UpsertRequest {

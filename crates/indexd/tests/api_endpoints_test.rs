@@ -10,7 +10,7 @@ use tower::ServiceExt;
 /// Test the complete forget API endpoint with confirmation requirement
 #[tokio::test]
 async fn test_forget_api_requires_confirmation() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     let app = router().with_state(state.clone());
 
     // Add a document
@@ -97,7 +97,7 @@ async fn test_forget_api_requires_confirmation() {
 /// Test the retention config endpoint
 #[tokio::test]
 async fn test_retention_api_endpoint() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Set retention configs
     state
@@ -141,7 +141,7 @@ async fn test_retention_api_endpoint() {
 /// Test the decay preview endpoint
 #[tokio::test]
 async fn test_decay_preview_api_endpoint() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Configure decay
     state
@@ -209,7 +209,7 @@ async fn test_decay_preview_api_endpoint() {
 /// Test dry-run forget operation
 #[tokio::test]
 async fn test_forget_dry_run_api() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Add documents
     for i in 1..=3 {
@@ -289,7 +289,7 @@ async fn test_forget_dry_run_api() {
 /// Test search with time-decay applied
 #[tokio::test]
 async fn test_search_with_decay_applied() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Configure very aggressive decay
     state
@@ -395,7 +395,7 @@ async fn test_search_with_decay_applied() {
 /// Test that forget API prevents unfiltered deletion
 #[tokio::test]
 async fn test_forget_api_prevents_unfiltered_deletion() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     // Add documents
     for i in 1..=3 {
@@ -485,7 +485,7 @@ async fn test_forget_api_prevents_unfiltered_deletion() {
 /// Test critical security check: allow_namespace_wipe without namespace should be rejected
 #[tokio::test]
 async fn test_forget_api_prevents_global_wipe() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     let app = router().with_state(state.clone());
 
     // Add documents in multiple namespaces
@@ -582,7 +582,7 @@ async fn test_forget_api_prevents_global_wipe() {
 /// Test that upsert without source_ref returns 422 error instead of panicking
 #[tokio::test]
 async fn test_upsert_missing_source_ref_returns_error() {
-    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}));
+    let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
     let app = router().with_state(state.clone());
 
     // Try to upsert without source_ref
