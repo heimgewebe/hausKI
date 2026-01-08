@@ -64,11 +64,7 @@ async fn test_decision_snapshot_emission() {
 
     // Verify that snapshots were created
     let snapshots = state.list_decision_snapshots().await;
-    assert_eq!(
-        snapshots.len(),
-        1,
-        "One snapshot should have been emitted"
-    );
+    assert_eq!(snapshots.len(), 1, "One snapshot should have been emitted");
 
     // Verify snapshot structure
     let snapshot = &snapshots[0];
@@ -76,10 +72,7 @@ async fn test_decision_snapshot_emission() {
     assert_eq!(snapshot.namespace, "default");
     assert_eq!(snapshot.candidates.len(), 2);
     assert!(snapshot.selected_id.is_some());
-    assert_eq!(
-        snapshot.selected_id.as_ref().unwrap(),
-        &results[0].doc_id
-    );
+    assert_eq!(snapshot.selected_id.as_ref().unwrap(), &results[0].doc_id);
 
     // Verify candidate structure
     let candidate = &snapshot.candidates[0];

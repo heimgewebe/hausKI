@@ -589,7 +589,7 @@ impl IndexState {
         let prom_score_bucket = Histogram::new([
             0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.99, 1.0, 1.2, 1.5, 2.0,
         ]);
-        
+
         // Decision feedback metrics
         let prom_decisions_total = Counter::default();
         let prom_decision_snapshots_total = Counter::default();
@@ -1062,24 +1062,27 @@ impl IndexState {
         // This provides feedback data for heimlern without hausKI interpreting it
         if request.include_weights && !matches.is_empty() {
             let decision_id = Ulid::new().to_string();
-            
+
             // Build candidates list from all matches (already sorted by final_score)
-            let candidates: Vec<DecisionCandidate> = matches.iter().map(|m| {
-                let weights = m.weights.clone().unwrap_or(WeightBreakdown {
-                    similarity: m.score,
-                    trust: 1.0,
-                    recency: 1.0,
-                    context: 1.0,
-                });
-                
-                DecisionCandidate {
-                    id: m.doc_id.clone(),
-                    similarity: weights.similarity,
-                    weights,
-                    final_score: m.score,
-                }
-            }).collect();
-            
+            let candidates: Vec<DecisionCandidate> = matches
+                .iter()
+                .map(|m| {
+                    let weights = m.weights.clone().unwrap_or(WeightBreakdown {
+                        similarity: m.score,
+                        trust: 1.0,
+                        recency: 1.0,
+                        context: 1.0,
+                    });
+
+                    DecisionCandidate {
+                        id: m.doc_id.clone(),
+                        similarity: weights.similarity,
+                        weights,
+                        final_score: m.score,
+                    }
+                })
+                .collect();
+
             let snapshot = DecisionSnapshot {
                 decision_id: decision_id.clone(),
                 intent: request.query.clone(),
@@ -1090,15 +1093,15 @@ impl IndexState {
                 selected_id: Some(matches[0].doc_id.clone()),
                 policy_hash: self.inner.policies.hash.clone(),
             };
-            
+
             // Store snapshot
             let mut snapshots = self.inner.decision_snapshots.write().await;
             snapshots.insert(decision_id.clone(), snapshot);
-            
+
             // Update metrics
             self.inner.prom_decisions_total.inc();
             self.inner.prom_decision_snapshots_total.inc();
-            
+
             tracing::debug!(
                 decision_id = %decision_id,
                 candidates_count = matches.len(),
@@ -1397,7 +1400,7 @@ impl IndexState {
     }
 
     /// Record an outcome for a decision
-    /// 
+    ///
     /// hausKI validates the schema and stores the outcome, but does NOT
     /// interpret or act on it. That's heimlern's responsibility.
     pub async fn record_outcome(&self, outcome: DecisionOutcome) -> Result<(), IndexError> {
@@ -1498,11 +1501,23 @@ where
         .route("/forget", post(forget_handler))
         .route("/retention", axum::routing::get(retention_handler))
         .route("/decay/preview", post(decay_preview_handler))
-        .route("/decisions/snapshot", axum::routing::get(list_decision_snapshots_handler))
-        .route("/decisions/snapshot/{id}", axum::routing::get(get_decision_snapshot_handler))
+        .route(
+            "/decisions/snapshot",
+            axum::routing::get(list_decision_snapshots_handler),
+        )
+        .route(
+            "/decisions/snapshot/{id}",
+            axum::routing::get(get_decision_snapshot_handler),
+        )
         .route("/decisions/outcome", post(record_outcome_handler))
-        .route("/decisions/outcome/{id}", axum::routing::get(get_decision_outcome_handler))
-        .route("/decisions/outcomes", axum::routing::get(list_decision_outcomes_handler))
+        .route(
+            "/decisions/outcome/{id}",
+            axum::routing::get(get_decision_outcome_handler),
+        )
+        .route(
+            "/decisions/outcomes",
+            axum::routing::get(list_decision_outcomes_handler),
+        )
 }
 
 async fn upsert_handler(
@@ -1816,11 +1831,7 @@ async fn list_decision_outcomes_handler(State(state): State<IndexState>) -> Resp
         StatusCode::OK,
         started,
     );
-    (
-        StatusCode::OK,
-        Json(DecisionOutcomesResponse { outcomes }),
-    )
-        .into_response()
+    (StatusCode::OK, Json(DecisionOutcomesResponse { outcomes })).into_response()
 }
 
 #[derive(Debug, Deserialize)]
@@ -1989,7 +2000,7 @@ pub struct DecisionCandidate {
 }
 
 /// Decision snapshot for feedback and learning
-/// 
+///
 /// This captures everything about a weighted decision so that heimlern
 /// can analyze and learn from it without hausKI interpreting outcomes.
 #[derive(Debug, Serialize, Clone)]
@@ -2015,7 +2026,7 @@ pub struct DecisionSnapshot {
 }
 
 /// Outcome signal for a decision
-/// 
+///
 /// This is hausKI's API for accepting feedback. hausKI validates and stores
 /// but does NOT interpret or act on this feedback. That's heimlern's job.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -2062,7 +2073,7 @@ impl std::fmt::Display for OutcomeSource {
 }
 
 /// Decision outcome record
-/// 
+///
 /// hausKI accepts this via API, validates the schema, and stores it.
 /// hausKI does NOT interpret or act on this data.
 #[derive(Debug, Serialize, Deserialize, Clone)]
