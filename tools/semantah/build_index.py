@@ -50,11 +50,11 @@ def write_embeddings(gewebe: Path, chunks: list[Path]) -> None:
                 "chunk_id": chunk_path.stem,
                 "source": str(chunk_path),
                 "namespace": gewebe.parent.name,
-                "embedding": "TODO",
+                "embedding": [],
             }
         )
 
-    parquet.write_text("placeholder for embeddings parquet\n", encoding="utf-8")
+    parquet.write_text("NOT A PARQUET FILE: placeholder for embeddings\n", encoding="utf-8")
     manifest.write_text(
         json.dumps(manifest_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
@@ -65,6 +65,8 @@ def write_report(gewebe: Path, chunks: list[Path]) -> None:
     reports.mkdir(exist_ok=True)
     report_path = reports / "index_report.md"
     lines = ["# semantAH Index Report (Stub)", "", f"Chunks verarbeitet: {len(chunks)}"]
+    lines.append("Hinweis: Embeddings wurden nicht generiert (Stub-Ausgabe).")
+    lines.append(f"Artefakt: {gewebe / 'embeddings.parquet'} (Stub-Text, kein Parquet)")
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
