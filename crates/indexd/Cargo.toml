@@ -15,6 +15,7 @@ serde_yaml_ng.workspace = true
 sha2 = "0.10"
 prometheus-client.workspace = true
 thiserror.workspace = true
+ulid.workspace = true
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }
