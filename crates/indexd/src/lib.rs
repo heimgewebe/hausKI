@@ -573,12 +573,9 @@ impl IndexState {
         // Initialize Prometheus metrics
         let prom_weight_applied = Family::<WeightFactorLabels, Counter>::default();
         // Custom buckets for score distribution (0.0 to 2.0+, weighted towards top)
-        let prom_score_bucket = Histogram::new(
-            [
-                0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.99, 1.0, 1.2, 1.5, 2.0,
-            ]
-            .into_iter(),
-        );
+        let prom_score_bucket = Histogram::new([
+            0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.99, 1.0, 1.2, 1.5, 2.0,
+        ]);
 
         if let Some(registry) = registry {
             registry.register(
@@ -634,7 +631,7 @@ impl IndexState {
             .trust_weights
             .get(&key)
             .cloned()
-            .unwrap_or_else(|| match trust_level {
+            .unwrap_or(match trust_level {
                 TrustLevel::High => 1.0,
                 TrustLevel::Medium => 0.7,
                 TrustLevel::Low => 0.3,
