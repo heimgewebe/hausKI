@@ -32,6 +32,11 @@ const QUARANTINE_NAMESPACE: &str = "quarantine";
 const MIN_WORD_LENGTH_FOR_SIMILARITY: usize = 3;
 const WORD_MATCH_SCORE_INCREMENT: f32 = 0.1;
 
+// Decision feedback storage limits
+const MAX_DECISION_SNAPSHOTS: usize = 10_000;
+const MAX_DECISION_OUTCOMES: usize = 10_000;
+const SNAPSHOT_CANDIDATES_MAX: usize = 50;
+
 pub type MetricsRecorder = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
@@ -490,7 +495,6 @@ struct IndexInner {
     decision_snapshots: RwLock<HashMap<String, DecisionSnapshot>>,
     decision_outcomes: RwLock<HashMap<String, DecisionOutcome>>,
     // Decision metrics
-    prom_decisions_total: Counter,
     prom_decision_snapshots_total: Counter,
     prom_decision_outcomes_total: Family<OutcomeLabels, Counter>,
 }
@@ -591,7 +595,6 @@ impl IndexState {
         ]);
 
         // Decision feedback metrics
-        let prom_decisions_total = Counter::default();
         let prom_decision_snapshots_total = Counter::default();
         let prom_decision_outcomes_total = Family::<OutcomeLabels, Counter>::default();
 
@@ -605,11 +608,6 @@ impl IndexState {
                 "decision_final_score",
                 "Distribution of final weighted scores",
                 prom_score_bucket.clone(),
-            );
-            registry.register(
-                "decisions_total",
-                "Total number of decisions made (weighted searches)",
-                prom_decisions_total.clone(),
             );
             registry.register(
                 "decision_snapshots_total",
@@ -639,7 +637,6 @@ impl IndexState {
                 prom_score_bucket,
                 decision_snapshots: RwLock::new(HashMap::new()),
                 decision_outcomes: RwLock::new(HashMap::new()),
-                prom_decisions_total,
                 prom_decision_snapshots_total,
                 prom_decision_outcomes_total,
             }),
@@ -1058,14 +1055,16 @@ impl IndexState {
             }
         }
 
-        // Emit decision snapshot if weights were included (indicating this is a weighted decision)
-        // This provides feedback data for heimlern without hausKI interpreting it
-        if request.include_weights && !matches.is_empty() {
+        // Emit decision snapshot if explicitly requested
+        // This is decoupled from include_weights (which is just for response transparency)
+        if request.emit_decision_snapshot && !matches.is_empty() {
             let decision_id = Ulid::new().to_string();
 
-            // Build candidates list from all matches (already sorted by final_score)
+            // Build candidates list from matches, capped at SNAPSHOT_CANDIDATES_MAX
+            // We only need top-N plus a few near-misses for learning
             let candidates: Vec<DecisionCandidate> = matches
                 .iter()
+                .take(SNAPSHOT_CANDIDATES_MAX)
                 .map(|m| {
                     let weights = m.weights.clone().unwrap_or(WeightBreakdown {
                         similarity: m.score,
@@ -1083,6 +1082,8 @@ impl IndexState {
                 })
                 .collect();
 
+            let candidates_count = candidates.len();
+
             let snapshot = DecisionSnapshot {
                 decision_id: decision_id.clone(),
                 intent: request.query.clone(),
@@ -1094,17 +1095,28 @@ impl IndexState {
                 policy_hash: self.inner.policies.hash.clone(),
             };
 
-            // Store snapshot
+            // Store snapshot with capacity management
             let mut snapshots = self.inner.decision_snapshots.write().await;
+
+            // If at capacity, remove oldest snapshot (ULID is time-sortable)
+            if snapshots.len() >= MAX_DECISION_SNAPSHOTS {
+                if let Some(oldest_id) = snapshots.keys().min().cloned() {
+                    snapshots.remove(&oldest_id);
+                    tracing::debug!(
+                        oldest_id = %oldest_id,
+                        "Removed oldest decision snapshot (capacity limit reached)"
+                    );
+                }
+            }
+
             snapshots.insert(decision_id.clone(), snapshot);
 
             // Update metrics
-            self.inner.prom_decisions_total.inc();
             self.inner.prom_decision_snapshots_total.inc();
 
             tracing::debug!(
                 decision_id = %decision_id,
-                candidates_count = matches.len(),
+                candidates_count = candidates_count,
                 selected_id = %matches[0].doc_id,
                 "Decision snapshot emitted"
             );
@@ -1394,9 +1406,12 @@ impl IndexState {
     }
 
     /// List all decision snapshots (for heimlern consumption)
+    /// Returns snapshots sorted by decision_id (which is ULID, so time-ordered)
     pub async fn list_decision_snapshots(&self) -> Vec<DecisionSnapshot> {
         let snapshots = self.inner.decision_snapshots.read().await;
-        snapshots.values().cloned().collect()
+        let mut snapshots_vec: Vec<DecisionSnapshot> = snapshots.values().cloned().collect();
+        snapshots_vec.sort_by(|a, b| a.decision_id.cmp(&b.decision_id));
+        snapshots_vec
     }
 
     /// Record an outcome for a decision
@@ -1417,8 +1432,20 @@ impl IndexState {
         }
         drop(snapshots);
 
-        // Store outcome
+        // Store outcome with capacity management
         let mut outcomes = self.inner.decision_outcomes.write().await;
+
+        // If at capacity, remove oldest outcome (ULID is time-sortable)
+        if outcomes.len() >= MAX_DECISION_OUTCOMES {
+            if let Some(oldest_id) = outcomes.keys().min().cloned() {
+                outcomes.remove(&oldest_id);
+                tracing::debug!(
+                    oldest_id = %oldest_id,
+                    "Removed oldest decision outcome (capacity limit reached)"
+                );
+            }
+        }
+
         outcomes.insert(outcome.decision_id.clone(), outcome.clone());
 
         // Update metrics
@@ -1446,9 +1473,12 @@ impl IndexState {
     }
 
     /// List all decision outcomes (for heimlern consumption)
+    /// Returns outcomes sorted by decision_id (which is ULID, so time-ordered)
     pub async fn list_decision_outcomes(&self) -> Vec<DecisionOutcome> {
         let outcomes = self.inner.decision_outcomes.read().await;
-        outcomes.values().cloned().collect()
+        let mut outcomes_vec: Vec<DecisionOutcome> = outcomes.values().cloned().collect();
+        outcomes_vec.sort_by(|a, b| a.decision_id.cmp(&b.decision_id));
+        outcomes_vec
     }
 }
 
@@ -1883,6 +1913,10 @@ pub struct SearchRequest {
     /// Include weight breakdown in response for transparency
     #[serde(default)]
     pub include_weights: bool,
+    /// Emit a decision snapshot for this search (for heimlern learning)
+    /// Independent of include_weights - this explicitly controls snapshot emission
+    #[serde(default)]
+    pub emit_decision_snapshot: bool,
 }
 
 impl SearchRequest {
@@ -1898,6 +1932,7 @@ impl SearchRequest {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         }
     }
 
@@ -2303,6 +2338,7 @@ mod tests {
                 exclude_origins: None,
                 context_profile: None,
                 include_weights: false,
+                emit_decision_snapshot: false,
             })
             .await;
 
@@ -2341,6 +2377,7 @@ mod tests {
                 exclude_origins: None,
                 context_profile: None,
                 include_weights: false,
+                emit_decision_snapshot: false,
             })
             .await;
 
@@ -2357,6 +2394,7 @@ mod tests {
                 exclude_origins: None,
                 context_profile: None,
                 include_weights: false,
+                emit_decision_snapshot: false,
             })
             .await;
 
@@ -2394,6 +2432,7 @@ mod tests {
                 exclude_origins: None,
                 context_profile: None,
                 include_weights: false,
+                emit_decision_snapshot: false,
             })
             .await;
 
@@ -2410,6 +2449,7 @@ mod tests {
                 exclude_origins: None,
                 context_profile: None,
                 include_weights: false,
+                emit_decision_snapshot: false,
             })
             .await;
 

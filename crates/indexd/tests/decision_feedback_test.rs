@@ -46,7 +46,7 @@ async fn test_decision_snapshot_emission() {
         .await
         .expect("upsert should succeed");
 
-    // Search with include_weights=true to trigger snapshot emission
+    // Search with emit_decision_snapshot=true and include_weights=true to get weight data
     let results = state
         .search(&SearchRequest {
             query: "Rust".into(),
@@ -56,7 +56,8 @@ async fn test_decision_snapshot_emission() {
             min_trust_level: None,
             exclude_origins: None,
             context_profile: None,
-            include_weights: true, // This triggers snapshot emission
+            include_weights: true,        // For weight data in response
+            emit_decision_snapshot: true, // Explicitly emit snapshot
         })
         .await;
 
@@ -81,9 +82,9 @@ async fn test_decision_snapshot_emission() {
     assert_eq!(candidate.weights.context, 1.0); // Default context
 }
 
-/// Test that decision snapshots are NOT emitted when include_weights is false
+/// Test that decision snapshots are NOT emitted when emit_decision_snapshot is false
 #[tokio::test]
-async fn test_decision_snapshot_not_emitted_without_weights() {
+async fn test_decision_snapshot_not_emitted_without_flag() {
     let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
 
     state
@@ -102,7 +103,7 @@ async fn test_decision_snapshot_not_emitted_without_weights() {
         .await
         .expect("upsert should succeed");
 
-    // Search without include_weights
+    // Search without emit_decision_snapshot
     let results = state
         .search(&SearchRequest {
             query: "Test".into(),
@@ -112,7 +113,8 @@ async fn test_decision_snapshot_not_emitted_without_weights() {
             min_trust_level: None,
             exclude_origins: None,
             context_profile: None,
-            include_weights: false, // No snapshot should be emitted
+            include_weights: false,        // Can be true or false
+            emit_decision_snapshot: false, // No snapshot should be emitted
         })
         .await;
 
@@ -123,7 +125,7 @@ async fn test_decision_snapshot_not_emitted_without_weights() {
     assert_eq!(
         snapshots.len(),
         0,
-        "No snapshots should be emitted without include_weights"
+        "No snapshots should be emitted without emit_decision_snapshot=true"
     );
 }
 
@@ -159,6 +161,7 @@ async fn test_decision_outcome_recording() {
             exclude_origins: None,
             context_profile: None,
             include_weights: true,
+            emit_decision_snapshot: true,
         })
         .await;
 
@@ -257,6 +260,7 @@ async fn test_decision_snapshot_includes_policy_hash() {
             exclude_origins: None,
             context_profile: None,
             include_weights: true,
+            emit_decision_snapshot: true,
         })
         .await;
 
