@@ -46,6 +46,7 @@ mod events_tests;
 pub mod intent;
 mod memory_api;
 mod plugins;
+pub mod system;
 pub mod tools;
 pub use config::{
     load_flags, load_limits, load_models, load_routing, Asr, FeatureFlags, Latency, Limits,
@@ -83,12 +84,14 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
             memory_api::MemoryEvictRequest, memory_api::MemoryEvictResponse,
             assist::AssistRequest,
             assist::AssistResponse,
-            plugins::Plugin
+            plugins::Plugin,
+            system::SystemSignals
         )
     ),
     tags(
         (name = "core", description = "Core service endpoints"),
-        (name = "plugins", description = "Plugin management endpoints")
+        (name = "plugins", description = "Plugin management endpoints"),
+        (name = "system", description = "System monitoring endpoints")
     )
 )]
 pub struct ApiDoc;
@@ -144,6 +147,8 @@ struct AppStateInner {
     tools: Arc<tools::ToolRegistry>,
     /// Registry for managed plugins.
     plugins: Arc<plugins::PluginRegistry>,
+    /// System resource monitor.
+    system_monitor: system::SystemMonitor,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -250,6 +255,7 @@ impl AppState {
         tool_registry.register(Arc::new(tools::CodeAnalysisTool));
 
         let plugin_registry = plugins::PluginRegistry::new();
+        let system_monitor = system::SystemMonitor::new();
 
         Self(Arc::new(AppStateInner {
             limits,
@@ -268,6 +274,7 @@ impl AppState {
             ready: AtomicBool::new(false),
             tools: Arc::new(tool_registry),
             plugins: Arc::new(plugin_registry),
+            system_monitor,
         }))
     }
 
@@ -343,6 +350,10 @@ impl AppState {
 
     pub fn plugins(&self) -> Arc<plugins::PluginRegistry> {
         self.0.plugins.clone()
+    }
+
+    pub fn system_monitor(&self) -> system::SystemMonitor {
+        self.0.system_monitor.clone()
     }
 }
 
@@ -716,6 +727,7 @@ fn core_routes() -> Router<AppState> {
         .route("/assist", post(assist::assist_handler))
         .route("/v1/chat", post(chat::chat_handler))
         .route("/events", post(events::event_handler))
+        .route("/system/signals", get(system::system_signals_handler))
 }
 
 fn memory_routes() -> Router<AppState> {

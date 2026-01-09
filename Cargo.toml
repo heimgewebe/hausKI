@@ -47,6 +47,7 @@ rusqlite = { version = "0.37.0", features = ["bundled", "chrono"] }
 chrono = { version = "0.4", features = ["clock", "serde"] }
 hostname = "0.4"
 ulid = "1"
+sysinfo = "0.30"
 
 [patch.crates-io]
 # Keep selected crates pinned to vendored stubs for offline builds. We retain
