@@ -29,6 +29,7 @@ hauski-memory = { path = "../memory", version = "0.1.0" }
 hostname.workspace = true
 ulid.workspace = true
 chrono = { workspace = true, features = ["serde"] }
+sysinfo.workspace = true
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }
