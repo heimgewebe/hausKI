@@ -149,9 +149,6 @@ curl http://localhost:8080/index/decisions/outcome/01HXJ8ZQVN7XYTD9F8KW3RH2PM
 ### Prometheus-Metriken
 
 ```
-# Anzahl getroffener Entscheidungen
-decisions_total
-
 # Anzahl emittierter Snapshots
 decision_snapshots_total
 
@@ -169,8 +166,8 @@ sum(rate(decision_outcomes_total{outcome="success"}[1h]))
 / 
 sum(rate(decision_outcomes_total[1h]))
 
-# Anzahl Entscheidungen ohne Feedback
-decisions_total - sum(decision_outcomes_total)
+# Anzahl Snapshots ohne Feedback
+decision_snapshots_total - sum(decision_outcomes_total)
 ```
 
 ## Workflow
@@ -184,7 +181,8 @@ let results = state.search(&SearchRequest {
     query: "Rust memory safety".into(),
     k: Some(10),
     namespace: Some("code".into()),
-    include_weights: true,  // Trigger Snapshot-Emission
+    include_weights: true,          // Für Response-Transparenz
+    emit_decision_snapshot: true,   // Trigger Snapshot-Emission
     context_profile: Some("code_analysis".into()),
     ..Default::default()
 }).await;
@@ -192,8 +190,8 @@ let results = state.search(&SearchRequest {
 
 **Effekt:**
 - Suche wird mit allen Gewichten durchgeführt
-- Decision Snapshot wird automatisch erzeugt und gespeichert
-- Metrik `decisions_total` und `decision_snapshots_total` werden inkrementiert
+- Decision Snapshot wird automatisch erzeugt und gespeichert (wegen `emit_decision_snapshot: true`)
+- Metrik `decision_snapshots_total` wird inkrementiert
 
 ### 2. Feedback erfassen
 
@@ -393,6 +391,4 @@ pub async fn record_outcome(&self, outcome: DecisionOutcome) -> Result<(), Index
 ## Referenzen
 
 - [Decision Weighting](./decision-weighting.md) – Wie Gewichtungen funktionieren
-- [Trust Policies](../policies/trust.yaml) – Trust-Level-Konfiguration
-- [Context Policies](../policies/context.yaml) – Context-Profile-Konfiguration
 - Issue #5 – Original-Beschreibung des Features

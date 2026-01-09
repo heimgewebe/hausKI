@@ -54,7 +54,8 @@ SEARCH_RESULT=$(curl -s -X POST "$CORE_URL/index/search" \
     "query": "Rust memory safety",
     "k": 5,
     "namespace": "code",
-    "include_weights": true
+    "include_weights": true,
+    "emit_decision_snapshot": true
   }')
 
 echo "$SEARCH_RESULT" | jq '{

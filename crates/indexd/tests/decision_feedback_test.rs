@@ -8,7 +8,7 @@ use hauski_indexd::{
 use serde_json::json;
 use std::sync::Arc;
 
-/// Test that decision snapshots are emitted when include_weights is true
+/// Test that decision snapshots are emitted when emit_decision_snapshot is true
 #[tokio::test]
 async fn test_decision_snapshot_emission() {
     let state = IndexState::new(60, Arc::new(|_, _, _, _| {}), None, None);
