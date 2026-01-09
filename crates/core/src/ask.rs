@@ -114,6 +114,7 @@ pub async fn ask_handler(
         exclude_origins: None,
         context_profile: None,
         include_weights: false,
+        emit_decision_snapshot: false,
     };
 
     let matches = state.index().search(&request).await;

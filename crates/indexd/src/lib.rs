@@ -25,11 +25,17 @@ use std::{
 };
 use thiserror::Error;
 use tokio::sync::RwLock;
+use ulid::Ulid;
 
 const DEFAULT_NAMESPACE: &str = "default";
 const QUARANTINE_NAMESPACE: &str = "quarantine";
 const MIN_WORD_LENGTH_FOR_SIMILARITY: usize = 3;
 const WORD_MATCH_SCORE_INCREMENT: f32 = 0.1;
+
+// Decision feedback storage limits
+const MAX_DECISION_SNAPSHOTS: usize = 10_000;
+const MAX_DECISION_OUTCOMES: usize = 10_000;
+const SNAPSHOT_CANDIDATES_MAX: usize = 50;
 
 pub type MetricsRecorder = dyn Fn(Method, &'static str, StatusCode, Instant) + Send + Sync;
 
@@ -485,6 +491,17 @@ struct IndexInner {
     // Prometheus metrics
     prom_weight_applied: Family<WeightFactorLabels, Counter>,
     prom_score_bucket: Histogram,
+    // Decision feedback storage
+    decision_snapshots: RwLock<HashMap<String, DecisionSnapshot>>,
+    decision_outcomes: RwLock<HashMap<String, DecisionOutcome>>,
+    // Decision metrics
+    prom_decision_snapshots_total: Counter,
+    prom_decision_outcomes_total: Family<OutcomeLabels, Counter>,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
+struct OutcomeLabels {
+    outcome: String, // "success", "failure", "neutral"
 }
 
 type NamespaceStore = HashMap<String, DocumentRecord>;
@@ -577,6 +594,10 @@ impl IndexState {
             0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 0.99, 1.0, 1.2, 1.5, 2.0,
         ]);
 
+        // Decision feedback metrics
+        let prom_decision_snapshots_total = Counter::default();
+        let prom_decision_outcomes_total = Family::<OutcomeLabels, Counter>::default();
+
         if let Some(registry) = registry {
             registry.register(
                 "decision_weight_applied",
@@ -587,6 +608,16 @@ impl IndexState {
                 "decision_final_score",
                 "Distribution of final weighted scores",
                 prom_score_bucket.clone(),
+            );
+            registry.register(
+                "decision_snapshots_total",
+                "Total number of decision snapshots emitted",
+                prom_decision_snapshots_total.clone(),
+            );
+            registry.register(
+                "decision_outcomes_total",
+                "Total number of decision outcomes reported",
+                prom_decision_outcomes_total.clone(),
             );
         }
 
@@ -604,6 +635,10 @@ impl IndexState {
                 },
                 prom_weight_applied,
                 prom_score_bucket,
+                decision_snapshots: RwLock::new(HashMap::new()),
+                decision_outcomes: RwLock::new(HashMap::new()),
+                prom_decision_snapshots_total,
+                prom_decision_outcomes_total,
             }),
         }
     }
@@ -901,8 +936,9 @@ impl IndexState {
                     context_applied = true;
                 }
 
-                // Optionally include weight breakdown for transparency
-                let weights = if request.include_weights {
+                // Include weight breakdown for transparency OR if snapshot emission is requested
+                // When emitting snapshots, we MUST have accurate weights for learning
+                let weights = if request.include_weights || request.emit_decision_snapshot {
                     Some(WeightBreakdown {
                         similarity: base_score,
                         trust: trust_weight,
@@ -1018,6 +1054,72 @@ impl IndexState {
                     }
                 }
             }
+        }
+
+        // Emit decision snapshot if explicitly requested
+        // This is decoupled from include_weights (which is just for response transparency)
+        if request.emit_decision_snapshot && !matches.is_empty() {
+            let decision_id = Ulid::new().to_string();
+
+            // Build candidates list from matches, capped at SNAPSHOT_CANDIDATES_MAX
+            // We only need top-N plus a few near-misses for learning
+            // Weights are guaranteed to be present because emit_decision_snapshot forces weight calculation
+            let candidates: Vec<DecisionCandidate> = matches
+                .iter()
+                .take(SNAPSHOT_CANDIDATES_MAX)
+                .map(|m| {
+                    // Weights must be present when snapshot emission is requested
+                    let weights = m.weights.clone().expect(
+                        "Weights must be present for snapshot emission - this is a bug if it panics"
+                    );
+
+                    DecisionCandidate {
+                        id: m.doc_id.clone(),
+                        similarity: weights.similarity,
+                        weights,
+                        final_score: m.score,
+                    }
+                })
+                .collect();
+
+            let candidates_count = candidates.len();
+
+            let snapshot = DecisionSnapshot {
+                decision_id: decision_id.clone(),
+                intent: request.query.clone(),
+                timestamp: Utc::now().to_rfc3339(),
+                namespace: namespace.to_string(),
+                context_profile: request.context_profile.clone(),
+                candidates,
+                selected_id: Some(matches[0].doc_id.clone()),
+                policy_hash: self.inner.policies.hash.clone(),
+            };
+
+            // Store snapshot with capacity management
+            let mut snapshots = self.inner.decision_snapshots.write().await;
+
+            // If at capacity, remove oldest snapshot (ULID is time-sortable)
+            if snapshots.len() >= MAX_DECISION_SNAPSHOTS {
+                if let Some(oldest_id) = snapshots.keys().min().cloned() {
+                    snapshots.remove(&oldest_id);
+                    tracing::debug!(
+                        oldest_id = %oldest_id,
+                        "Removed oldest decision snapshot (capacity limit reached)"
+                    );
+                }
+            }
+
+            snapshots.insert(decision_id.clone(), snapshot);
+
+            // Update metrics
+            self.inner.prom_decision_snapshots_total.inc();
+
+            tracing::debug!(
+                decision_id = %decision_id,
+                candidates_count = candidates_count,
+                selected_id = %matches[0].doc_id,
+                "Decision snapshot emitted"
+            );
         }
 
         matches
@@ -1296,6 +1398,93 @@ impl IndexState {
             previews,
         }
     }
+
+    /// Get a decision snapshot by ID
+    pub async fn get_decision_snapshot(&self, decision_id: &str) -> Option<DecisionSnapshot> {
+        let snapshots = self.inner.decision_snapshots.read().await;
+        snapshots.get(decision_id).cloned()
+    }
+
+    /// List all decision snapshots (for heimlern consumption)
+    /// Returns snapshots sorted by decision_id (which is ULID, so time-ordered)
+    pub async fn list_decision_snapshots(&self) -> Vec<DecisionSnapshot> {
+        let snapshots = self.inner.decision_snapshots.read().await;
+        let mut snapshots_vec: Vec<DecisionSnapshot> = snapshots.values().cloned().collect();
+        snapshots_vec.sort_by(|a, b| a.decision_id.cmp(&b.decision_id));
+        snapshots_vec
+    }
+
+    /// Record an outcome for a decision
+    ///
+    /// hausKI validates the schema and stores the outcome, but does NOT
+    /// interpret or act on it. That's heimlern's responsibility.
+    pub async fn record_outcome(&self, outcome: DecisionOutcome) -> Result<(), IndexError> {
+        // Validate that the decision_id exists
+        let snapshots = self.inner.decision_snapshots.read().await;
+        if !snapshots.contains_key(&outcome.decision_id) {
+            return Err(IndexError {
+                error: format!("Decision ID {} not found", outcome.decision_id),
+                code: "decision_not_found".into(),
+                details: Some(serde_json::json!({
+                    "hint": "Decision snapshot must exist before recording outcome"
+                })),
+            });
+        }
+        drop(snapshots);
+
+        // Store outcome with capacity management
+        let mut outcomes = self.inner.decision_outcomes.write().await;
+
+        // If at capacity, remove oldest outcome based on feedback timestamp
+        // (not decision_id, since outcomes can be recorded long after the decision)
+        if outcomes.len() >= MAX_DECISION_OUTCOMES {
+            if let Some(oldest_id) = outcomes
+                .iter()
+                .min_by_key(|(_, outcome)| &outcome.timestamp)
+                .map(|(id, _)| id.clone())
+            {
+                outcomes.remove(&oldest_id);
+                tracing::debug!(
+                    oldest_id = %oldest_id,
+                    "Removed oldest decision outcome by feedback timestamp (capacity limit reached)"
+                );
+            }
+        }
+
+        outcomes.insert(outcome.decision_id.clone(), outcome.clone());
+
+        // Update metrics
+        self.inner
+            .prom_decision_outcomes_total
+            .get_or_create(&OutcomeLabels {
+                outcome: outcome.outcome.to_string(),
+            })
+            .inc();
+
+        tracing::info!(
+            decision_id = %outcome.decision_id,
+            outcome = %outcome.outcome,
+            source = %outcome.signal_source,
+            "Decision outcome recorded"
+        );
+
+        Ok(())
+    }
+
+    /// Get an outcome for a decision
+    pub async fn get_decision_outcome(&self, decision_id: &str) -> Option<DecisionOutcome> {
+        let outcomes = self.inner.decision_outcomes.read().await;
+        outcomes.get(decision_id).cloned()
+    }
+
+    /// List all decision outcomes (for heimlern consumption)
+    /// Returns outcomes sorted by feedback timestamp (when outcome was recorded)
+    pub async fn list_decision_outcomes(&self) -> Vec<DecisionOutcome> {
+        let outcomes = self.inner.decision_outcomes.read().await;
+        let mut outcomes_vec: Vec<DecisionOutcome> = outcomes.values().cloned().collect();
+        outcomes_vec.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        outcomes_vec
+    }
 }
 
 fn substring_match_score(
@@ -1347,6 +1536,23 @@ where
         .route("/forget", post(forget_handler))
         .route("/retention", axum::routing::get(retention_handler))
         .route("/decay/preview", post(decay_preview_handler))
+        .route(
+            "/decisions/snapshot",
+            axum::routing::get(list_decision_snapshots_handler),
+        )
+        .route(
+            "/decisions/snapshot/{id}",
+            axum::routing::get(get_decision_snapshot_handler),
+        )
+        .route("/decisions/outcome", post(record_outcome_handler))
+        .route(
+            "/decisions/outcome/{id}",
+            axum::routing::get(get_decision_outcome_handler),
+        )
+        .route(
+            "/decisions/outcomes",
+            axum::routing::get(list_decision_outcomes_handler),
+        )
 }
 
 async fn upsert_handler(
@@ -1528,6 +1734,141 @@ async fn decay_preview_handler(
     (StatusCode::OK, Json(preview)).into_response()
 }
 
+async fn list_decision_snapshots_handler(State(state): State<IndexState>) -> Response {
+    let started = Instant::now();
+    let snapshots = state.list_decision_snapshots().await;
+    state.record(
+        Method::GET,
+        "/index/decisions/snapshot",
+        StatusCode::OK,
+        started,
+    );
+    (
+        StatusCode::OK,
+        Json(DecisionSnapshotsResponse { snapshots }),
+    )
+        .into_response()
+}
+
+async fn get_decision_snapshot_handler(
+    State(state): State<IndexState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    let started = Instant::now();
+    match state.get_decision_snapshot(&id).await {
+        Some(snapshot) => {
+            state.record(
+                Method::GET,
+                "/index/decisions/snapshot/:id",
+                StatusCode::OK,
+                started,
+            );
+            (StatusCode::OK, Json(snapshot)).into_response()
+        }
+        None => {
+            state.record(
+                Method::GET,
+                "/index/decisions/snapshot/:id",
+                StatusCode::NOT_FOUND,
+                started,
+            );
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "error": "Decision snapshot not found",
+                    "decision_id": id
+                })),
+            )
+                .into_response()
+        }
+    }
+}
+
+async fn record_outcome_handler(
+    State(state): State<IndexState>,
+    Json(mut payload): Json<DecisionOutcome>,
+) -> Response {
+    let started = Instant::now();
+
+    // Set timestamp if not provided
+    if payload.timestamp.is_empty() {
+        payload.timestamp = Utc::now().to_rfc3339();
+    }
+
+    match state.record_outcome(payload).await {
+        Ok(()) => {
+            state.record(
+                Method::POST,
+                "/index/decisions/outcome",
+                StatusCode::OK,
+                started,
+            );
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "status": "recorded"
+                })),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            state.record(
+                Method::POST,
+                "/index/decisions/outcome",
+                StatusCode::UNPROCESSABLE_ENTITY,
+                started,
+            );
+            (StatusCode::UNPROCESSABLE_ENTITY, Json(error)).into_response()
+        }
+    }
+}
+
+async fn get_decision_outcome_handler(
+    State(state): State<IndexState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Response {
+    let started = Instant::now();
+    match state.get_decision_outcome(&id).await {
+        Some(outcome) => {
+            state.record(
+                Method::GET,
+                "/index/decisions/outcome/:id",
+                StatusCode::OK,
+                started,
+            );
+            (StatusCode::OK, Json(outcome)).into_response()
+        }
+        None => {
+            state.record(
+                Method::GET,
+                "/index/decisions/outcome/:id",
+                StatusCode::NOT_FOUND,
+                started,
+            );
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "error": "Decision outcome not found",
+                    "decision_id": id
+                })),
+            )
+                .into_response()
+        }
+    }
+}
+
+async fn list_decision_outcomes_handler(State(state): State<IndexState>) -> Response {
+    let started = Instant::now();
+    let outcomes = state.list_decision_outcomes().await;
+    state.record(
+        Method::GET,
+        "/index/decisions/outcomes",
+        StatusCode::OK,
+        started,
+    );
+    (StatusCode::OK, Json(DecisionOutcomesResponse { outcomes })).into_response()
+}
+
 #[derive(Debug, Deserialize)]
 pub struct UpsertRequest {
     pub doc_id: String,
@@ -1577,6 +1918,10 @@ pub struct SearchRequest {
     /// Include weight breakdown in response for transparency
     #[serde(default)]
     pub include_weights: bool,
+    /// Emit a decision snapshot for this search (for heimlern learning)
+    /// Independent of include_weights - this explicitly controls snapshot emission
+    #[serde(default)]
+    pub emit_decision_snapshot: bool,
 }
 
 impl SearchRequest {
@@ -1592,6 +1937,7 @@ impl SearchRequest {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         }
     }
 
@@ -1676,6 +2022,113 @@ pub struct SearchMatch {
     /// Optional weight breakdown for transparency (only included when requested)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weights: Option<WeightBreakdown>,
+}
+
+// ---- Decision Feedback Structures --------------------------------------------
+
+/// A candidate considered during a decision
+#[derive(Debug, Serialize, Clone)]
+pub struct DecisionCandidate {
+    /// Document ID of the candidate
+    pub id: String,
+    /// Base similarity score (0.0 - 1.0)
+    pub similarity: f32,
+    /// Weight factors applied to this candidate
+    pub weights: WeightBreakdown,
+    /// Final weighted score (similarity × trust × recency × context)
+    pub final_score: f32,
+}
+
+/// Decision snapshot for feedback and learning
+///
+/// This captures everything about a weighted decision so that heimlern
+/// can analyze and learn from it without hausKI interpreting outcomes.
+#[derive(Debug, Serialize, Clone)]
+pub struct DecisionSnapshot {
+    /// Unique decision identifier (ULID)
+    pub decision_id: String,
+    /// The intent/query that triggered this decision
+    pub intent: String,
+    /// Timestamp when the decision was made
+    pub timestamp: String,
+    /// Namespace searched
+    pub namespace: String,
+    /// Context profile used (if any)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_profile: Option<String>,
+    /// All candidates considered (sorted by final_score, descending)
+    pub candidates: Vec<DecisionCandidate>,
+    /// ID of the selected candidate (top result)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_id: Option<String>,
+    /// Policy hash at time of decision (for drift detection)
+    pub policy_hash: String,
+}
+
+/// Outcome signal for a decision
+///
+/// This is hausKI's API for accepting feedback. hausKI validates and stores
+/// but does NOT interpret or act on this feedback. That's heimlern's job.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum OutcomeSignal {
+    /// Decision led to successful outcome
+    Success,
+    /// Decision led to unsuccessful outcome
+    Failure,
+    /// Outcome was neither clearly good nor bad
+    Neutral,
+}
+
+impl std::fmt::Display for OutcomeSignal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OutcomeSignal::Success => write!(f, "success"),
+            OutcomeSignal::Failure => write!(f, "failure"),
+            OutcomeSignal::Neutral => write!(f, "neutral"),
+        }
+    }
+}
+
+/// Source of outcome feedback
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum OutcomeSource {
+    /// User-provided feedback
+    User,
+    /// System-generated feedback
+    System,
+    /// Policy-based feedback
+    Policy,
+}
+
+impl std::fmt::Display for OutcomeSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OutcomeSource::User => write!(f, "user"),
+            OutcomeSource::System => write!(f, "system"),
+            OutcomeSource::Policy => write!(f, "policy"),
+        }
+    }
+}
+
+/// Decision outcome record
+///
+/// hausKI accepts this via API, validates the schema, and stores it.
+/// hausKI does NOT interpret or act on this data.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DecisionOutcome {
+    /// Decision ID this outcome refers to
+    pub decision_id: String,
+    /// Outcome signal
+    pub outcome: OutcomeSignal,
+    /// Source of the feedback
+    pub signal_source: OutcomeSource,
+    /// Timestamp when feedback was recorded
+    pub timestamp: String,
+    /// Optional context or notes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
 }
 
 fn default_namespace() -> String {
@@ -1763,6 +2216,18 @@ pub struct DecayPreviewItem {
     pub ingested_at: String,
     pub age_seconds: u64,
     pub decay_factor: f32,
+}
+
+/// Response containing list of decision snapshots
+#[derive(Debug, Serialize)]
+pub struct DecisionSnapshotsResponse {
+    pub snapshots: Vec<DecisionSnapshot>,
+}
+
+/// Response containing list of decision outcomes
+#[derive(Debug, Serialize)]
+pub struct DecisionOutcomesResponse {
+    pub outcomes: Vec<DecisionOutcome>,
 }
 
 #[cfg(test)]
@@ -1878,6 +2343,7 @@ mod tests {
                 exclude_origins: None,
                 context_profile: None,
                 include_weights: false,
+                emit_decision_snapshot: false,
             })
             .await;
 
@@ -1916,6 +2382,7 @@ mod tests {
                 exclude_origins: None,
                 context_profile: None,
                 include_weights: false,
+                emit_decision_snapshot: false,
             })
             .await;
 
@@ -1932,6 +2399,7 @@ mod tests {
                 exclude_origins: None,
                 context_profile: None,
                 include_weights: false,
+                emit_decision_snapshot: false,
             })
             .await;
 
@@ -1969,6 +2437,7 @@ mod tests {
                 exclude_origins: None,
                 context_profile: None,
                 include_weights: false,
+                emit_decision_snapshot: false,
             })
             .await;
 
@@ -1985,6 +2454,7 @@ mod tests {
                 exclude_origins: None,
                 context_profile: None,
                 include_weights: false,
+                emit_decision_snapshot: false,
             })
             .await;
 

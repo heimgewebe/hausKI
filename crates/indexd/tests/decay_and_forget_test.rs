@@ -52,6 +52,7 @@ async fn test_time_decay_reduces_scores() {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         })
         .await;
     assert_eq!(results.len(), 1);
@@ -166,6 +167,7 @@ async fn test_forget_by_namespace() {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         })
         .await;
     assert_eq!(search_after_dry.len(), 1);
@@ -195,6 +197,7 @@ async fn test_forget_by_namespace() {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         })
         .await;
     assert_eq!(search_after.len(), 0);
@@ -209,6 +212,7 @@ async fn test_forget_by_namespace() {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         })
         .await;
     assert_eq!(keep_search.len(), 1);
@@ -274,6 +278,7 @@ async fn test_forget_by_source_ref_origin() {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         })
         .await;
     assert_eq!(search_code.len(), 1);
@@ -383,6 +388,7 @@ async fn test_forget_by_doc_id() {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         })
         .await;
     assert_eq!(search.len(), 2);
@@ -518,6 +524,7 @@ async fn test_decay_affects_search_ranking() {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         })
         .await;
     assert_eq!(results1.len(), 1);
@@ -535,6 +542,7 @@ async fn test_decay_affects_search_ranking() {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         })
         .await;
     assert_eq!(results2.len(), 1);
@@ -644,6 +652,7 @@ async fn test_forget_uses_and_semantics() {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         })
         .await;
     assert_eq!(search.len(), 2);
@@ -767,6 +776,7 @@ async fn test_future_timestamp_handling() {
             exclude_origins: None,
             context_profile: None,
             include_weights: false,
+            emit_decision_snapshot: false,
         })
         .await;
     assert_eq!(results.len(), 1);

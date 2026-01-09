@@ -123,6 +123,7 @@ async fn test_trust_weighting_affects_ranking() {
             exclude_origins: None,
             context_profile: None,
             include_weights: true,
+            emit_decision_snapshot: false,
         })
         .await;
 
@@ -249,6 +250,7 @@ async fn test_context_profile_weighting() {
             exclude_origins: None,
             context_profile: Some("incident_response".into()),
             include_weights: true,
+            emit_decision_snapshot: false,
         })
         .await;
 
@@ -270,6 +272,7 @@ async fn test_context_profile_weighting() {
             exclude_origins: None,
             context_profile: Some("incident_response".into()),
             include_weights: true,
+            emit_decision_snapshot: false,
         })
         .await;
 
@@ -291,6 +294,7 @@ async fn test_context_profile_weighting() {
             exclude_origins: None,
             context_profile: Some("code_analysis".into()),
             include_weights: true,
+            emit_decision_snapshot: false,
         })
         .await;
 
@@ -363,6 +367,7 @@ async fn test_combined_weighting() {
             exclude_origins: None,
             context_profile: Some("code_analysis".into()),
             include_weights: true,
+            emit_decision_snapshot: false,
         })
         .await;
 
@@ -429,6 +434,7 @@ async fn test_weights_omitted_when_not_requested() {
             exclude_origins: None,
             context_profile: None,
             include_weights: false, // Explicitly don't include weights
+            emit_decision_snapshot: false,
         })
         .await;
 
@@ -497,6 +503,7 @@ async fn test_invalid_policies_fallback_to_default() {
             exclude_origins: None,
             context_profile: None,
             include_weights: true,
+            emit_decision_snapshot: false,
         })
         .await;
 
@@ -549,6 +556,7 @@ async fn test_invalid_policies_fallback_to_default() {
             k: Some(1),
             namespace: Some("default".into()),
             include_weights: true,
+            emit_decision_snapshot: false,
             exclude_flags: None,
             min_trust_level: None,
             exclude_origins: None,
@@ -603,6 +611,7 @@ async fn test_context_weighting_falls_back_to_origin() {
             namespace: Some("default".into()),
             context_profile: Some("incident_response".into()),
             include_weights: true,
+            emit_decision_snapshot: false,
             exclude_flags: None,
             min_trust_level: None,
             exclude_origins: None,
@@ -679,6 +688,7 @@ recency:
             namespace: Some("chronik".into()),
             context_profile: Some("custom_profile".into()),
             include_weights: true,
+            emit_decision_snapshot: false,
             exclude_flags: None,
             min_trust_level: None,
             exclude_origins: None,
