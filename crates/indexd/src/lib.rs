@@ -936,8 +936,9 @@ impl IndexState {
                     context_applied = true;
                 }
 
-                // Optionally include weight breakdown for transparency
-                let weights = if request.include_weights {
+                // Include weight breakdown for transparency OR if snapshot emission is requested
+                // When emitting snapshots, we MUST have accurate weights for learning
+                let weights = if request.include_weights || request.emit_decision_snapshot {
                     Some(WeightBreakdown {
                         similarity: base_score,
                         trust: trust_weight,
@@ -1062,16 +1063,15 @@ impl IndexState {
 
             // Build candidates list from matches, capped at SNAPSHOT_CANDIDATES_MAX
             // We only need top-N plus a few near-misses for learning
+            // Weights are guaranteed to be present because emit_decision_snapshot forces weight calculation
             let candidates: Vec<DecisionCandidate> = matches
                 .iter()
                 .take(SNAPSHOT_CANDIDATES_MAX)
                 .map(|m| {
-                    let weights = m.weights.clone().unwrap_or(WeightBreakdown {
-                        similarity: m.score,
-                        trust: 1.0,
-                        recency: 1.0,
-                        context: 1.0,
-                    });
+                    // Weights must be present when snapshot emission is requested
+                    let weights = m.weights.clone().expect(
+                        "Weights must be present for snapshot emission - this is a bug if it panics"
+                    );
 
                     DecisionCandidate {
                         id: m.doc_id.clone(),
