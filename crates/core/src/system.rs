@@ -7,17 +7,27 @@ use utoipa::ToSchema;
 
 use crate::AppState;
 
+/// System signals for meta-cognitive monitoring.
+///
+/// This endpoint exposes smoothed system resource metrics (CPU, Memory, GPU)
+/// that serve as input for Heimgeist's self-model.
+///
+/// TODO: Formalize this contract in `metarepo` (contracts/hauski/system.signals.schema.json).
+/// Currently, this implementation acts as the de-facto definition.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]
 pub struct SystemSignals {
-    /// Global CPU load in percent (0.0 - 100.0), smoothed.
+    /// Global CPU load in percent (0.0 - 100.0), smoothed via EMA.
     pub cpu_load: f32,
-    /// Memory pressure in percent (0.0 - 100.0), smoothed.
+    /// Memory pressure in percent (0.0 - 100.0), smoothed via EMA.
     pub memory_pressure: f32,
-    /// Whether an NVIDIA GPU is detected available.
+    /// Whether an NVIDIA GPU is detected available (checked at startup).
     pub gpu_available: bool,
 }
 
 /// Helper to manage system monitoring in the background.
+///
+/// It runs a background loop updating metrics every 2 seconds, applying
+/// an Exponential Moving Average (EMA) with alpha=0.1 to smooth out spikes.
 #[derive(Clone)]
 pub struct SystemMonitor {
     signals: Arc<RwLock<SystemSignals>>,
