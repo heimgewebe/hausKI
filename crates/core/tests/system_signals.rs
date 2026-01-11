@@ -3,7 +3,7 @@ use axum::{
     http::{Request, StatusCode},
 };
 use hauski_core::{
-    build_app, FeatureFlags, Limits, ModelsFile, RoutingPolicy,
+    FeatureFlags, Limits, ModelsFile, RoutingPolicy,
     system::SystemSignals,
 };
 use http_body_util::BodyExt;
