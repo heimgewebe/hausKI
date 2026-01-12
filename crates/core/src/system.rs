@@ -89,7 +89,10 @@ impl SystemMonitor {
                 let mut guard = match signals_clone.write() {
                     Ok(g) => g,
                     Err(poisoned) => {
-                        tracing::warn!(error = "lock poisoned", "system monitor recovering lock (init)");
+                        tracing::warn!(
+                            error = "lock poisoned",
+                            "system monitor recovering lock (init)"
+                        );
                         poisoned.into_inner()
                     }
                 };
@@ -131,14 +134,16 @@ impl SystemMonitor {
                 let mut guard = match signals_clone.write() {
                     Ok(g) => g,
                     Err(poisoned) => {
-                         tracing::warn!(error = "lock poisoned", "system monitor recovering lock (loop)");
-                         poisoned.into_inner()
+                        tracing::warn!(
+                            error = "lock poisoned",
+                            "system monitor recovering lock (loop)"
+                        );
+                        poisoned.into_inner()
                     }
                 };
                 // Exponential Moving Average
                 guard.cpu_load = alpha * current_cpu + (1.0 - alpha) * guard.cpu_load;
-                guard.memory_pressure =
-                    alpha * current_mem + (1.0 - alpha) * guard.memory_pressure;
+                guard.memory_pressure = alpha * current_mem + (1.0 - alpha) * guard.memory_pressure;
                 guard.gpu_available = gpu_available;
             }
         });
@@ -153,7 +158,10 @@ impl SystemMonitor {
         match self.signals.read() {
             Ok(guard) => Ok(guard.clone()),
             Err(poisoned) => {
-                tracing::warn!(error = "lock poisoned", "system monitor recovering lock (read)");
+                tracing::warn!(
+                    error = "lock poisoned",
+                    "system monitor recovering lock (read)"
+                );
                 Ok(poisoned.into_inner().clone())
             }
         }
@@ -164,10 +172,7 @@ fn check_gpu_availability() -> bool {
     // Platform-tolerant check.
     // We currently rely on nvidia-smi as a heuristic, but wrap it to ensure
     // it doesn't spam logs or panic on non-NVIDIA systems (like CI, WSL, generic Linux).
-    match std::process::Command::new("nvidia-smi")
-        .arg("-L")
-        .output()
-    {
+    match std::process::Command::new("nvidia-smi").arg("-L").output() {
         Ok(output) => output.status.success(),
         Err(_) => {
             // nvidia-smi not found or failed to execute (expected on non-NVIDIA systems)
@@ -186,13 +191,15 @@ fn check_gpu_availability() -> bool {
     ),
     tag = "system"
 )]
-pub async fn system_signals_handler(State(state): State<AppState>) -> Result<Json<SystemSignals>, StatusCode> {
+pub async fn system_signals_handler(
+    State(state): State<AppState>,
+) -> Result<Json<SystemSignals>, StatusCode> {
     match state.system_monitor().get_signals() {
         Ok(signals) => Ok(Json(signals)),
         Err(_) => {
-             // In case we change get_signals to return fatal errors later.
-             // Currently it recovers from poison, so this path is unlikely but safe.
-             Err(StatusCode::INTERNAL_SERVER_ERROR)
+            // In case we change get_signals to return fatal errors later.
+            // Currently it recovers from poison, so this path is unlikely but safe.
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
