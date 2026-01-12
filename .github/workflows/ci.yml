@@ -74,13 +74,6 @@ jobs:
           git show -s --oneline origin/main
           echo "Current HEAD:"
           git show -s --oneline HEAD
-      - name: Validate required toolchain input
-        run: |
-          set -euo pipefail
-          if [ -z "${toolchain}" ]; then
-            echo "'toolchain' input is required; set workflow_dispatch or workflow_call input, or define RUST_TOOLCHAIN." >&2
-            exit 1
-          fi
       - name: Detect changed paths
         id: filter
         env:
@@ -166,10 +159,17 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
-      - name: Show resolved toolchain
-        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
+      - name: Normalize toolchain variable
+        run: |
+          set -euo pipefail
+          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
+          tc="${RUST_TOOLCHAIN:-}"
+          tc="${tc:-stable}"
+          echo "Using toolchain: $tc"
+          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
+          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
       # Pin to fixed v2.7.7 release for reproducibility
@@ -316,10 +316,17 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
-      - name: Show resolved toolchain
-        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
+      - name: Normalize toolchain variable
+        run: |
+          set -euo pipefail
+          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
+          tc="${RUST_TOOLCHAIN:-}"
+          tc="${tc:-stable}"
+          echo "Using toolchain: $tc"
+          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
+          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
       # Pin to fixed v2.7.7 release for reproducibility
@@ -367,10 +374,17 @@ jobs:
         uses: actions/checkout@v4.2.2
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
-      - name: Show resolved toolchain
-        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
+      - name: Normalize toolchain variable
+        run: |
+          set -euo pipefail
+          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
+          tc="${RUST_TOOLCHAIN:-}"
+          tc="${tc:-stable}"
+          echo "Using toolchain: $tc"
+          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
+          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       # Pin to fixed v2.7.7 release to keep builds deterministic
       - uses: Swatinem/rust-cache@v2.7.7
@@ -391,10 +405,17 @@ jobs:
         uses: actions/checkout@v4.2.2
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
-      - name: Show resolved toolchain
-        run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
+      - name: Normalize toolchain variable
+        run: |
+          set -euo pipefail
+          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
+          tc="${RUST_TOOLCHAIN:-}"
+          tc="${tc:-stable}"
+          echo "Using toolchain: $tc"
+          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
+          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
