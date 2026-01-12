@@ -159,12 +159,17 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
-      - name: Show resolved toolchain
-        run: 'echo "Using toolchain: stable"'
+      - name: Normalize toolchain variable
+        run: |
+          set -euo pipefail
+          tc="${RUST_TOOLCHAIN:-}"
+          tc="${tc:-stable}"
+          echo "Using toolchain: $tc"
+          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: stable
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
       # Pin to fixed v2.7.7 release for reproducibility
       - uses: Swatinem/rust-cache@v2.7.7
@@ -310,12 +315,17 @@ jobs:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
-      - name: Show resolved toolchain
-        run: 'echo "Using toolchain: stable"'
+      - name: Normalize toolchain variable
+        run: |
+          set -euo pipefail
+          tc="${RUST_TOOLCHAIN:-}"
+          tc="${tc:-stable}"
+          echo "Using toolchain: $tc"
+          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: stable
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
       # Pin to fixed v2.7.7 release for reproducibility
       - uses: Swatinem/rust-cache@v2.7.7
@@ -362,12 +372,17 @@ jobs:
         uses: actions/checkout@v4.2.2
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
-      - name: Show resolved toolchain
-        run: 'echo "Using toolchain: stable"'
+      - name: Normalize toolchain variable
+        run: |
+          set -euo pipefail
+          tc="${RUST_TOOLCHAIN:-}"
+          tc="${tc:-stable}"
+          echo "Using toolchain: $tc"
+          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: stable
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       # Pin to fixed v2.7.7 release to keep builds deterministic
       - uses: Swatinem/rust-cache@v2.7.7
       - name: Health & chat smoke (mock ollama)
@@ -387,12 +402,17 @@ jobs:
         uses: actions/checkout@v4.2.2
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
-      - name: Show resolved toolchain
-        run: 'echo "Using toolchain: stable"'
+      - name: Normalize toolchain variable
+        run: |
+          set -euo pipefail
+          tc="${RUST_TOOLCHAIN:-}"
+          tc="${tc:-stable}"
+          echo "Using toolchain: $tc"
+          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: stable
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       # Pin to v2 for stability while allowing patch updates
