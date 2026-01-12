@@ -162,7 +162,7 @@ jobs:
       - name: Normalize toolchain variable
         run: |
           set -euo pipefail
-          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN}'"
+          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
           tc="${RUST_TOOLCHAIN:-}"
           tc="${tc:-stable}"
           echo "Using toolchain: $tc"
@@ -319,7 +319,7 @@ jobs:
       - name: Normalize toolchain variable
         run: |
           set -euo pipefail
-          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN}'"
+          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
           tc="${RUST_TOOLCHAIN:-}"
           tc="${tc:-stable}"
           echo "Using toolchain: $tc"
@@ -377,7 +377,7 @@ jobs:
       - name: Normalize toolchain variable
         run: |
           set -euo pipefail
-          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN}'"
+          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
           tc="${RUST_TOOLCHAIN:-}"
           tc="${tc:-stable}"
           echo "Using toolchain: $tc"
@@ -408,7 +408,7 @@ jobs:
       - name: Normalize toolchain variable
         run: |
           set -euo pipefail
-          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN}'"
+          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
           tc="${RUST_TOOLCHAIN:-}"
           tc="${tc:-stable}"
           echo "Using toolchain: $tc"
