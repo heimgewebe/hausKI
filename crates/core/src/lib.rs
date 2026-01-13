@@ -567,7 +567,13 @@ pub fn build_app_with_state(
         .nest("/index", index_router::<AppState>());
 
     // Initialize memory subsystem. This is fallible, so we capture the result.
-    let memory_initialized = hauski_memory::init_default()
+    let max_pool_size = env_u64("HAUSKI_MEMORY_MAX_POOL_SIZE", 4) as u32;
+    let memory_config = hauski_memory::MemoryConfig {
+        max_pool_size,
+        ..Default::default()
+    };
+
+    let memory_initialized = hauski_memory::init_with(memory_config)
         .map_err(|e| {
             tracing::error!(error = ?e, "failed to initialize memory subsystem");
             e
