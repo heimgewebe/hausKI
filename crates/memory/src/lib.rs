@@ -118,12 +118,15 @@ pub struct MemoryConfig {
     pub db_path: Option<PathBuf>,
     /// Janitor-Intervall in Sekunden (Default 60).
     pub janitor_interval_secs: u64,
+    /// Maximale Anzahl an Connections im Pool (Default 4).
+    pub max_pool_size: u32,
 }
 impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
             db_path: None,
             janitor_interval_secs: 60,
+            max_pool_size: 4,
         }
     }
 }
@@ -170,7 +173,7 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
     // setup pool
     let manager = SqliteConnectionManager::new(&db_path);
     let pool = r2d2::Pool::builder()
-        .max_size(4)
+        .max_size(cfg.max_pool_size)
         .build(manager)
         .context("failed to create sqlite pool")?;
 
@@ -458,6 +461,40 @@ mod tests {
             _janitor: jp,
         };
         (store, tmp)
+    }
+
+    #[tokio::test]
+    async fn verify_pragmas() {
+        let (store, _tmp) = test_store(60);
+        let pool = store.pool.clone();
+
+        tokio::task::spawn_blocking(move || {
+            let conn = pool.get().expect("get connection");
+
+            let journal_mode: String = conn
+                .query_row("PRAGMA journal_mode", [], |r| r.get(0))
+                .expect("query journal_mode");
+            assert_eq!(journal_mode.to_uppercase(), "WAL");
+
+            let synchronous: i32 = conn
+                .query_row("PRAGMA synchronous", [], |r| r.get(0))
+                .expect("query synchronous");
+            // 1 = NORMAL
+            assert_eq!(synchronous, 1);
+
+            let foreign_keys: i32 = conn
+                .query_row("PRAGMA foreign_keys", [], |r| r.get(0))
+                .expect("query foreign_keys");
+            // 1 = ON
+            assert_eq!(foreign_keys, 1);
+
+            let busy_timeout: i32 = conn
+                .query_row("PRAGMA busy_timeout", [], |r| r.get(0))
+                .expect("query busy_timeout");
+            assert_eq!(busy_timeout, 5000);
+        })
+        .await
+        .expect("spawn_blocking");
     }
 
     #[tokio::test]
