@@ -69,7 +69,8 @@ type MetricsCallback = dyn Fn(Method, &'static str, StatusCode, Instant) + Send 
         ask::ask_handler, chat::chat_handler,
         memory_api::memory_get_handler, memory_api::memory_set_handler, memory_api::memory_evict_handler,
         assist::assist_handler,
-        plugins::list_plugins_handler, plugins::get_plugin_handler
+        plugins::list_plugins_handler, plugins::get_plugin_handler,
+        system::system_signals_handler
     ),
     components(
         schemas(
