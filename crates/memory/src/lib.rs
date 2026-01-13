@@ -38,11 +38,16 @@ impl r2d2::ManageConnection for SqliteConnectionManager {
     type Error = rusqlite::Error;
 
     fn connect(&self) -> Result<Connection, rusqlite::Error> {
-        Connection::open(&self.path)
+        let conn = Connection::open(&self.path)?;
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+        conn.pragma_update(None, "synchronous", "NORMAL")?;
+        conn.pragma_update(None, "foreign_keys", "ON")?;
+        conn.pragma_update(None, "busy_timeout", 5000)?;
+        Ok(conn)
     }
 
     fn is_valid(&self, conn: &mut Connection) -> Result<(), rusqlite::Error> {
-        conn.execute_batch("")
+        conn.execute_batch("SELECT 1")
     }
 
     fn has_broken(&self, _conn: &mut Connection) -> bool {
@@ -164,7 +169,10 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
 
     // setup pool
     let manager = SqliteConnectionManager::new(&db_path);
-    let pool = r2d2::Pool::new(manager).context("failed to create sqlite pool")?;
+    let pool = r2d2::Pool::builder()
+        .max_size(4)
+        .build(manager)
+        .context("failed to create sqlite pool")?;
 
     // ensure schema exists
     {
@@ -173,7 +181,6 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
             .with_context(|| format!("open sqlite at {}", db_path.display()))?;
         conn.execute_batch(
             r"
-            PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS memory_items(
                 key TEXT PRIMARY KEY,
                 value BLOB NOT NULL,
@@ -424,14 +431,16 @@ mod tests {
         let db_path = tmp.path().join("m.db");
 
         let manager = SqliteConnectionManager::new(&db_path);
-        let pool = r2d2::Pool::new(manager).unwrap();
+        let pool = r2d2::Pool::builder()
+            .max_size(4)
+            .build(manager)
+            .unwrap();
 
         // Schema-Erstellung (wie in init_with)
         {
             let conn = pool.get().unwrap();
             conn.execute_batch(
                 r"
-                PRAGMA journal_mode=WAL;
                 CREATE TABLE IF NOT EXISTS memory_items(
                     key TEXT PRIMARY KEY, value BLOB NOT NULL, ttl_sec INTEGER NULL,
                     pinned INTEGER NOT NULL DEFAULT 0, created_ts TEXT NOT NULL, updated_ts TEXT NOT NULL
