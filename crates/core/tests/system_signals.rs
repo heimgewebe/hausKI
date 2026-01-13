@@ -96,5 +96,5 @@ fn contract_validation_rejects_invalid_json() {
     let signals: SystemSignals = serde_json::from_str(valid).expect("Should parse valid JSON");
     assert_eq!(signals.cpu_load, 50.0);
     assert_eq!(signals.memory_pressure, 60.0);
-    assert_eq!(signals.gpu_available, true);
+    assert!(signals.gpu_available);
 }
