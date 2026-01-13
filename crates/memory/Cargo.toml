@@ -15,6 +15,7 @@ tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 once_cell = { workspace = true }
+r2d2 = "0.8"
 
 [dev-dependencies]
 tempfile = { workspace = true }

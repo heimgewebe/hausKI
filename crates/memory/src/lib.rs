@@ -18,6 +18,38 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use tokio::task::{self, JoinHandle};
 
+// ---------- Connection Manager ----------
+
+#[derive(Debug)]
+pub struct SqliteConnectionManager {
+    path: PathBuf,
+}
+
+impl SqliteConnectionManager {
+    pub fn new<P: AsRef<std::path::Path>>(path: P) -> Self {
+        Self {
+            path: path.as_ref().to_path_buf(),
+        }
+    }
+}
+
+impl r2d2::ManageConnection for SqliteConnectionManager {
+    type Connection = Connection;
+    type Error = rusqlite::Error;
+
+    fn connect(&self) -> Result<Connection, rusqlite::Error> {
+        Connection::open(&self.path)
+    }
+
+    fn is_valid(&self, conn: &mut Connection) -> Result<(), rusqlite::Error> {
+        conn.execute_batch("")
+    }
+
+    fn has_broken(&self, _conn: &mut Connection) -> bool {
+        false
+    }
+}
+
 // ---------- Metrik-Labels (bleiben wie in A1) ----------
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -92,7 +124,7 @@ impl Default for MemoryConfig {
 }
 
 pub struct MemoryStore {
-    pub(crate) db_path: PathBuf,
+    pub(crate) pool: r2d2::Pool<SqliteConnectionManager>,
     // Metriken (werden in A3 an die Core-Registry gehängt)
     pub(crate) ops_total: Family<MemoryLabels<'static>, Counter>,
     pub(crate) evictions_total: Family<EvictLabels<'static>, Counter>,
@@ -130,9 +162,14 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
         ));
     }
 
+    // setup pool
+    let manager = SqliteConnectionManager::new(&db_path);
+    let pool = r2d2::Pool::new(manager).context("failed to create sqlite pool")?;
+
     // ensure schema exists
     {
-        let conn = Connection::open(&db_path)
+        let conn = pool
+            .get()
             .with_context(|| format!("open sqlite at {}", db_path.display()))?;
         conn.execute_batch(
             r"
@@ -151,10 +188,11 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
 
     // spawn janitor
     let interval = cfg.janitor_interval_secs.max(5);
-    let jp = tokio::spawn(janitor_task(db_path.clone(), interval));
+    // Janitor uses separate connections (or pool clone in future step)
+    let jp = tokio::spawn(janitor_task(pool.clone(), interval));
 
     let store = MemoryStore {
-        db_path,
+        pool,
         ops_total: Family::default(),
         evictions_total: Family::default(),
         _janitor: jp,
@@ -180,12 +218,12 @@ impl MemoryStore {
         ttl: TtlUpdate,
         pinned: Option<bool>,
     ) -> Result<()> {
-        let db_path = self.db_path.clone();
+        let pool = self.pool.clone();
         let ops_total = self.ops_total.clone();
 
         task::spawn_blocking(move || {
             let now = Utc::now().to_rfc3339();
-            let conn = Connection::open(&db_path)?;
+            let conn = pool.get().map_err(|e| anyhow::anyhow!("pool error: {}", e))?;
 
             // Bestehende Metadaten (created_ts, pinned, ttl) beibehalten, sofern vorhanden.
             let existing: Option<(String, Option<i64>, Option<i64>)> = conn
@@ -240,11 +278,11 @@ impl MemoryStore {
     }
 
     pub async fn get(&self, key: String) -> Result<Option<Item>> {
-        let db_path = self.db_path.clone();
+        let pool = self.pool.clone();
         let ops_total = self.ops_total.clone();
 
         task::spawn_blocking(move || {
-            let conn = Connection::open(&db_path)?;
+            let conn = pool.get().map_err(|e| anyhow::anyhow!("pool error: {}", e))?;
             let row = conn
                 .query_row(
                     r"SELECT key, value, ttl_sec, pinned, created_ts, updated_ts
@@ -284,11 +322,11 @@ impl MemoryStore {
     }
 
     pub async fn evict(&self, key: String) -> Result<bool> {
-        let db_path = self.db_path.clone();
+        let pool = self.pool.clone();
         let evictions_total = self.evictions_total.clone();
 
         task::spawn_blocking(move || {
-            let conn = Connection::open(&db_path)?;
+            let conn = pool.get().map_err(|e| anyhow::anyhow!("pool error: {}", e))?;
             let n = conn.execute("DELETE FROM memory_items WHERE key=?1", params![key])?;
             if n > 0 {
                 let c = evictions_total.get_or_create(&EvictLabels {
@@ -303,10 +341,10 @@ impl MemoryStore {
     }
 
     pub async fn stats(&self) -> Result<Stats> {
-        let db_path = self.db_path.clone();
+        let pool = self.pool.clone();
 
         task::spawn_blocking(move || {
-            let conn = Connection::open(&db_path)?;
+            let conn = pool.get().map_err(|e| anyhow::anyhow!("pool error: {}", e))?;
             let (pinned, unpinned) = conn.query_row(
                 "SELECT
                     COUNT(CASE WHEN pinned = 1 THEN 1 END),
@@ -326,10 +364,10 @@ impl MemoryStore {
     }
 
     pub async fn scan_prefix(&self, prefix: String) -> Result<Vec<String>> {
-        let db_path = self.db_path.clone();
+        let pool = self.pool.clone();
 
         task::spawn_blocking(move || {
-            let conn = Connection::open(&db_path)?;
+            let conn = pool.get().map_err(|e| anyhow::anyhow!("pool error: {}", e))?;
             let mut stmt = conn.prepare("SELECT key FROM memory_items WHERE key LIKE ?1")?;
             let keys_iter = stmt.query_map(params![format!("{}%", prefix)], |row| row.get(0))?;
 
@@ -344,14 +382,14 @@ impl MemoryStore {
     }
 }
 
-async fn janitor_task(db_path: PathBuf, every_secs: u64) {
+async fn janitor_task(pool: r2d2::Pool<SqliteConnectionManager>, every_secs: u64) {
     let d = Duration::from_secs(every_secs);
     loop {
         tokio::time::sleep(d).await;
-        let db_path_clone = db_path.clone();
+        let pool_clone = pool.clone();
 
         if let Err(e) = task::spawn_blocking(move || {
-            if let Ok(conn) = Connection::open(&db_path_clone) {
+            if let Ok(conn) = pool_clone.get() {
                 // Lösche abgelaufene TTLs, wenn nicht gepinnt
                 let n = conn.execute(
                     r"DELETE FROM memory_items
@@ -385,9 +423,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let db_path = tmp.path().join("m.db");
 
+        let manager = SqliteConnectionManager::new(&db_path);
+        let pool = r2d2::Pool::new(manager).unwrap();
+
         // Schema-Erstellung (wie in init_with)
         {
-            let conn = Connection::open(&db_path).unwrap();
+            let conn = pool.get().unwrap();
             conn.execute_batch(
                 r"
                 PRAGMA journal_mode=WAL;
@@ -399,10 +440,10 @@ mod tests {
             .unwrap();
         }
 
-        let jp = tokio::spawn(janitor_task(db_path.clone(), janitor_interval_secs));
+        let jp = tokio::spawn(janitor_task(pool.clone(), janitor_interval_secs));
 
         let store = MemoryStore {
-            db_path,
+            pool,
             ops_total: Family::default(),
             evictions_total: Family::default(),
             _janitor: jp,
