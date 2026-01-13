@@ -10,11 +10,13 @@ use crate::AppState;
 
 /// System signals for meta-cognitive monitoring.
 ///
-/// This endpoint exposes smoothed system resource metrics (CPU, Memory, GPU)
-/// that serve as input for Heimgeist's self-model.
+/// This struct implements the canonical contract defined in:
+/// `docs/contracts/hauski/system.signals.v1.schema.json`
 ///
-/// TODO: Formalize this contract in `metarepo` (contracts/hauski/system.signals.v1.schema.json).
-/// temporary implementation; contract must be canonical in metarepo.
+/// Contract: hauski.system.signals.v1
+/// Schema: https://schemas.heimgewebe.org/hauski/system.signals.v1.schema.json
+///
+/// The contract is the source of truth. This implementation must match exactly.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]
 pub struct SystemSignals {
     /// Global CPU load in percent (0.0 - 100.0), smoothed via EMA.

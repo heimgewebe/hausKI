@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.heimgewebe.org/hauski/system.signals.v1.schema.json",
+  "title": "HausKI System Signals",
+  "description": "Smoothed system resource metrics (CPU, Memory, GPU) for meta-cognitive monitoring. Metrics are updated every 2 seconds with Exponential Moving Average (EMA, alpha=0.1) smoothing to reduce noise.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cpu_load", "memory_pressure", "gpu_available"],
+  "properties": {
+    "cpu_load": {
+      "description": "Global CPU load in percent (0.0 - 100.0), smoothed via EMA.",
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 100.0
+    },
+    "memory_pressure": {
+      "description": "Memory pressure in percent (0.0 - 100.0), smoothed via EMA.",
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 100.0
+    },
+    "gpu_available": {
+      "description": "Whether an NVIDIA GPU is detected available (heuristic check at startup via nvidia-smi).",
+      "type": "boolean"
+    }
+  }
+}
