@@ -20,7 +20,7 @@
       "maximum": 100.0
     },
     "gpu_available": {
-      "description": "Whether an NVIDIA GPU is detected available (heuristic check at startup via nvidia-smi).",
+      "description": "Whether an NVIDIA GPU is detected available (best-effort heuristic check at startup via nvidia-smi, falls back to false on non-NVIDIA systems or when nvidia-smi is unavailable).",
       "type": "boolean"
     }
   }
