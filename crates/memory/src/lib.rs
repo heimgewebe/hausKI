@@ -198,7 +198,7 @@ pub fn init_with(cfg: MemoryConfig) -> Result<&'static MemoryStore> {
 
     // spawn janitor
     let interval = cfg.janitor_interval_secs.max(5);
-    // Janitor uses separate connections (or pool clone in future step)
+    // Janitor shares the same connection pool (pool.clone() is a cheap Arc clone)
     let jp = tokio::spawn(janitor_task(pool.clone(), interval));
 
     let store = MemoryStore {
@@ -233,7 +233,9 @@ impl MemoryStore {
 
         task::spawn_blocking(move || {
             let now = Utc::now().to_rfc3339();
-            let conn = pool.get().map_err(|e| anyhow::anyhow!("pool error: {}", e))?;
+            let conn = pool
+                .get()
+                .with_context(|| "failed to get connection from pool in set")?;
 
             // Bestehende Metadaten (created_ts, pinned, ttl) beibehalten, sofern vorhanden.
             let existing: Option<(String, Option<i64>, Option<i64>)> = conn
@@ -292,7 +294,9 @@ impl MemoryStore {
         let ops_total = self.ops_total.clone();
 
         task::spawn_blocking(move || {
-            let conn = pool.get().map_err(|e| anyhow::anyhow!("pool error: {}", e))?;
+            let conn = pool
+                .get()
+                .with_context(|| "failed to get connection from pool in get")?;
             let row = conn
                 .query_row(
                     r"SELECT key, value, ttl_sec, pinned, created_ts, updated_ts
@@ -336,7 +340,9 @@ impl MemoryStore {
         let evictions_total = self.evictions_total.clone();
 
         task::spawn_blocking(move || {
-            let conn = pool.get().map_err(|e| anyhow::anyhow!("pool error: {}", e))?;
+            let conn = pool
+                .get()
+                .with_context(|| "failed to get connection from pool in evict")?;
             let n = conn.execute("DELETE FROM memory_items WHERE key=?1", params![key])?;
             if n > 0 {
                 let c = evictions_total.get_or_create(&EvictLabels {
@@ -354,7 +360,9 @@ impl MemoryStore {
         let pool = self.pool.clone();
 
         task::spawn_blocking(move || {
-            let conn = pool.get().map_err(|e| anyhow::anyhow!("pool error: {}", e))?;
+            let conn = pool
+                .get()
+                .with_context(|| "failed to get connection from pool in stats")?;
             let (pinned, unpinned) = conn.query_row(
                 "SELECT
                     COUNT(CASE WHEN pinned = 1 THEN 1 END),
@@ -377,7 +385,9 @@ impl MemoryStore {
         let pool = self.pool.clone();
 
         task::spawn_blocking(move || {
-            let conn = pool.get().map_err(|e| anyhow::anyhow!("pool error: {}", e))?;
+            let conn = pool
+                .get()
+                .with_context(|| "failed to get connection from pool in scan_prefix")?;
             let mut stmt = conn.prepare("SELECT key FROM memory_items WHERE key LIKE ?1")?;
             let keys_iter = stmt.query_map(params![format!("{}%", prefix)], |row| row.get(0))?;
 
@@ -434,10 +444,7 @@ mod tests {
         let db_path = tmp.path().join("m.db");
 
         let manager = SqliteConnectionManager::new(&db_path);
-        let pool = r2d2::Pool::builder()
-            .max_size(4)
-            .build(manager)
-            .unwrap();
+        let pool = r2d2::Pool::builder().max_size(4).build(manager).unwrap();
 
         // Schema-Erstellung (wie in init_with)
         {
