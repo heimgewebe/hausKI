@@ -233,9 +233,7 @@ impl MemoryStore {
 
         task::spawn_blocking(move || {
             let now = Utc::now().to_rfc3339();
-            let conn = pool
-                .get()
-                .with_context(|| "failed to get connection from pool in set")?;
+            let conn = pool.get().context("MemoryStore::set: r2d2 pool get")?;
 
             // Bestehende Metadaten (created_ts, pinned, ttl) beibehalten, sofern vorhanden.
             let existing: Option<(String, Option<i64>, Option<i64>)> = conn
@@ -294,9 +292,7 @@ impl MemoryStore {
         let ops_total = self.ops_total.clone();
 
         task::spawn_blocking(move || {
-            let conn = pool
-                .get()
-                .with_context(|| "failed to get connection from pool in get")?;
+            let conn = pool.get().context("MemoryStore::get: r2d2 pool get")?;
             let row = conn
                 .query_row(
                     r"SELECT key, value, ttl_sec, pinned, created_ts, updated_ts
@@ -340,9 +336,7 @@ impl MemoryStore {
         let evictions_total = self.evictions_total.clone();
 
         task::spawn_blocking(move || {
-            let conn = pool
-                .get()
-                .with_context(|| "failed to get connection from pool in evict")?;
+            let conn = pool.get().context("MemoryStore::evict: r2d2 pool get")?;
             let n = conn.execute("DELETE FROM memory_items WHERE key=?1", params![key])?;
             if n > 0 {
                 let c = evictions_total.get_or_create(&EvictLabels {
@@ -360,9 +354,7 @@ impl MemoryStore {
         let pool = self.pool.clone();
 
         task::spawn_blocking(move || {
-            let conn = pool
-                .get()
-                .with_context(|| "failed to get connection from pool in stats")?;
+            let conn = pool.get().context("MemoryStore::stats: r2d2 pool get")?;
             let (pinned, unpinned) = conn.query_row(
                 "SELECT
                     COUNT(CASE WHEN pinned = 1 THEN 1 END),
@@ -387,7 +379,7 @@ impl MemoryStore {
         task::spawn_blocking(move || {
             let conn = pool
                 .get()
-                .with_context(|| "failed to get connection from pool in scan_prefix")?;
+                .context("MemoryStore::scan_prefix: r2d2 pool get")?;
             let mut stmt = conn.prepare("SELECT key FROM memory_items WHERE key LIKE ?1")?;
             let keys_iter = stmt.query_map(params![format!("{}%", prefix)], |row| row.get(0))?;
 
