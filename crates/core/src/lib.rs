@@ -567,7 +567,16 @@ pub fn build_app_with_state(
         .nest("/index", index_router::<AppState>());
 
     // Initialize memory subsystem. This is fallible, so we capture the result.
-    let max_pool_size = env_u64("HAUSKI_MEMORY_MAX_POOL_SIZE", 4) as u32;
+    let raw_pool_size = env_u64("HAUSKI_MEMORY_MAX_POOL_SIZE", 4);
+    let max_pool_size = raw_pool_size.clamp(1, 64) as u32;
+    if raw_pool_size != max_pool_size as u64 {
+        tracing::warn!(
+            raw_pool_size,
+            max_pool_size,
+            "clamped HAUSKI_MEMORY_MAX_POOL_SIZE to safe limits"
+        );
+    }
+
     let memory_config = hauski_memory::MemoryConfig {
         max_pool_size,
         ..Default::default()
