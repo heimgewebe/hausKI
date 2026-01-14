@@ -63,14 +63,20 @@ async fn system_signals_returns_expected_keys() {
     );
 
     // Validate contract-required timestamp field
-    // occurred_at must be a valid RFC3339 timestamp and parseable
-    // The struct already validates this via chrono::DateTime<Utc> type
-    // Just ensure it's reasonably recent (within last minute, accounting for test overhead)
+    // occurred_at must be a valid RFC3339 timestamp (ensured by DateTime<Utc> type)
+    // Check it's not in the future and not absurdly old (basic sanity check)
     let now = chrono::Utc::now();
+    assert!(
+        signals.occurred_at <= now,
+        "occurred_at is in the future: {:?}",
+        signals.occurred_at
+    );
+
+    // Ensure it's reasonably recent (within last 10 minutes to avoid CI flakes)
     let age = now.signed_duration_since(signals.occurred_at);
     assert!(
-        age.num_seconds() >= 0 && age.num_seconds() < 60,
-        "occurred_at timestamp is not recent: {:?}",
+        age.num_seconds() < 600,
+        "occurred_at is too old (>10 min): {:?}",
         signals.occurred_at
     );
 

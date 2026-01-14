@@ -16,7 +16,6 @@ use crate::AppState;
 ///
 /// Contract: This struct conforms to the canonical schema at
 /// `contracts/hauski/system.signals.v1.schema.json` in the metarepo.
-/// $id: https://heimgewebe/contracts/hauski/system.signals.v1.schema.json
 #[derive(Serialize, Deserialize, Clone, Debug, ToSchema)]
 pub struct SystemSignals {
     /// Global CPU load in percent (0.0 - 100.0), smoothed via EMA.
@@ -33,19 +32,6 @@ pub struct SystemSignals {
     /// Optional hostname where the signal was collected.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
-}
-
-impl Default for SystemSignals {
-    fn default() -> Self {
-        Self {
-            cpu_load: 0.0,
-            memory_pressure: 0.0,
-            gpu_available: false,
-            occurred_at: Utc::now(),
-            source: Some("hauski-core".to_string()),
-            host: hostname::get().ok().and_then(|h| h.into_string().ok()),
-        }
-    }
 }
 
 /// Helper to manage system monitoring in the background.
@@ -82,54 +68,49 @@ impl Default for SystemMonitor {
 
 impl SystemMonitor {
     pub fn new() -> Self {
-        let signals = Arc::new(RwLock::new(SystemSignals::default()));
-        let signals_clone = signals.clone();
         let cancel = CancellationToken::new();
         let cancel_child = cancel.clone();
 
+        // Initialize sysinfo and take first measurements synchronously
+        let mut sys = System::new_with_specifics(
+            RefreshKind::new()
+                .with_cpu(CpuRefreshKind::new().with_cpu_usage())
+                .with_memory(MemoryRefreshKind::everything()),
+        );
+
+        // Check GPU availability once (heuristic)
+        let gpu_available = check_gpu_availability();
+
+        // Get initial measurements
+        sys.refresh_cpu();
+        sys.refresh_memory();
+
+        let cpu_load = sys.global_cpu_info().cpu_usage();
+        let used = sys.used_memory() as f64;
+        let total = sys.total_memory() as f64;
+        let memory_pressure = if total > 0.0 {
+            (used / total * 100.0) as f32
+        } else {
+            0.0
+        };
+
+        // Create initial signals with actual measurements
+        let initial_signals = SystemSignals {
+            cpu_load,
+            memory_pressure,
+            gpu_available,
+            occurred_at: Utc::now(),
+            source: Some("hauski-core".to_string()),
+            host: hostname::get().ok().and_then(|h| h.into_string().ok()),
+        };
+
+        let signals = Arc::new(RwLock::new(initial_signals));
+        let signals_clone = signals.clone();
+
         tokio::spawn(async move {
-            // sysinfo: only refresh what we need to minimize overhead
-            let mut sys = System::new_with_specifics(
-                RefreshKind::new()
-                    .with_cpu(CpuRefreshKind::new().with_cpu_usage())
-                    .with_memory(MemoryRefreshKind::everything()),
-            );
-
-            // Check GPU availability once (heuristic)
-            let gpu_available = check_gpu_availability();
-
-            // Initial refresh
-            sys.refresh_cpu();
-            sys.refresh_memory();
-            // Wait a bit for CPU usage to have a delta
+            // Wait a bit for CPU usage to have a proper delta before starting loop
             sleep(Duration::from_millis(200)).await;
             sys.refresh_cpu();
-
-            // Initialize values
-            // We use explicit error handling instead of unwrap to be robust against lock poisoning.
-            // If poisoned, we recover the lock as we just want to write fresh values.
-            {
-                let mut guard = match signals_clone.write() {
-                    Ok(g) => g,
-                    Err(poisoned) => {
-                        tracing::warn!(
-                            error = "lock poisoned",
-                            "system monitor recovering lock (init)"
-                        );
-                        poisoned.into_inner()
-                    }
-                };
-                guard.gpu_available = gpu_available;
-                guard.cpu_load = sys.global_cpu_info().cpu_usage();
-                let used = sys.used_memory() as f64;
-                let total = sys.total_memory() as f64;
-                guard.memory_pressure = if total > 0.0 {
-                    (used / total * 100.0) as f32
-                } else {
-                    0.0
-                };
-                guard.occurred_at = Utc::now();
-            }
 
             let alpha = 0.1; // Smoothing factor (EWMA)
 
