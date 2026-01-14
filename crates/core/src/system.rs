@@ -1,4 +1,5 @@
 use axum::{extract::State, http::StatusCode, Json};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
@@ -13,9 +14,19 @@ use crate::AppState;
 /// This endpoint exposes smoothed system resource metrics (CPU, Memory, GPU)
 /// that serve as input for Heimgeist's self-model.
 ///
-/// TODO: Formalize this contract in `metarepo` (contracts/hauski/system.signals.v1.schema.json).
-/// temporary implementation; contract must be canonical in metarepo.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]
+/// Contract: This struct conforms to the canonical schema at
+/// `contracts/hauski/system.signals.v1.schema.json` in the metarepo.
+///
+/// # Field Semantics
+///
+/// - `cpu_load`, `memory_pressure`, `gpu_available`: Dynamic measurement values
+/// - `occurred_at`: Timestamp when the signal was sampled (updated every 2s)
+/// - `source`, `host`: Static provenance metadata (set once at initialization)
+///
+/// Provenance fields (`source` and `host`) identify the sensor and remain constant
+/// for the lifetime of the monitor instance. If either changes, a new monitor
+/// (and signal stream) should be created rather than updating these fields.
+#[derive(Serialize, Deserialize, Clone, Debug, ToSchema)]
 pub struct SystemSignals {
     /// Global CPU load in percent (0.0 - 100.0), smoothed via EMA.
     pub cpu_load: f32,
@@ -23,6 +34,16 @@ pub struct SystemSignals {
     pub memory_pressure: f32,
     /// Whether an NVIDIA GPU is detected available (checked at startup).
     pub gpu_available: bool,
+    /// Timestamp when this signal was sampled (RFC3339/ISO8601).
+    pub occurred_at: DateTime<Utc>,
+    /// Optional source identifier (e.g., "hauski-core", "core/system_monitor").
+    /// Set once at initialization and remains static for provenance tracking.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    /// Optional hostname where the signal was collected.
+    /// Set once at initialization and remains static for provenance tracking.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
 }
 
 /// Helper to manage system monitoring in the background.
@@ -59,53 +80,49 @@ impl Default for SystemMonitor {
 
 impl SystemMonitor {
     pub fn new() -> Self {
-        let signals = Arc::new(RwLock::new(SystemSignals::default()));
-        let signals_clone = signals.clone();
         let cancel = CancellationToken::new();
         let cancel_child = cancel.clone();
 
+        // Initialize sysinfo and take first measurements synchronously
+        let mut sys = System::new_with_specifics(
+            RefreshKind::new()
+                .with_cpu(CpuRefreshKind::new().with_cpu_usage())
+                .with_memory(MemoryRefreshKind::everything()),
+        );
+
+        // Check GPU availability once (heuristic)
+        let gpu_available = check_gpu_availability();
+
+        // Get initial measurements
+        sys.refresh_cpu();
+        sys.refresh_memory();
+
+        let cpu_load = sys.global_cpu_info().cpu_usage();
+        let used = sys.used_memory() as f64;
+        let total = sys.total_memory() as f64;
+        let memory_pressure = if total > 0.0 {
+            (used / total * 100.0) as f32
+        } else {
+            0.0
+        };
+
+        // Create initial signals with actual measurements
+        let initial_signals = SystemSignals {
+            cpu_load,
+            memory_pressure,
+            gpu_available,
+            occurred_at: Utc::now(),
+            source: Some("hauski-core".to_string()),
+            host: hostname::get().ok().and_then(|h| h.into_string().ok()),
+        };
+
+        let signals = Arc::new(RwLock::new(initial_signals));
+        let signals_clone = signals.clone();
+
         tokio::spawn(async move {
-            // sysinfo: only refresh what we need to minimize overhead
-            let mut sys = System::new_with_specifics(
-                RefreshKind::new()
-                    .with_cpu(CpuRefreshKind::new().with_cpu_usage())
-                    .with_memory(MemoryRefreshKind::everything()),
-            );
-
-            // Check GPU availability once (heuristic)
-            let gpu_available = check_gpu_availability();
-
-            // Initial refresh
-            sys.refresh_cpu();
-            sys.refresh_memory();
-            // Wait a bit for CPU usage to have a delta
+            // Wait a bit for CPU usage to have a proper delta before starting loop
             sleep(Duration::from_millis(200)).await;
             sys.refresh_cpu();
-
-            // Initialize values
-            // We use explicit error handling instead of unwrap to be robust against lock poisoning.
-            // If poisoned, we recover the lock as we just want to write fresh values.
-            {
-                let mut guard = match signals_clone.write() {
-                    Ok(g) => g,
-                    Err(poisoned) => {
-                        tracing::warn!(
-                            error = "lock poisoned",
-                            "system monitor recovering lock (init)"
-                        );
-                        poisoned.into_inner()
-                    }
-                };
-                guard.gpu_available = gpu_available;
-                guard.cpu_load = sys.global_cpu_info().cpu_usage();
-                let used = sys.used_memory() as f64;
-                let total = sys.total_memory() as f64;
-                guard.memory_pressure = if total > 0.0 {
-                    (used / total * 100.0) as f32
-                } else {
-                    0.0
-                };
-            }
 
             let alpha = 0.1; // Smoothing factor (EWMA)
 
@@ -145,6 +162,8 @@ impl SystemMonitor {
                 guard.cpu_load = alpha * current_cpu + (1.0 - alpha) * guard.cpu_load;
                 guard.memory_pressure = alpha * current_mem + (1.0 - alpha) * guard.memory_pressure;
                 guard.gpu_available = gpu_available;
+                guard.occurred_at = Utc::now();
+                // Note: source and host are static provenance fields and are not updated here by design.
             }
         });
 
