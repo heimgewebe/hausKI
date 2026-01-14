@@ -16,6 +16,16 @@ use crate::AppState;
 ///
 /// Contract: This struct conforms to the canonical schema at
 /// `contracts/hauski/system.signals.v1.schema.json` in the metarepo.
+///
+/// # Field Semantics
+///
+/// - `cpu_load`, `memory_pressure`, `gpu_available`: Dynamic measurement values
+/// - `occurred_at`: Timestamp when the signal was sampled (updated every 2s)
+/// - `source`, `host`: Static provenance metadata (set once at initialization)
+///
+/// Provenance fields (`source` and `host`) identify the sensor and remain constant
+/// for the lifetime of the monitor instance. If either changes, a new monitor
+/// (and signal stream) should be created rather than updating these fields.
 #[derive(Serialize, Deserialize, Clone, Debug, ToSchema)]
 pub struct SystemSignals {
     /// Global CPU load in percent (0.0 - 100.0), smoothed via EMA.
@@ -27,9 +37,11 @@ pub struct SystemSignals {
     /// Timestamp when this signal was sampled (RFC3339/ISO8601).
     pub occurred_at: DateTime<Utc>,
     /// Optional source identifier (e.g., "hauski-core", "core/system_monitor").
+    /// Set once at initialization and remains static for provenance tracking.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
     /// Optional hostname where the signal was collected.
+    /// Set once at initialization and remains static for provenance tracking.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
 }
@@ -151,6 +163,7 @@ impl SystemMonitor {
                 guard.memory_pressure = alpha * current_mem + (1.0 - alpha) * guard.memory_pressure;
                 guard.gpu_available = gpu_available;
                 guard.occurred_at = Utc::now();
+                // Note: source and host are static provenance fields and are not updated here by design.
             }
         });
 
