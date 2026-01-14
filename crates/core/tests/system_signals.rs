@@ -45,7 +45,7 @@ async fn system_signals_returns_expected_keys() {
     let signals: SystemSignals =
         serde_json::from_slice(&body).expect("Failed to deserialize SystemSignals");
 
-    // Validate values are within expected ranges
+    // Validate metric values are within expected ranges
     assert!(
         signals.cpu_load >= 0.0 && signals.cpu_load <= 100.0,
         "CPU load out of range"
@@ -54,6 +54,33 @@ async fn system_signals_returns_expected_keys() {
         signals.memory_pressure >= 0.0 && signals.memory_pressure <= 100.0,
         "Memory pressure out of range"
     );
+
+    // Validate that values are finite (not NaN or Inf)
+    assert!(signals.cpu_load.is_finite(), "CPU load is not finite");
+    assert!(
+        signals.memory_pressure.is_finite(),
+        "Memory pressure is not finite"
+    );
+
+    // Validate contract-required timestamp field
+    // occurred_at must be a valid RFC3339 timestamp and parseable
+    // The struct already validates this via chrono::DateTime<Utc> type
+    // Just ensure it's reasonably recent (within last minute, accounting for test overhead)
+    let now = chrono::Utc::now();
+    let age = now.signed_duration_since(signals.occurred_at);
+    assert!(
+        age.num_seconds() >= 0 && age.num_seconds() < 60,
+        "occurred_at timestamp is not recent: {:?}",
+        signals.occurred_at
+    );
+
+    // Validate optional fields if present
+    if let Some(ref source) = signals.source {
+        assert!(!source.is_empty(), "source should not be empty if present");
+    }
+    if let Some(ref host) = signals.host {
+        assert!(!host.is_empty(), "host should not be empty if present");
+    }
 
     // We cannot assert true/false for GPU as it depends on the runner environment,
     // but the field must exist (which is guaranteed by type safety here).

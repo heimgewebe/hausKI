@@ -1,4 +1,5 @@
 use axum::{extract::State, http::StatusCode, Json};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
@@ -13,9 +14,10 @@ use crate::AppState;
 /// This endpoint exposes smoothed system resource metrics (CPU, Memory, GPU)
 /// that serve as input for Heimgeist's self-model.
 ///
-/// TODO: Formalize this contract in `metarepo` (contracts/hauski/system.signals.v1.schema.json).
-/// temporary implementation; contract must be canonical in metarepo.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, ToSchema)]
+/// Contract: This struct conforms to the canonical schema at
+/// `contracts/hauski/system.signals.v1.schema.json` in the metarepo.
+/// $id: https://heimgewebe/contracts/hauski/system.signals.v1.schema.json
+#[derive(Serialize, Deserialize, Clone, Debug, ToSchema)]
 pub struct SystemSignals {
     /// Global CPU load in percent (0.0 - 100.0), smoothed via EMA.
     pub cpu_load: f32,
@@ -23,6 +25,27 @@ pub struct SystemSignals {
     pub memory_pressure: f32,
     /// Whether an NVIDIA GPU is detected available (checked at startup).
     pub gpu_available: bool,
+    /// Timestamp when this signal was sampled (RFC3339/ISO8601).
+    pub occurred_at: DateTime<Utc>,
+    /// Optional source identifier (e.g., "hauski-core", "core/system_monitor").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    /// Optional hostname where the signal was collected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+}
+
+impl Default for SystemSignals {
+    fn default() -> Self {
+        Self {
+            cpu_load: 0.0,
+            memory_pressure: 0.0,
+            gpu_available: false,
+            occurred_at: Utc::now(),
+            source: Some("hauski-core".to_string()),
+            host: hostname::get().ok().and_then(|h| h.into_string().ok()),
+        }
+    }
 }
 
 /// Helper to manage system monitoring in the background.
@@ -105,6 +128,7 @@ impl SystemMonitor {
                 } else {
                     0.0
                 };
+                guard.occurred_at = Utc::now();
             }
 
             let alpha = 0.1; // Smoothing factor (EWMA)
@@ -145,6 +169,7 @@ impl SystemMonitor {
                 guard.cpu_load = alpha * current_cpu + (1.0 - alpha) * guard.cpu_load;
                 guard.memory_pressure = alpha * current_mem + (1.0 - alpha) * guard.memory_pressure;
                 guard.gpu_available = gpu_available;
+                guard.occurred_at = Utc::now();
             }
         });
 
