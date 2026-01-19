@@ -26,7 +26,7 @@ pub struct Event {
     pub payload: EventPayload,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct RecheckReason {
     #[serde(rename = "type")]
     event_type: String,
@@ -118,16 +118,26 @@ pub async fn event_handler(
                                         {
                                             Some(normalized.to_string())
                                         } else {
-                                            tracing::warn!("Invalid SHA format, dropping: {}", s);
+                                            tracing::warn!(
+                                                "Invalid SHA format (syntax-only check failed), dropping: {}",
+                                                s
+                                            );
                                             None
                                         }
                                     });
 
                                     let schema_ref = event.payload.schema_ref.as_ref().filter(|s| {
-                                        if url::Url::parse(s).is_ok() {
-                                            return true;
+                                        if let Ok(u) = url::Url::parse(s) {
+                                            if u.host_str() == Some("schemas.heimgewebe.org") {
+                                                return true;
+                                            }
+                                            tracing::warn!(
+                                                "schema_ref host not allowed: {}, dropping",
+                                                u.host_str().unwrap_or("unknown")
+                                            );
+                                        } else {
+                                            tracing::warn!("Invalid schema_ref URL, dropping: {}", s);
                                         }
-                                        tracing::warn!("Invalid schema_ref URL, dropping: {}", s);
                                         false
                                     });
 
