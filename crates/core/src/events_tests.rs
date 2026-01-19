@@ -201,7 +201,7 @@ mod tests {
             "payload": {
                 "url": "https://example.com/obs.json",
                 "generated_at": "2023-10-27T10:00:00Z",
-                "sha": "sha256:abcdef123456",
+                "sha": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "schema_ref": "https://schemas.heimgewebe.org/contracts/knowledge/observatory.schema.json"
             }
         });
@@ -235,7 +235,10 @@ mod tests {
         );
 
         let reason = &json_open["recheck_reason"];
-        assert_eq!(reason["sha"], "sha256:abcdef123456");
+        assert_eq!(
+            reason["sha"],
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
         assert_eq!(
             reason["schema_ref"],
             "https://schemas.heimgewebe.org/contracts/knowledge/observatory.schema.json"

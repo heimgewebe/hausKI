@@ -26,7 +26,7 @@ pub struct Event {
     pub payload: EventPayload,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct RecheckReason {
     #[serde(rename = "type")]
     event_type: String,
@@ -111,12 +111,32 @@ pub async fn event_handler(
                                         serde_json::Value::Bool(true),
                                     );
 
+                                    let sha = event.payload.sha.as_ref().filter(|s| {
+                                        if let Some(stripped) = s.strip_prefix("sha256:") {
+                                            if stripped.len() == 64
+                                                && stripped.chars().all(|c| c.is_ascii_hexdigit())
+                                            {
+                                                return true;
+                                            }
+                                        }
+                                        tracing::warn!("Invalid SHA format, dropping: {}", s);
+                                        false
+                                    });
+
+                                    let schema_ref = event.payload.schema_ref.as_ref().filter(|s| {
+                                        if url::Url::parse(s).is_ok() {
+                                            return true;
+                                        }
+                                        tracing::warn!("Invalid schema_ref URL, dropping: {}", s);
+                                        false
+                                    });
+
                                     let reason = RecheckReason {
                                         event_type: event.event_type.clone(),
                                         url: event.payload.url.clone(),
                                         generated_at: event.payload.generated_at.clone(),
-                                        sha: event.payload.sha.clone(),
-                                        schema_ref: event.payload.schema_ref.clone(),
+                                        sha: sha.cloned(),
+                                        schema_ref: schema_ref.cloned(),
                                     };
 
                                     if let Ok(reason_val) = serde_json::to_value(reason) {
