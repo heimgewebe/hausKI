@@ -200,7 +200,9 @@ mod tests {
             "type": "knowledge.observatory.published.v1",
             "payload": {
                 "url": "https://example.com/obs.json",
-                "generated_at": "2023-10-27T10:00:00Z"
+                "generated_at": "2023-10-27T10:00:00Z",
+                "sha": "sha256:abcdef123456",
+                "schema_ref": "https://schemas.heimgewebe.org/contracts/knowledge/observatory.schema.json"
             }
         });
 
@@ -230,6 +232,13 @@ mod tests {
         assert_eq!(
             json_open["needs_recheck"], true,
             "Open item should be marked"
+        );
+
+        let reason = &json_open["recheck_reason"];
+        assert_eq!(reason["sha"], "sha256:abcdef123456");
+        assert_eq!(
+            reason["schema_ref"],
+            "https://schemas.heimgewebe.org/contracts/knowledge/observatory.schema.json"
         );
 
         // Cleanup

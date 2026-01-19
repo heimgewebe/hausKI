@@ -13,6 +13,10 @@ pub struct EventPayload {
     pub url: String,
     #[serde(default)]
     pub generated_at: Option<String>,
+    #[serde(default)]
+    pub sha: Option<String>,
+    #[serde(default)]
+    pub schema_ref: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -28,6 +32,10 @@ struct RecheckReason {
     event_type: String,
     url: String,
     generated_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sha: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    schema_ref: Option<String>,
 }
 
 pub async fn event_handler(
@@ -107,6 +115,8 @@ pub async fn event_handler(
                                         event_type: event.event_type.clone(),
                                         url: event.payload.url.clone(),
                                         generated_at: event.payload.generated_at.clone(),
+                                        sha: event.payload.sha.clone(),
+                                        schema_ref: event.payload.schema_ref.clone(),
                                     };
 
                                     if let Ok(reason_val) = serde_json::to_value(reason) {
