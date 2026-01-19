@@ -111,16 +111,16 @@ pub async fn event_handler(
                                         serde_json::Value::Bool(true),
                                     );
 
-                                    let sha = event.payload.sha.as_ref().filter(|s| {
-                                        if let Some(stripped) = s.strip_prefix("sha256:") {
-                                            if stripped.len() == 64
-                                                && stripped.chars().all(|c| c.is_ascii_hexdigit())
-                                            {
-                                                return true;
-                                            }
+                                    let sha = event.payload.sha.as_ref().and_then(|s| {
+                                        let normalized = s.strip_prefix("sha256:").unwrap_or(s);
+                                        if normalized.len() == 64
+                                            && normalized.chars().all(|c| c.is_ascii_hexdigit())
+                                        {
+                                            Some(normalized.to_string())
+                                        } else {
+                                            tracing::warn!("Invalid SHA format, dropping: {}", s);
+                                            None
                                         }
-                                        tracing::warn!("Invalid SHA format, dropping: {}", s);
-                                        false
                                     });
 
                                     let schema_ref = event.payload.schema_ref.as_ref().filter(|s| {
@@ -135,7 +135,7 @@ pub async fn event_handler(
                                         event_type: event.event_type.clone(),
                                         url: event.payload.url.clone(),
                                         generated_at: event.payload.generated_at.clone(),
-                                        sha: sha.cloned(),
+                                        sha,
                                         schema_ref: schema_ref.cloned(),
                                     };
 
