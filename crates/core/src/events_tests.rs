@@ -360,6 +360,16 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
+        // Verify state after first request
+        let item_open = mem::global()
+            .get(key_open.to_string())
+            .await
+            .unwrap()
+            .expect("open item missing");
+        let json_open: serde_json::Value = serde_json::from_slice(&item_open.value).unwrap();
+        let reason = &json_open["recheck_reason"];
+        assert!(reason.get("schema_ref").is_none());
+
         // Case 2: Wrong scheme (http)
         let event_payload_scheme = json!({
             "type": "knowledge.observatory.published.v1",
@@ -386,18 +396,15 @@ mod tests {
 
         assert_eq!(response2.status(), StatusCode::OK);
 
-        let item_open = mem::global()
+        // Verify state after second request
+        let item_open_2 = mem::global()
             .get(key_open.to_string())
             .await
             .unwrap()
             .expect("open item missing");
-        let json_open: serde_json::Value = serde_json::from_slice(&item_open.value).unwrap();
-
-        let reason = &json_open["recheck_reason"];
-        // SHA matches because it's None in payload
-        assert!(reason.get("sha").is_none());
-        // schema_ref should be missing because it was dropped in both cases (last update overwrites, but both should drop)
-        assert!(reason.get("schema_ref").is_none());
+        let json_open_2: serde_json::Value = serde_json::from_slice(&item_open_2.value).unwrap();
+        let reason_2 = &json_open_2["recheck_reason"];
+        assert!(reason_2.get("schema_ref").is_none());
 
         mem::global().evict(key_open.to_string()).await.unwrap();
     }

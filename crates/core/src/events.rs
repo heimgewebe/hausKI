@@ -128,29 +128,34 @@ pub async fn event_handler(
                                         }
                                     });
 
-                                    let schema_ref = event.payload.schema_ref.as_ref().filter(|s| {
-                                        if let Ok(u) = url::Url::parse(s) {
-                                            if u.scheme() == "https"
-                                                && u.host_str() == Some("schemas.heimgewebe.org")
-                                            {
-                                                return true;
-                                            }
-                                            tracing::warn!(
+                                    let schema_ref =
+                                        event.payload.schema_ref.as_deref().and_then(|s| {
+                                            if let Ok(u) = url::Url::parse(s) {
+                                                if u.scheme() == "https"
+                                                    && u.host_str()
+                                                        == Some("schemas.heimgewebe.org")
+                                                {
+                                                    return Some(s.to_string());
+                                                }
+                                                tracing::warn!(
                                                 "schema_ref not allowed (must be https://schemas.heimgewebe.org): {}, dropping",
                                                 s
                                             );
-                                        } else {
-                                            tracing::warn!("Invalid schema_ref URL, dropping: {}", s);
-                                        }
-                                        false
-                                    });
+                                            } else {
+                                                tracing::warn!(
+                                                    "Invalid schema_ref URL, dropping: {}",
+                                                    s
+                                                );
+                                            }
+                                            None
+                                        });
 
                                     let reason = RecheckReason {
                                         event_type: event.event_type.clone(),
                                         url: event.payload.url.clone(),
                                         generated_at: event.payload.generated_at.clone(),
                                         sha,
-                                        schema_ref: schema_ref.cloned(),
+                                        schema_ref,
                                     };
 
                                     if let Ok(reason_val) = serde_json::to_value(reason) {
