@@ -26,7 +26,7 @@ pub struct Event {
     pub payload: EventPayload,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct RecheckReason {
     #[serde(rename = "type")]
     event_type: String,
