@@ -334,7 +334,8 @@ mod tests {
             .await
             .unwrap();
 
-        let event_payload = json!({
+        // Case 1: Wrong host
+        let event_payload_host = json!({
             "type": "knowledge.observatory.published.v1",
             "payload": {
                 "url": "https://example.com/obs3.json",
@@ -351,13 +352,39 @@ mod tests {
                     .method(Method::POST)
                     .header(header::CONTENT_TYPE, "application/json")
                     .header(header::AUTHORIZATION, "Bearer secret123")
-                    .body(Body::from(event_payload.to_string()))
+                    .body(Body::from(event_payload_host.to_string()))
                     .unwrap(),
             )
             .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+
+        // Case 2: Wrong scheme (http)
+        let event_payload_scheme = json!({
+            "type": "knowledge.observatory.published.v1",
+            "payload": {
+                "url": "https://example.com/obs4.json",
+                "generated_at": "2023-10-27T10:00:00Z",
+                "schema_ref": "http://schemas.heimgewebe.org/contracts/knowledge/observatory.schema.json"
+            }
+        });
+
+        let response2 = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/events")
+                    .method(Method::POST)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, "Bearer secret123")
+                    .body(Body::from(event_payload_scheme.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response2.status(), StatusCode::OK);
 
         let item_open = mem::global()
             .get(key_open.to_string())
@@ -369,7 +396,7 @@ mod tests {
         let reason = &json_open["recheck_reason"];
         // SHA matches because it's None in payload
         assert!(reason.get("sha").is_none());
-        // schema_ref should be missing because it was dropped
+        // schema_ref should be missing because it was dropped in both cases (last update overwrites, but both should drop)
         assert!(reason.get("schema_ref").is_none());
 
         mem::global().evict(key_open.to_string()).await.unwrap();

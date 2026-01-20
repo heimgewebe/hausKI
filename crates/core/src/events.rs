@@ -130,12 +130,14 @@ pub async fn event_handler(
 
                                     let schema_ref = event.payload.schema_ref.as_ref().filter(|s| {
                                         if let Ok(u) = url::Url::parse(s) {
-                                            if u.host_str() == Some("schemas.heimgewebe.org") {
+                                            if u.scheme() == "https"
+                                                && u.host_str() == Some("schemas.heimgewebe.org")
+                                            {
                                                 return true;
                                             }
                                             tracing::warn!(
-                                                "schema_ref host not allowed: {}, dropping",
-                                                u.host_str().unwrap_or("unknown")
+                                                "schema_ref not allowed (must be https://schemas.heimgewebe.org): {}, dropping",
+                                                s
                                             );
                                         } else {
                                             tracing::warn!("Invalid schema_ref URL, dropping: {}", s);
