@@ -116,7 +116,8 @@ pub async fn event_handler(
                                         if normalized.len() == 64
                                             && normalized.chars().all(|c| c.is_ascii_hexdigit())
                                         {
-                                            Some(normalized.to_string())
+                                            // Enforce canonical format: sha256:<hex>
+                                            Some(format!("sha256:{}", normalized))
                                         } else {
                                             tracing::warn!(
                                                 "Invalid SHA format (syntax-only check failed), dropping: {}",

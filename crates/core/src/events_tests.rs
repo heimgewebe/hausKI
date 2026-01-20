@@ -237,7 +237,7 @@ mod tests {
         let reason = &json_open["recheck_reason"];
         assert_eq!(
             reason["sha"],
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         );
         assert_eq!(
             reason["schema_ref"],
@@ -306,7 +306,7 @@ mod tests {
         let reason = &json_open["recheck_reason"];
         assert_eq!(
             reason["sha"],
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         );
 
         mem::global().evict(key_open.to_string()).await.unwrap();
