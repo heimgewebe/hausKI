@@ -370,6 +370,31 @@ mod tests {
         let reason = &json_open["recheck_reason"];
         assert!(reason.get("schema_ref").is_none());
 
+        mem::global().evict(key_open.to_string()).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_observatory_event_drops_invalid_schema_ref_scheme() {
+        let flags = FeatureFlags {
+            events_token: Some("secret123".into()),
+            ..FeatureFlags::default()
+        };
+        let (app, _state) = test_app(flags);
+
+        let key_open = "decision.preimage:open_bad_scheme";
+        let val_open = json!({ "status": "open", "context": "foo" });
+
+        mem::global()
+            .set(
+                key_open.to_string(),
+                serde_json::to_vec(&val_open).unwrap(),
+                mem::TtlUpdate::Set(300),
+                Some(false),
+            )
+            .await
+            .unwrap();
+
         // Case 2: Wrong scheme (http)
         let event_payload_scheme = json!({
             "type": "knowledge.observatory.published.v1",

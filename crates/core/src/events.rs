@@ -26,7 +26,7 @@ pub struct Event {
     pub payload: EventPayload,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct RecheckReason {
     #[serde(rename = "type")]
     event_type: String,
@@ -112,6 +112,7 @@ pub async fn event_handler(
                                     );
 
                                     let sha = event.payload.sha.as_ref().and_then(|s| {
+                                        // SHA-Check ist syntax-only, keine Inhaltsvalidierung.
                                         // Allow input with or without 'sha256:' prefix
                                         let raw_hex = s.strip_prefix("sha256:").unwrap_or(s);
                                         if raw_hex.len() == 64
@@ -130,6 +131,9 @@ pub async fn event_handler(
 
                                     let schema_ref =
                                         event.payload.schema_ref.as_deref().and_then(|s| {
+                                            // schema_ref ist bewusst Trust Anchor auf https://schemas.heimgewebe.org/... (Host+Scheme),
+                                            // damit keine fremden Schemas in den Zustand einsickern.
+                                            // Hinweis: Spätere Multi-Env-Hosts (z.B. staging) nur via bewusster Policy-Änderung erlaubt.
                                             if let Ok(u) = url::Url::parse(s) {
                                                 if u.scheme() == "https"
                                                     && u.host_str()
