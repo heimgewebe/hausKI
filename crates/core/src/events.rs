@@ -13,6 +13,10 @@ pub struct EventPayload {
     pub url: String,
     #[serde(default)]
     pub generated_at: Option<String>,
+    #[serde(default)]
+    pub sha: Option<String>,
+    #[serde(default)]
+    pub schema_ref: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -28,6 +32,10 @@ struct RecheckReason {
     event_type: String,
     url: String,
     generated_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sha: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    schema_ref: Option<String>,
 }
 
 pub async fn event_handler(
@@ -103,10 +111,51 @@ pub async fn event_handler(
                                         serde_json::Value::Bool(true),
                                     );
 
+                                    let sha = event.payload.sha.as_ref().and_then(|s| {
+                                        // Allow input with or without 'sha256:' prefix
+                                        let raw_hex = s.strip_prefix("sha256:").unwrap_or(s);
+                                        if raw_hex.len() == 64
+                                            && raw_hex.chars().all(|c| c.is_ascii_hexdigit())
+                                        {
+                                            // Always store canonical format: sha256:<lowercase-hex>
+                                            Some(format!("sha256:{}", raw_hex.to_ascii_lowercase()))
+                                        } else {
+                                            tracing::warn!(
+                                                "Invalid SHA format (syntax-only check failed), dropping: {}",
+                                                s
+                                            );
+                                            None
+                                        }
+                                    });
+
+                                    let schema_ref =
+                                        event.payload.schema_ref.as_deref().and_then(|s| {
+                                            if let Ok(u) = url::Url::parse(s) {
+                                                if u.scheme() == "https"
+                                                    && u.host_str()
+                                                        == Some("schemas.heimgewebe.org")
+                                                {
+                                                    return Some(s.to_string());
+                                                }
+                                                tracing::warn!(
+                                                "schema_ref not allowed (must be https://schemas.heimgewebe.org): {}, dropping",
+                                                s
+                                            );
+                                            } else {
+                                                tracing::warn!(
+                                                    "Invalid schema_ref URL, dropping: {}",
+                                                    s
+                                                );
+                                            }
+                                            None
+                                        });
+
                                     let reason = RecheckReason {
                                         event_type: event.event_type.clone(),
                                         url: event.payload.url.clone(),
                                         generated_at: event.payload.generated_at.clone(),
+                                        sha,
+                                        schema_ref,
                                     };
 
                                     if let Ok(reason_val) = serde_json::to_value(reason) {

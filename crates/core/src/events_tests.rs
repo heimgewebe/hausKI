@@ -195,12 +195,14 @@ mod tests {
             .await
             .unwrap();
 
-        // 2. Action: Send the event
+        // 2. Action: Send the event (Raw SHA)
         let event_payload = json!({
             "type": "knowledge.observatory.published.v1",
             "payload": {
                 "url": "https://example.com/obs.json",
-                "generated_at": "2023-10-27T10:00:00Z"
+                "generated_at": "2023-10-27T10:00:00Z",
+                "sha": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "schema_ref": "https://schemas.heimgewebe.org/contracts/events/knowledge.observatory.published.v1.schema.json"
             }
         });
 
@@ -232,7 +234,240 @@ mod tests {
             "Open item should be marked"
         );
 
+        let reason = &json_open["recheck_reason"];
+        assert_eq!(
+            reason["sha"],
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            reason["schema_ref"],
+            "https://schemas.heimgewebe.org/contracts/events/knowledge.observatory.published.v1.schema.json"
+        );
+
         // Cleanup
+        mem::global().evict(key_open.to_string()).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_observatory_event_normalizes_sha_prefix() {
+        let flags = FeatureFlags {
+            events_token: Some("secret123".into()),
+            ..FeatureFlags::default()
+        };
+        let (app, _state) = test_app(flags);
+
+        let key_open = "decision.preimage:open_prefixed";
+        let val_open = json!({ "status": "open", "context": "foo" });
+
+        mem::global()
+            .set(
+                key_open.to_string(),
+                serde_json::to_vec(&val_open).unwrap(),
+                mem::TtlUpdate::Set(300),
+                Some(false),
+            )
+            .await
+            .unwrap();
+
+        let event_payload = json!({
+            "type": "knowledge.observatory.published.v1",
+            "payload": {
+                "url": "https://example.com/obs2.json",
+                "generated_at": "2023-10-27T10:00:00Z",
+                "sha": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "schema_ref": "https://schemas.heimgewebe.org/contracts/events/knowledge.observatory.published.v1.schema.json"
+            }
+        });
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/events")
+                    .method(Method::POST)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, "Bearer secret123")
+                    .body(Body::from(event_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let item_open = mem::global()
+            .get(key_open.to_string())
+            .await
+            .unwrap()
+            .expect("open item missing");
+        let json_open: serde_json::Value = serde_json::from_slice(&item_open.value).unwrap();
+
+        let reason = &json_open["recheck_reason"];
+        assert_eq!(
+            reason["sha"],
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+
+        mem::global().evict(key_open.to_string()).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_observatory_event_drops_invalid_schema_ref_host() {
+        let flags = FeatureFlags {
+            events_token: Some("secret123".into()),
+            ..FeatureFlags::default()
+        };
+        let (app, _state) = test_app(flags);
+
+        let key_open = "decision.preimage:open_bad_host";
+        let val_open = json!({ "status": "open", "context": "foo" });
+
+        mem::global()
+            .set(
+                key_open.to_string(),
+                serde_json::to_vec(&val_open).unwrap(),
+                mem::TtlUpdate::Set(300),
+                Some(false),
+            )
+            .await
+            .unwrap();
+
+        // Case 1: Wrong host
+        let event_payload_host = json!({
+            "type": "knowledge.observatory.published.v1",
+            "payload": {
+                "url": "https://example.com/obs3.json",
+                "generated_at": "2023-10-27T10:00:00Z",
+                "schema_ref": "https://evil.com/contracts/knowledge/observatory.schema.json"
+            }
+        });
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/events")
+                    .method(Method::POST)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, "Bearer secret123")
+                    .body(Body::from(event_payload_host.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // Verify state after first request
+        let item_open = mem::global()
+            .get(key_open.to_string())
+            .await
+            .unwrap()
+            .expect("open item missing");
+        let json_open: serde_json::Value = serde_json::from_slice(&item_open.value).unwrap();
+        let reason = &json_open["recheck_reason"];
+        assert!(reason.get("schema_ref").is_none());
+
+        // Case 2: Wrong scheme (http)
+        let event_payload_scheme = json!({
+            "type": "knowledge.observatory.published.v1",
+            "payload": {
+                "url": "https://example.com/obs4.json",
+                "generated_at": "2023-10-27T10:00:00Z",
+                "schema_ref": "http://schemas.heimgewebe.org/contracts/knowledge/observatory.schema.json"
+            }
+        });
+
+        let response2 = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/events")
+                    .method(Method::POST)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, "Bearer secret123")
+                    .body(Body::from(event_payload_scheme.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response2.status(), StatusCode::OK);
+
+        // Verify state after second request
+        let item_open_2 = mem::global()
+            .get(key_open.to_string())
+            .await
+            .unwrap()
+            .expect("open item missing");
+        let json_open_2: serde_json::Value = serde_json::from_slice(&item_open_2.value).unwrap();
+        let reason_2 = &json_open_2["recheck_reason"];
+        assert!(reason_2.get("schema_ref").is_none());
+
+        mem::global().evict(key_open.to_string()).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_observatory_event_drops_invalid_sha_length() {
+        let flags = FeatureFlags {
+            events_token: Some("secret123".into()),
+            ..FeatureFlags::default()
+        };
+        let (app, _state) = test_app(flags);
+
+        let key_open = "decision.preimage:open_bad_sha";
+        let val_open = json!({ "status": "open", "context": "foo" });
+
+        mem::global()
+            .set(
+                key_open.to_string(),
+                serde_json::to_vec(&val_open).unwrap(),
+                mem::TtlUpdate::Set(300),
+                Some(false),
+            )
+            .await
+            .unwrap();
+
+        let event_payload = json!({
+            "type": "knowledge.observatory.published.v1",
+            "payload": {
+                "url": "https://example.com/obs4.json",
+                "generated_at": "2023-10-27T10:00:00Z",
+                "sha": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855aa", // too long
+                "schema_ref": "https://schemas.heimgewebe.org/contracts/events/knowledge.observatory.published.v1.schema.json"
+            }
+        });
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/events")
+                    .method(Method::POST)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, "Bearer secret123")
+                    .body(Body::from(event_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let item_open = mem::global()
+            .get(key_open.to_string())
+            .await
+            .unwrap()
+            .expect("open item missing");
+        let json_open: serde_json::Value = serde_json::from_slice(&item_open.value).unwrap();
+
+        let reason = &json_open["recheck_reason"];
+        assert!(reason.get("sha").is_none());
+        assert!(reason.get("schema_ref").is_some());
+
         mem::global().evict(key_open.to_string()).await.unwrap();
     }
 }
