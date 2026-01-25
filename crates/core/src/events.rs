@@ -115,9 +115,7 @@ pub async fn event_handler(
                                         // Allow input with or without 'sha256:' prefix
                                         let raw_hex = s.strip_prefix("sha256:").unwrap_or(s);
                                         if raw_hex.len() == 64
-                                            && raw_hex.chars().all(|c| {
-                                                matches!(c, '0'..='9' | 'a'..='f' | 'A'..='F')
-                                            })
+                                            && raw_hex.chars().all(|c| c.is_ascii_hexdigit())
                                         {
                                             // Always store canonical format: sha256:<lowercase-hex>
                                             Some(format!("sha256:{}", raw_hex.to_ascii_lowercase()))
