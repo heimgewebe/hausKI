@@ -85,8 +85,8 @@ impl SystemMonitor {
 
         // Initialize sysinfo and take first measurements synchronously
         let mut sys = System::new_with_specifics(
-            RefreshKind::new()
-                .with_cpu(CpuRefreshKind::new().with_cpu_usage())
+            RefreshKind::nothing()
+                .with_cpu(CpuRefreshKind::nothing().with_cpu_usage())
                 .with_memory(MemoryRefreshKind::everything()),
         );
 
@@ -94,10 +94,10 @@ impl SystemMonitor {
         let gpu_available = check_gpu_availability();
 
         // Get initial measurements
-        sys.refresh_cpu();
+        sys.refresh_cpu_all();
         sys.refresh_memory();
 
-        let cpu_load = sys.global_cpu_info().cpu_usage();
+        let cpu_load = sys.global_cpu_usage();
         let used = sys.used_memory() as f64;
         let total = sys.total_memory() as f64;
         let memory_pressure = if total > 0.0 {
@@ -122,7 +122,7 @@ impl SystemMonitor {
         tokio::spawn(async move {
             // Wait a bit for CPU usage to have a proper delta before starting loop
             sleep(Duration::from_millis(200)).await;
-            sys.refresh_cpu();
+            sys.refresh_cpu_all();
 
             let alpha = 0.1; // Smoothing factor (EWMA)
 
@@ -136,10 +136,10 @@ impl SystemMonitor {
                 }
 
                 // Refresh system stats
-                sys.refresh_cpu();
+                sys.refresh_cpu_all();
                 sys.refresh_memory();
 
-                let current_cpu = sys.global_cpu_info().cpu_usage();
+                let current_cpu = sys.global_cpu_usage();
                 let used = sys.used_memory() as f64;
                 let total = sys.total_memory() as f64;
                 let current_mem = if total > 0.0 {
