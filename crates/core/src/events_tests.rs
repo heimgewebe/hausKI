@@ -27,6 +27,12 @@ mod tests {
         (app, state)
     }
 
+    // Best-effort eviction to ensure clean slate (idempotency) and test isolation.
+    // Ignores errors (e.g. key not found) to prevent noise before/after tests.
+    async fn evict_best_effort(key: &str) {
+        let _ = mem::global().evict(key.to_string()).await;
+    }
+
     #[tokio::test]
     #[serial_test::serial]
     async fn test_auth_token_missing_config_returns_forbidden() {
@@ -181,8 +187,10 @@ mod tests {
         };
         let (app, _state) = test_app(flags);
 
-        // 1. Setup: Insert open and closed preimages
+        // 1. Setup: Clean slate + Insert open and closed preimages
         let key_open = "decision.preimage:open";
+        evict_best_effort(key_open).await;
+
         let val_open = json!({ "status": "open", "context": "foo" });
 
         mem::global()
@@ -245,7 +253,7 @@ mod tests {
         );
 
         // Cleanup
-        mem::global().evict(key_open.to_string()).await.unwrap();
+        evict_best_effort(key_open).await;
     }
 
     #[tokio::test]
@@ -258,6 +266,8 @@ mod tests {
         let (app, _state) = test_app(flags);
 
         let key_open = "decision.preimage:open_prefixed";
+        evict_best_effort(key_open).await;
+
         let val_open = json!({ "status": "open", "context": "foo" });
 
         mem::global()
@@ -309,7 +319,7 @@ mod tests {
             "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         );
 
-        mem::global().evict(key_open.to_string()).await.unwrap();
+        evict_best_effort(key_open).await;
     }
 
     #[tokio::test]
@@ -322,6 +332,8 @@ mod tests {
         let (app, _state) = test_app(flags);
 
         let key_open = "decision.preimage:open_bad_host";
+        evict_best_effort(key_open).await;
+
         let val_open = json!({ "status": "open", "context": "foo" });
 
         mem::global()
@@ -370,6 +382,33 @@ mod tests {
         let reason = &json_open["recheck_reason"];
         assert!(reason.get("schema_ref").is_none());
 
+        evict_best_effort(key_open).await;
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_observatory_event_drops_invalid_schema_ref_scheme() {
+        let flags = FeatureFlags {
+            events_token: Some("secret123".into()),
+            ..FeatureFlags::default()
+        };
+        let (app, _state) = test_app(flags);
+
+        let key_open = "decision.preimage:open_bad_scheme";
+        evict_best_effort(key_open).await;
+
+        let val_open = json!({ "status": "open", "context": "foo" });
+
+        mem::global()
+            .set(
+                key_open.to_string(),
+                serde_json::to_vec(&val_open).unwrap(),
+                mem::TtlUpdate::Set(300),
+                Some(false),
+            )
+            .await
+            .unwrap();
+
         // Case 2: Wrong scheme (http)
         let event_payload_scheme = json!({
             "type": "knowledge.observatory.published.v1",
@@ -380,7 +419,7 @@ mod tests {
             }
         });
 
-        let response2 = app
+        let response = app
             .clone()
             .oneshot(
                 Request::builder()
@@ -394,19 +433,19 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response2.status(), StatusCode::OK);
+        assert_eq!(response.status(), StatusCode::OK);
 
-        // Verify state after second request
-        let item_open_2 = mem::global()
+        // Verify state after request
+        let item_open = mem::global()
             .get(key_open.to_string())
             .await
             .unwrap()
             .expect("open item missing");
-        let json_open_2: serde_json::Value = serde_json::from_slice(&item_open_2.value).unwrap();
-        let reason_2 = &json_open_2["recheck_reason"];
-        assert!(reason_2.get("schema_ref").is_none());
+        let json_open: serde_json::Value = serde_json::from_slice(&item_open.value).unwrap();
+        let reason = &json_open["recheck_reason"];
+        assert!(reason.get("schema_ref").is_none());
 
-        mem::global().evict(key_open.to_string()).await.unwrap();
+        evict_best_effort(key_open).await;
     }
 
     #[tokio::test]
@@ -419,6 +458,8 @@ mod tests {
         let (app, _state) = test_app(flags);
 
         let key_open = "decision.preimage:open_bad_sha";
+        evict_best_effort(key_open).await;
+
         let val_open = json!({ "status": "open", "context": "foo" });
 
         mem::global()
@@ -468,6 +509,6 @@ mod tests {
         assert!(reason.get("sha").is_none());
         assert!(reason.get("schema_ref").is_some());
 
-        mem::global().evict(key_open.to_string()).await.unwrap();
+        evict_best_effort(key_open).await;
     }
 }
