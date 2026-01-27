@@ -405,7 +405,7 @@ mod tests {
             }
         });
 
-        let response2 = app
+        let response = app
             .clone()
             .oneshot(
                 Request::builder()
@@ -419,17 +419,17 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response2.status(), StatusCode::OK);
+        assert_eq!(response.status(), StatusCode::OK);
 
-        // Verify state after second request
-        let item_open_2 = mem::global()
+        // Verify state after request
+        let item_open = mem::global()
             .get(key_open.to_string())
             .await
             .unwrap()
             .expect("open item missing");
-        let json_open_2: serde_json::Value = serde_json::from_slice(&item_open_2.value).unwrap();
-        let reason_2 = &json_open_2["recheck_reason"];
-        assert!(reason_2.get("schema_ref").is_none());
+        let json_open: serde_json::Value = serde_json::from_slice(&item_open.value).unwrap();
+        let reason = &json_open["recheck_reason"];
+        assert!(reason.get("schema_ref").is_none());
 
         mem::global().evict(key_open.to_string()).await.unwrap();
     }

@@ -112,7 +112,7 @@ pub async fn event_handler(
                                     );
 
                                     let sha = event.payload.sha.as_ref().and_then(|s| {
-                                        // SHA-Check ist syntax-only, keine Inhaltsvalidierung.
+                                        // SHA-Check ist syntax-only (len=64 hex), keine Inhaltsvalidierung.
                                         // Allow input with or without 'sha256:' prefix
                                         let raw_hex = s.strip_prefix("sha256:").unwrap_or(s);
                                         if raw_hex.len() == 64
