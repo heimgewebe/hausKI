@@ -47,7 +47,7 @@ rusqlite = { version = "0.37.0", features = ["bundled", "chrono"] }
 chrono = { version = "0.4", features = ["clock", "serde"] }
 hostname = "0.4"
 ulid = "1"
-sysinfo = "0.37"
+sysinfo = "0.38"
 r2d2 = "0.8"
 
 [patch.crates-io]
