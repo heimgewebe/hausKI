@@ -27,6 +27,10 @@ mod tests {
         (app, state)
     }
 
+    async fn evict_best_effort(key: &str) {
+        let _ = mem::global().evict(key.to_string()).await;
+    }
+
     #[tokio::test]
     #[serial_test::serial]
     async fn test_auth_token_missing_config_returns_forbidden() {
@@ -181,8 +185,10 @@ mod tests {
         };
         let (app, _state) = test_app(flags);
 
-        // 1. Setup: Insert open and closed preimages
+        // 1. Setup: Clean slate + Insert open and closed preimages
         let key_open = "decision.preimage:open";
+        evict_best_effort(key_open).await;
+
         let val_open = json!({ "status": "open", "context": "foo" });
 
         mem::global()
@@ -258,6 +264,8 @@ mod tests {
         let (app, _state) = test_app(flags);
 
         let key_open = "decision.preimage:open_prefixed";
+        evict_best_effort(key_open).await;
+
         let val_open = json!({ "status": "open", "context": "foo" });
 
         mem::global()
@@ -322,6 +330,8 @@ mod tests {
         let (app, _state) = test_app(flags);
 
         let key_open = "decision.preimage:open_bad_host";
+        evict_best_effort(key_open).await;
+
         let val_open = json!({ "status": "open", "context": "foo" });
 
         mem::global()
@@ -383,6 +393,8 @@ mod tests {
         let (app, _state) = test_app(flags);
 
         let key_open = "decision.preimage:open_bad_scheme";
+        evict_best_effort(key_open).await;
+
         let val_open = json!({ "status": "open", "context": "foo" });
 
         mem::global()
@@ -444,6 +456,8 @@ mod tests {
         let (app, _state) = test_app(flags);
 
         let key_open = "decision.preimage:open_bad_sha";
+        evict_best_effort(key_open).await;
+
         let val_open = json!({ "status": "open", "context": "foo" });
 
         mem::global()
