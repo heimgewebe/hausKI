@@ -26,6 +26,7 @@ pub struct Event {
     pub payload: EventPayload,
 }
 
+/// Internal use only. Do not use as untrusted input DTO.
 #[derive(Debug, Serialize, Deserialize)]
 struct RecheckReason {
     #[serde(rename = "type")]

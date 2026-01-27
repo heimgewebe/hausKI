@@ -27,6 +27,8 @@ mod tests {
         (app, state)
     }
 
+    // Best-effort eviction to ensure clean slate (idempotency) and test isolation.
+    // Ignores errors (e.g. key not found) to prevent noise before/after tests.
     async fn evict_best_effort(key: &str) {
         let _ = mem::global().evict(key.to_string()).await;
     }
