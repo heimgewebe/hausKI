@@ -130,30 +130,12 @@ pub async fn event_handler(
                                         }
                                     });
 
-                                    let schema_ref =
-                                        event.payload.schema_ref.as_deref().and_then(|s| {
-                                            // schema_ref ist bewusst Trust Anchor auf https://schemas.heimgewebe.org/... (Host+Scheme),
-                                            // damit keine fremden Schemas in den Zustand einsickern.
-                                            // Hinweis: Spätere Multi-Env-Hosts (z.B. staging) nur via bewusster Policy-Änderung erlaubt.
-                                            if let Ok(u) = url::Url::parse(s) {
-                                                if u.scheme() == "https"
-                                                    && u.host_str()
-                                                        == Some("schemas.heimgewebe.org")
-                                                {
-                                                    return Some(s.to_string());
-                                                }
-                                                tracing::warn!(
-                                                "schema_ref not allowed (must be https://schemas.heimgewebe.org): {}, dropping",
-                                                s
-                                            );
-                                            } else {
-                                                tracing::warn!(
-                                                    "Invalid schema_ref URL, dropping: {}",
-                                                    s
-                                                );
-                                            }
-                                            None
-                                        });
+                                    let schema_ref = event
+                                        .payload
+                                        .schema_ref
+                                        .as_deref()
+                                        .filter(|s| should_store_schema_ref(s))
+                                        .map(|s| s.to_string());
 
                                     let reason = RecheckReason {
                                         event_type: event.event_type.clone(),
@@ -195,4 +177,25 @@ pub async fn event_handler(
         }
     }
     StatusCode::OK
+}
+
+/// Validates if a schema_ref is allowed to be stored.
+/// Policy:
+/// - Must be a valid URL
+/// - Scheme must be "https"
+/// - Host must be "schemas.heimgewebe.org" (Trust Anchor)
+/// - Multi-env (e.g. staging) allowed only via future policy change.
+fn should_store_schema_ref(s: &str) -> bool {
+    if let Ok(u) = url::Url::parse(s) {
+        if u.scheme() == "https" && u.host_str() == Some("schemas.heimgewebe.org") {
+            return true;
+        }
+        tracing::warn!(
+            "schema_ref not allowed (must be https://schemas.heimgewebe.org): {}, dropping",
+            s
+        );
+    } else {
+        tracing::warn!("Invalid schema_ref URL, dropping: {}", s);
+    }
+    false
 }
