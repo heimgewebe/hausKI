@@ -11,7 +11,7 @@
 
 ## Neuer Layer: Agent-Orchestrierung (aus Template)
 - Supervisor (LangGraph) routet zu **Code-Agent** und **Knowledge-Agent**.
-- **Tool-Calls** strikt per JSON-Schema (contracts/tools/*.schema.json).
+- **Tool-Calls** strikt per JSON-Schema (kanonisch `contracts/lenskit/*.schema.json`; Legacy-Kopie unter `contracts/tools/*.schema.json`).
 - **RAG-Loop:** Query → semantAH (Top-K) → Synthese → Antwort **mit Zitaten**.
 
 ## MVP (Woche 1)
@@ -44,13 +44,15 @@ else → knowledge_agent (default)
 
 ## Next Steps (konkret)
 1) **Templates syncen:** `just agents.sync` (zieht `templates/agent-kit/**` flach ins Repo).
-2) **Contracts prüfen:** `docs/contracts/tools/*.schema.json` (siehe unten).
+2) **Contracts prüfen:** `docs/contracts/lenskit/*.schema.json` (Legacy-Spiegel unter `docs/contracts/tools/*.schema.json`, siehe unten).
 3) **Dry-Run:** `just agents.run` (Supervisor + Dummy-Adapter).
 4) **Adapter anschließen:** semantAH-Search + Vault-Reader an Tools hängen.
 
 ---
 
 ## Tool-Schemas (verlinkte $id aus metarepo)
-**search_codebase.schema.json** und **query_vault.schema.json** liegen lokal unter `docs/contracts/tools/` und referenzieren `$id` aus dem metarepo. Consumer können direkt diese Dateien validieren (AJV).
+**search_codebase.schema.json** und **query_vault.schema.json** liegen kanonisch unter `docs/contracts/lenskit/` und referenzieren die `lenskit`-$id aus dem metarepo.
+
+Eine kompatible Legacy-Kopie bleibt unter `docs/contracts/tools/` (historischer Namespace), damit bestehende Consumer nicht brechen. Beide Varianten sind lokal validierbar (AJV).
 
 > Hinweis: Quelle der Wahrheit ist im metarepo; dieses Repo hält nur eine synchronisierte Kopie (siehe `scripts/agents-sync-from-metarepo.sh`).
