@@ -1,3 +1,4 @@
+use anyhow::Context;
 use once_cell::sync::OnceCell;
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -12,7 +13,7 @@ fn get_http_client() -> anyhow::Result<&'static reqwest::Client> {
         reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
             .build()
-            .map_err(|e| anyhow::anyhow!("failed to build reqwest client with timeout: {}", e))
+            .context("failed to build reqwest client with timeout")
     })
 }
 
@@ -37,7 +38,7 @@ pub async fn feedback(
     features: Option<Value>,
 ) -> anyhow::Result<()> {
     let url = std::env::var("POLICY_URL").unwrap_or_else(|_| "http://127.0.0.1:8779".into());
-    let body = json!({"kind": kind, "action": action, "reward": reward, "features": features.unwrap_or(json!({}))});
+    let body = json!({"kind": kind, "action": action, "reward": reward, "features": features.unwrap_or_else(|| json!({}))});
     let client = get_http_client()?;
     client
         .post(format!("{url}/v1/policy/feedback"))
