@@ -18,8 +18,15 @@ mod tests {
         let routing = RoutingPolicy::default();
         let allowed_origin = HeaderValue::from_static("http://127.0.0.1:8080");
 
-        // Ensure memory is initialized (it might be already if running multiple tests, but init_default handles OnceCell)
-        let _ = mem::init_default();
+        // Use a process-unique DB path so that concurrent nextest processes don't
+        // share the same SQLite file and contaminate each other's test data.
+        let db_path =
+            std::env::temp_dir().join(format!("hauski_test_{}.db", std::process::id()));
+        let cfg = mem::MemoryConfig {
+            db_path: Some(db_path),
+            ..mem::MemoryConfig::default()
+        };
+        let _ = mem::init_with(cfg);
 
         let (app, state) =
             build_app_with_state(limits, models, routing, flags, false, allowed_origin);
