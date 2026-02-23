@@ -111,7 +111,7 @@ def write_embeddings(gewebe: Path, chunks: list[Path], embedder: OllamaEmbedder)
 
     # 3. Daten zusammenführen
     manifest_data: list[dict[str, Any]] = []
-    for meta, emb in zip(chunk_meta, embeddings):
+    for meta, emb in zip(chunk_meta, embeddings, strict=True):
         manifest_data.append({**meta, "embedding": emb})
 
     # 4. Parquet schreiben (erfordert pyarrow)
