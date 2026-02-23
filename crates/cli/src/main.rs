@@ -41,11 +41,13 @@ enum Commands {
         bind: Option<String>,
     },
     /// ASR-Werkzeuge
+    #[command(hide = true)]
     Asr {
         #[command(subcommand)]
         cmd: AsrCmd,
     },
     /// Audio-Profile (`PipeWire`)
+    #[command(hide = true)]
     Audio {
         #[command(subcommand)]
         cmd: AudioCmd,
@@ -77,6 +79,7 @@ enum ModelsCmd {
     /// verfügbare Modelle anzeigen (aus configs/models.yml)
     Ls,
     /// Modell herunterladen/registrieren
+    #[command(hide = true)]
     Pull { id: String },
 }
 
