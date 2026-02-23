@@ -155,29 +155,27 @@ fn build_recheck_reason(
         "generated_at": generated_at,
     });
 
-    let obj = reason
-        .as_object_mut()
-        .expect("json macro should return an object");
-
-    // SHA-Check ist syntax-only (len=64 hex), keine Inhaltsvalidierung.
-    if let Some(s) = sha_input {
-        let raw_hex = s.strip_prefix("sha256:").unwrap_or(s);
-        if raw_hex.len() == 64 && raw_hex.chars().all(|c| c.is_ascii_hexdigit()) {
-            obj.insert(
-                "sha".to_string(),
-                serde_json::Value::String(format!("sha256:{}", raw_hex.to_ascii_lowercase())),
-            );
-        } else {
-            tracing::warn!(
-                "Invalid SHA format (syntax-only check failed), dropping: {}",
-                s
-            );
+    if let Some(obj) = reason.as_object_mut() {
+        // SHA-Check ist syntax-only (len=64 hex), keine Inhaltsvalidierung.
+        if let Some(s) = sha_input {
+            let raw_hex = s.strip_prefix("sha256:").unwrap_or(s);
+            if raw_hex.len() == 64 && raw_hex.chars().all(|c| c.is_ascii_hexdigit()) {
+                obj.insert(
+                    "sha".to_string(),
+                    serde_json::Value::String(format!("sha256:{}", raw_hex.to_ascii_lowercase())),
+                );
+            } else {
+                tracing::warn!(
+                    "Invalid SHA format (syntax-only check failed), dropping: {}",
+                    s
+                );
+            }
         }
-    }
 
-    if let Some(s) = schema_ref_input {
-        if should_store_schema_ref(s) {
-            obj.insert("schema_ref".to_string(), serde_json::Value::String(s.to_string()));
+        if let Some(s) = schema_ref_input {
+            if should_store_schema_ref(s) {
+                obj.insert("schema_ref".to_string(), serde_json::Value::String(s.to_string()));
+            }
         }
     }
 
@@ -221,6 +219,8 @@ mod tests {
 
     #[test]
     fn test_build_recheck_reason_full_valid() {
+        // NOTE: This test also acts as a Policy-Guard for the schema_ref domain.
+        // It must match schemas.heimgewebe.org to be stored.
         let sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
         let schema = "https://schemas.heimgewebe.org/contracts/events/knowledge.observatory.published.v1.schema.json";
         let reason = build_recheck_reason(
