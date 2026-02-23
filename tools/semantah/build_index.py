@@ -99,8 +99,12 @@ def ensure_dirs(base: Path) -> Path:
     return gewebe
 
 
-def write_embeddings(gewebe: Path, chunks: list[Path], embedder: OllamaEmbedder) -> None:
-    """Erzeugt Embeddings und schreibt sie als Parquet und JSON-Manifest."""
+def write_embeddings(
+    gewebe: Path, chunks: list[Path], embedder: OllamaEmbedder
+) -> dict[str, int]:
+    """Erzeugt Embeddings und schreibt sie als Parquet und JSON-Manifest.
+    Gibt Statistik über verarbeitete Chunks zurück.
+    """
     parquet_path = gewebe / "embeddings.parquet"
     manifest_path = gewebe / "chunks.json"
 
@@ -133,7 +137,7 @@ def write_embeddings(gewebe: Path, chunks: list[Path], embedder: OllamaEmbedder)
         )
 
     manifest_data: list[dict[str, Any]] = []
-    for meta, emb in zip(chunk_meta, embeddings, strict=True):
+    for meta, emb in zip(chunk_meta, embeddings):
         manifest_data.append({**meta, "embedding": emb})
 
     # 4. Parquet schreiben (erfordert pyarrow)
@@ -165,12 +169,24 @@ def write_embeddings(gewebe: Path, chunks: list[Path], embedder: OllamaEmbedder)
         json.dumps(manifest_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
 
+    return {
+        "passed": len(chunks),
+        "read": len(chunk_meta),
+        "embedded": len(manifest_data),
+    }
 
-def write_report(gewebe: Path, chunks: list[Path]) -> None:
+
+def write_report(gewebe: Path, stats: dict[str, int]) -> None:
     reports = gewebe / "reports"
     reports.mkdir(exist_ok=True)
     report_path = reports / "index_report.md"
-    lines = ["# semantAH Index Report", "", f"Chunks verarbeitet: {len(chunks)}"]
+    lines = [
+        "# semantAH Index Report",
+        "",
+        f"- Chunks übergeben: {stats.get('passed', 0)}",
+        f"- Chunks gelesen: {stats.get('read', 0)}",
+        f"- Embeddings erzeugt: {stats.get('embedded', 0)}",
+    ]
 
     parquet_file = gewebe / "embeddings.parquet"
     if parquet_file.exists():
@@ -189,8 +205,8 @@ def main() -> None:
 
     embedder = OllamaEmbedder(args.ollama_url, args.model, allow_empty=args.allow_empty_embeddings)
     chunk_paths = [Path(chunk) for chunk in args.chunks] if args.chunks else []
-    write_embeddings(gewebe, chunk_paths, embedder)
-    write_report(gewebe, chunk_paths)
+    stats = write_embeddings(gewebe, chunk_paths, embedder)
+    write_report(gewebe, stats)
 
     print(f"[semantah] embeddings aktualisiert unter {gewebe}")
 
