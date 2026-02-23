@@ -26,19 +26,6 @@ pub struct Event {
     pub payload: EventPayload,
 }
 
-/// Internal use only. Do not use as untrusted input DTO.
-#[derive(Debug, Serialize, Deserialize)]
-struct RecheckReason {
-    #[serde(rename = "type")]
-    event_type: String,
-    url: String,
-    generated_at: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    sha: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    schema_ref: Option<String>,
-}
-
 pub async fn event_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -112,7 +99,13 @@ pub async fn event_handler(
                                         serde_json::Value::Bool(true),
                                     );
 
-                                    let sha = event.payload.sha.as_ref().and_then(|s| {
+                                    let mut reason = serde_json::json!({
+                                        "type": event.event_type,
+                                        "url": event.payload.url,
+                                        "generated_at": event.payload.generated_at,
+                                    });
+
+                                    if let Some(s) = event.payload.sha.as_ref().and_then(|s| {
                                         // SHA-Check ist syntax-only (len=64 hex), keine Inhaltsvalidierung.
                                         // Allow input with or without 'sha256:' prefix
                                         let raw_hex = s.strip_prefix("sha256:").unwrap_or(s);
@@ -128,26 +121,18 @@ pub async fn event_handler(
                                             );
                                             None
                                         }
-                                    });
-
-                                    let schema_ref = event
-                                        .payload
-                                        .schema_ref
-                                        .as_deref()
-                                        .filter(|s| should_store_schema_ref(s))
-                                        .map(|s| s.to_string());
-
-                                    let reason = RecheckReason {
-                                        event_type: event.event_type.clone(),
-                                        url: event.payload.url.clone(),
-                                        generated_at: event.payload.generated_at.clone(),
-                                        sha,
-                                        schema_ref,
-                                    };
-
-                                    if let Ok(reason_val) = serde_json::to_value(reason) {
-                                        obj.insert("recheck_reason".to_string(), reason_val);
+                                    }) {
+                                        reason["sha"] = serde_json::Value::String(s);
                                     }
+
+                                    if let Some(s) = event.payload.schema_ref.as_deref() {
+                                        if should_store_schema_ref(s) {
+                                            reason["schema_ref"] =
+                                                serde_json::Value::String(s.to_string());
+                                        }
+                                    }
+
+                                    obj.insert("recheck_reason".to_string(), reason);
 
                                     if let Ok(new_val) = serde_json::to_vec(&obj) {
                                         let _ = mem::global()
