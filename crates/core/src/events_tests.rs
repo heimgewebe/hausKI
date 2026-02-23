@@ -9,7 +9,12 @@ mod tests {
     };
     use hauski_memory as mem;
     use serde_json::json;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use tower::ServiceExt; // for oneshot
+
+    // Monotonically increasing counter to ensure each test_app call gets a
+    // unique DB path even when multiple tests run within the same process.
+    static TEST_DB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     // Helper to build a minimal app for testing
     fn test_app(flags: FeatureFlags) -> (Router, AppState) {
@@ -18,8 +23,18 @@ mod tests {
         let routing = RoutingPolicy::default();
         let allowed_origin = HeaderValue::from_static("http://127.0.0.1:8080");
 
-        // Ensure memory is initialized (it might be already if running multiple tests, but init_default handles OnceCell)
-        let _ = mem::init_default();
+        // Combine process ID and a per-call counter so neither same-process
+        // (cargo test) nor concurrent nextest processes share the same file.
+        let db_path = std::env::temp_dir().join(format!(
+            "hauski_test_{}_{}.db",
+            std::process::id(),
+            TEST_DB_COUNTER.fetch_add(1, Ordering::Relaxed),
+        ));
+        let cfg = mem::MemoryConfig {
+            db_path: Some(db_path),
+            ..mem::MemoryConfig::default()
+        };
+        let _ = mem::init_with(cfg);
 
         let (app, state) =
             build_app_with_state(limits, models, routing, flags, false, allowed_origin);
