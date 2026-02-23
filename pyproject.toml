@@ -30,7 +30,6 @@ dev = [
   "pytest>=8.3",
   "rich>=13.9",
   "uvicorn[standard]>=0.32",
-  "pyarrow>=14.0",
   # Keep jsonschema in the dev extra so the uv.lock pin stays reachable for CI.
   "jsonschema==4.26.0",
 ]

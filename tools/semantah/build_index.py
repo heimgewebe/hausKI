@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import urllib.error
@@ -165,10 +166,8 @@ def write_embeddings(
             "Nutze 'pip install pyarrow' zum Aktivieren.\n"
         )
         if parquet_path.exists():
-            try:
+            with contextlib.suppress(Exception):
                 parquet_path.unlink()
-            except Exception:
-                pass
 
     # 5. JSON-Manifest schreiben
     manifest_path.write_text(
