@@ -48,7 +48,13 @@ class OllamaEmbedder:
                         f"Anzahl Embeddings ({len(embeddings)}) entspricht nicht Input ({len(texts)})"
                     )
                 return embeddings
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError) as e:
+        except (
+            urllib.error.HTTPError,
+            urllib.error.URLError,
+            TimeoutError,
+            json.JSONDecodeError,
+            ValueError,
+        ) as e:
             msg = f"[semantah] Fehler beim Aufruf von Ollama ({self.url}, Modell: {self.model}): {e}"
             if self.allow_empty:
                 print(f"WARNUNG: {msg} (Fahre fort wegen --allow-empty-embeddings)")
@@ -124,7 +130,7 @@ def write_embeddings(
                     "text": content,
                 }
             )
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             print(f"[semantah] Fehler beim Lesen von {chunk_path}: {e}")
 
     # 2. Embeddings erzeugen
