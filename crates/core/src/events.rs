@@ -221,7 +221,10 @@ mod tests {
             reason.get("url").and_then(|v| v.as_str()),
             Some("https://example.com")
         );
-        assert!(reason.get("generated_at").map_or(false, |v| v.is_null()));
+        assert!(reason
+            .get("generated_at")
+            .map(|v| v.is_null())
+            .unwrap_or(false));
         assert!(reason.get("sha").is_none());
         assert!(reason.get("schema_ref").is_none());
     }
