@@ -174,7 +174,10 @@ fn build_recheck_reason(
 
         if let Some(s) = schema_ref_input {
             if should_store_schema_ref(s) {
-                obj.insert("schema_ref".to_string(), serde_json::Value::String(s.to_string()));
+                obj.insert(
+                    "schema_ref".to_string(),
+                    serde_json::Value::String(s.to_string()),
+                );
             }
         }
     }
@@ -210,30 +213,59 @@ mod tests {
     #[test]
     fn test_build_recheck_reason_minimal() {
         let reason = build_recheck_reason("test.event", "https://example.com", None, None, None);
-        assert_eq!(reason["type"], "test.event");
-        assert_eq!(reason["url"], "https://example.com");
-        assert!(reason.get("generated_at").unwrap().is_null());
+        assert_eq!(
+            reason.get("type").and_then(|v| v.as_str()),
+            Some("test.event")
+        );
+        assert_eq!(
+            reason.get("url").and_then(|v| v.as_str()),
+            Some("https://example.com")
+        );
+        assert!(reason.get("generated_at").map_or(false, |v| v.is_null()));
         assert!(reason.get("sha").is_none());
         assert!(reason.get("schema_ref").is_none());
     }
 
     #[test]
-    fn test_build_recheck_reason_full_valid() {
-        // NOTE: This test also acts as a Policy-Guard for the schema_ref domain.
-        // It must match schemas.heimgewebe.org to be stored.
-        let sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-        let schema = "https://schemas.heimgewebe.org/contracts/events/knowledge.observatory.published.v1.schema.json";
+    fn test_build_recheck_reason_sha_canonicalization() {
+        let raw_sha = "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991b7852B855";
+        let expected_sha =
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
         let reason = build_recheck_reason(
             "test.event",
             "https://example.com",
             Some("2023-10-27T10:00:00Z"),
-            Some(sha),
+            Some(raw_sha),
+            None,
+        );
+
+        assert_eq!(
+            reason.get("sha").and_then(|v| v.as_str()),
+            Some(expected_sha)
+        );
+        assert_eq!(
+            reason.get("generated_at").and_then(|v| v.as_str()),
+            Some("2023-10-27T10:00:00Z")
+        );
+    }
+
+    #[test]
+    fn test_build_recheck_reason_policy_guard() {
+        // This test ensures that the schema_ref domain policy is enforced.
+        // It must match schemas.heimgewebe.org to be included.
+        let schema = "https://schemas.heimgewebe.org/contracts/events/knowledge.observatory.published.v1.schema.json";
+        let reason = build_recheck_reason(
+            "test.event",
+            "https://example.com",
+            None,
+            None,
             Some(schema),
         );
 
-        assert_eq!(reason["sha"], format!("sha256:{}", sha));
-        assert_eq!(reason["schema_ref"], schema);
-        assert_eq!(reason["generated_at"], "2023-10-27T10:00:00Z");
+        assert_eq!(
+            reason.get("schema_ref").and_then(|v| v.as_str()),
+            Some(schema)
+        );
     }
 
     #[test]
