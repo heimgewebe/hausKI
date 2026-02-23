@@ -134,11 +134,10 @@ impl std::fmt::Display for ContentFlag {
     }
 }
 
-/// Detect potential prompt injection patterns in text
+/// Detect potential prompt injection patterns in pre-lowercased text
 /// Returns a set of flags indicating issues found
-fn detect_injection_patterns(text: &str) -> Vec<ContentFlag> {
+fn detect_injection_patterns(text_lower: &str) -> Vec<ContentFlag> {
     let mut flags = Vec::new();
-    let text_lower = text.to_lowercase();
 
     // Imperative language patterns
     let imperative_patterns = [
@@ -749,7 +748,7 @@ impl IndexState {
         let UpsertRequest {
             doc_id,
             namespace,
-            chunks,
+            mut chunks,
             meta,
             source_ref,
         } = payload;
@@ -759,9 +758,11 @@ impl IndexState {
 
         // Detect injection patterns in all chunk text
         let mut flags = Vec::new();
-        for chunk in &chunks {
+        for chunk in &mut chunks {
             if let Some(text) = &chunk.text {
-                let chunk_flags = detect_injection_patterns(text);
+                let text_lower = text.to_lowercase();
+                let chunk_flags = detect_injection_patterns(&text_lower);
+                chunk.text_lower = Some(text_lower);
                 for flag in chunk_flags {
                     if !flags.contains(&flag) {
                         flags.push(flag);
@@ -888,9 +889,22 @@ impl IndexState {
                     continue;
                 };
 
-                let Some(base_score) =
-                    substring_match_score(text, &query_lower, query_byte_len, query_char_len)
-                else {
+                // Use pre-lowercased text for performance
+                let text_lower_storage;
+                let text_lower = match chunk.text_lower.as_ref() {
+                    Some(tl) => tl,
+                    None => {
+                        text_lower_storage = text.to_lowercase();
+                        &text_lower_storage
+                    }
+                };
+
+                let Some(base_score) = substring_match_score(
+                    text_lower,
+                    &query_lower,
+                    query_byte_len,
+                    query_char_len,
+                ) else {
                     continue;
                 };
 
@@ -1173,7 +1187,12 @@ impl IndexState {
         let source_text: Vec<String> = source_doc
             .chunks
             .iter()
-            .filter_map(|c| c.text.as_ref().map(|t| t.to_lowercase()))
+            .filter_map(|c| {
+                c.text_lower
+                    .as_ref()
+                    .cloned()
+                    .or_else(|| c.text.as_ref().map(|t| t.to_lowercase()))
+            })
             .collect();
 
         // For now, use simple text-based similarity (compare all chunks with source)
@@ -1189,7 +1208,14 @@ impl IndexState {
                 };
 
                 // Simple heuristic: calculate overlap with source document text
-                let text_lower = text.to_lowercase();
+                let text_lower_storage;
+                let text_lower = match chunk.text_lower.as_ref() {
+                    Some(tl) => tl,
+                    None => {
+                        text_lower_storage = text.to_lowercase();
+                        &text_lower_storage
+                    }
+                };
                 let mut score = 0.0f32;
                 for src_text in &source_text {
                     let words: Vec<&str> = src_text.split_whitespace().collect();
@@ -1488,7 +1514,7 @@ impl IndexState {
 }
 
 fn substring_match_score(
-    text: &str,
+    text_lower: &str,
     query_lower: &str,
     query_byte_len: usize,
     query_char_len: usize,
@@ -1497,9 +1523,8 @@ fn substring_match_score(
         return None;
     }
 
-    let text_lower = text.to_lowercase();
     let mut count = 0;
-    let mut remaining = text_lower.as_str();
+    let mut remaining = text_lower;
 
     while let Some(pos) = remaining.find(query_lower) {
         count += 1;
@@ -1887,6 +1912,9 @@ pub struct ChunkPayload {
     pub chunk_id: Option<String>,
     #[serde(default)]
     pub text: Option<String>,
+    /// Pre-lowercased version of text for performance (internal use)
+    #[serde(skip)]
+    pub text_lower: Option<String>,
     #[serde(default)]
     pub embedding: Vec<f32>,
     #[serde(default)]
@@ -2575,4 +2603,5 @@ mod tests {
         assert!(!related.is_empty());
         assert!(related.iter().any(|m| m.doc_id == "doc-rust-guide"));
     }
+
 }
