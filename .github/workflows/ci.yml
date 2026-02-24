@@ -17,12 +17,12 @@ on:
       toolchain:
         description: 'Rust toolchain version to use'
         default: stable
-        required: false
+        required: true
   workflow_call:
     inputs:
       toolchain:
         description: 'Rust toolchain version to use'
-        required: false
+        required: true
         default: stable
         type: string
 

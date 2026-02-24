@@ -22,6 +22,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                         "Rust programming topic {}: memory safety and ownership",
                         i
                     )),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"topic": "rust", "id": i}),
                 }],
@@ -41,6 +42,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some(format!("python-{}#0", i)),
                     text: Some(format!("Python scripting tutorial {}: dynamic typing", i)),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"topic": "python", "id": i}),
                 }],
@@ -63,6 +65,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                         "System event {}: process started with high memory usage",
                         i
                     )),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"event_type": "process_start", "id": i}),
                 }],
@@ -85,6 +88,7 @@ async fn test_fixture_corpus_indexing_and_search() {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some(format!("doc-{}#0", i)),
                     text: Some(format!("Documentation page {}: getting started guide", i)),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"section": "getting-started", "id": i}),
                 }],
@@ -177,6 +181,7 @@ async fn test_namespace_isolation() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("shared-doc#ns1".into()),
                 text: Some("Shared content".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -193,6 +198,7 @@ async fn test_namespace_isolation() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("shared-doc#ns2".into()),
                 text: Some("Shared content".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -250,6 +256,7 @@ async fn test_source_ref_and_ingested_at_populated() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-with-ref#0".into()),
                 text: Some("Content with source".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],

@@ -21,6 +21,7 @@ async fn test_decision_snapshot_emission() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-1#0".into()),
                 text: Some("Rust programming language".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -37,6 +38,7 @@ async fn test_decision_snapshot_emission() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-2#0".into()),
                 text: Some("Rust memory safety".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -94,6 +96,7 @@ async fn test_decision_snapshot_not_emitted_without_flag() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-1#0".into()),
                 text: Some("Test content".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -142,6 +145,7 @@ async fn test_decision_outcome_recording() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-1#0".into()),
                 text: Some("Test content".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -241,6 +245,7 @@ async fn test_decision_snapshot_includes_policy_hash() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-1#0".into()),
                 text: Some("Test content".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
