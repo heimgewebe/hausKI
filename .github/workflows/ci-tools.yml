@@ -55,6 +55,15 @@ jobs:
           echo "Using uv version: $version"
 
       # --- Sanity check: lock must exist and be in sync for dev extra ----------
+      - name: Diagnose CI Workspace (pre-sanity)
+        if: ${{ hashFiles('pyproject.toml') != '' }}
+        run: |
+          echo "Current working directory: $(pwd)"
+          echo "Repository root listing:"
+          ls -la
+          echo "Full tree listing (depth 2):"
+          ls -R | head -n 100
+
       - name: Sanity - require uv.lock when schema sources exist
         if: ${{ hashFiles('pyproject.toml') != '' }}
         shell: bash
