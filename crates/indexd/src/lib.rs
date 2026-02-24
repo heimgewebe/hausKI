@@ -899,12 +899,9 @@ impl IndexState {
                     }
                 };
 
-                let Some(base_score) = substring_match_score(
-                    text_lower,
-                    &query_lower,
-                    query_byte_len,
-                    query_char_len,
-                ) else {
+                let Some(base_score) =
+                    substring_match_score(text_lower, &query_lower, query_byte_len, query_char_len)
+                else {
                     continue;
                 };
 
