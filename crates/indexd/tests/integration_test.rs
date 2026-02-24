@@ -16,7 +16,7 @@ async fn test_fixture_corpus_indexing_and_search() {
             .upsert(UpsertRequest {
                 doc_id: format!("rust-{}", i),
                 namespace: "code".into(),
-                chunks: vec![ChunkPayload {
+                chunks: vec![ChunkPayload { text_lower: None,
                     chunk_id: Some(format!("rust-{}#0", i)),
                     text: Some(format!(
                         "Rust programming topic {}: memory safety and ownership",
@@ -38,7 +38,7 @@ async fn test_fixture_corpus_indexing_and_search() {
             .upsert(UpsertRequest {
                 doc_id: format!("python-{}", i),
                 namespace: "code".into(),
-                chunks: vec![ChunkPayload {
+                chunks: vec![ChunkPayload { text_lower: None,
                     chunk_id: Some(format!("python-{}#0", i)),
                     text: Some(format!("Python scripting tutorial {}: dynamic typing", i)),
                     embedding: Vec::new(),
@@ -57,7 +57,7 @@ async fn test_fixture_corpus_indexing_and_search() {
             .upsert(UpsertRequest {
                 doc_id: format!("event-{}", i),
                 namespace: "chronik".into(),
-                chunks: vec![ChunkPayload {
+                chunks: vec![ChunkPayload { text_lower: None,
                     chunk_id: Some(format!("event-{}#0", i)),
                     text: Some(format!(
                         "System event {}: process started with high memory usage",
@@ -82,7 +82,7 @@ async fn test_fixture_corpus_indexing_and_search() {
             .upsert(UpsertRequest {
                 doc_id: format!("doc-{}", i),
                 namespace: "docs".into(),
-                chunks: vec![ChunkPayload {
+                chunks: vec![ChunkPayload { text_lower: None,
                     chunk_id: Some(format!("doc-{}#0", i)),
                     text: Some(format!("Documentation page {}: getting started guide", i)),
                     embedding: Vec::new(),
@@ -174,7 +174,7 @@ async fn test_namespace_isolation() {
         .upsert(UpsertRequest {
             doc_id: "shared-doc".into(),
             namespace: "ns1".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("shared-doc#ns1".into()),
                 text: Some("Shared content".into()),
                 embedding: Vec::new(),
@@ -190,7 +190,7 @@ async fn test_namespace_isolation() {
         .upsert(UpsertRequest {
             doc_id: "shared-doc".into(),
             namespace: "ns2".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("shared-doc#ns2".into()),
                 text: Some("Shared content".into()),
                 embedding: Vec::new(),
@@ -247,7 +247,7 @@ async fn test_source_ref_and_ingested_at_populated() {
         .upsert(UpsertRequest {
             doc_id: "doc-with-ref".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-with-ref#0".into()),
                 text: Some("Content with source".into()),
                 embedding: Vec::new(),

@@ -162,7 +162,7 @@ async fn test_decay_preview_api_endpoint() {
             .upsert(hauski_indexd::UpsertRequest {
                 doc_id: format!("doc-{}", i),
                 namespace: "test".into(),
-                chunks: vec![hauski_indexd::ChunkPayload {
+                chunks: vec![hauski_indexd::ChunkPayload { text_lower: None,
                     chunk_id: Some(format!("doc-{}#0", i)),
                     text: Some(format!("Content {}", i)),
                     embedding: Vec::new(),
@@ -217,7 +217,7 @@ async fn test_forget_dry_run_api() {
             .upsert(hauski_indexd::UpsertRequest {
                 doc_id: format!("doc-{}", i),
                 namespace: "test".into(),
-                chunks: vec![hauski_indexd::ChunkPayload {
+                chunks: vec![hauski_indexd::ChunkPayload { text_lower: None,
                     chunk_id: Some(format!("doc-{}#0", i)),
                     text: Some(format!("Content {}", i)),
                     embedding: Vec::new(),
@@ -309,7 +309,7 @@ async fn test_search_with_decay_applied() {
         .upsert(hauski_indexd::UpsertRequest {
             doc_id: "test-doc".into(),
             namespace: "test".into(),
-            chunks: vec![hauski_indexd::ChunkPayload {
+            chunks: vec![hauski_indexd::ChunkPayload { text_lower: None,
                 chunk_id: Some("test-doc#0".into()),
                 text: Some("Testing decay in search".into()),
                 embedding: Vec::new(),
@@ -403,7 +403,7 @@ async fn test_forget_api_prevents_unfiltered_deletion() {
             .upsert(hauski_indexd::UpsertRequest {
                 doc_id: format!("doc-{}", i),
                 namespace: "test".into(),
-                chunks: vec![hauski_indexd::ChunkPayload {
+                chunks: vec![hauski_indexd::ChunkPayload { text_lower: None,
                     chunk_id: Some(format!("doc-{}#0", i)),
                     text: Some(format!("Content {}", i)),
                     embedding: Vec::new(),

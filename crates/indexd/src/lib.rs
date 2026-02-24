@@ -2336,6 +2336,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-rust#0".into()),
                     text: Some("Rust programming language".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"chunk": 0}),
                 }],
@@ -2352,6 +2353,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-cooking#0".into()),
                     text: Some("A collection of delicious recipes".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"chunk": 0}),
                 }],
@@ -2391,6 +2393,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-trim#0".into()),
                     text: Some("Rust namespaces".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"chunk": 0}),
                 }],
@@ -2446,6 +2449,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-empty#0".into()),
                     text: Some("Hello default namespace".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"chunk": 0}),
                 }],
@@ -2503,12 +2507,14 @@ mod tests {
                     ChunkPayload {
                         chunk_id: Some("doc-1#0".into()),
                         text: Some("First chunk".into()),
+                        text_lower: None,
                         embedding: Vec::new(),
                         meta: json!({}),
                     },
                     ChunkPayload {
                         chunk_id: Some("doc-1#1".into()),
                         text: Some("Second chunk".into()),
+                        text_lower: None,
                         embedding: Vec::new(),
                         meta: json!({}),
                     },
@@ -2526,6 +2532,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-2#0".into()),
                     text: Some("Third chunk".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({}),
                 }],
@@ -2554,6 +2561,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-rust#0".into()),
                     text: Some("Rust programming language with memory safety".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({}),
                 }],
@@ -2570,6 +2578,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-rust-guide#0".into()),
                     text: Some("A guide to memory management in Rust".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({}),
                 }],
@@ -2586,6 +2595,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-python#0".into()),
                     text: Some("Python scripting tutorial".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({}),
                 }],

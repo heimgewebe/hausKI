@@ -30,7 +30,7 @@ async fn test_time_decay_reduces_scores() {
         .upsert(UpsertRequest {
             doc_id: "recent-doc".into(),
             namespace: "test".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("recent-doc#0".into()),
                 text: Some("Recent content about testing".into()),
                 embedding: Vec::new(),
@@ -81,7 +81,7 @@ async fn test_decay_preview() {
             .upsert(UpsertRequest {
                 doc_id: format!("doc-{}", i),
                 namespace: "test".into(),
-                chunks: vec![ChunkPayload {
+                chunks: vec![ChunkPayload { text_lower: None,
                     chunk_id: Some(format!("doc-{}#0", i)),
                     text: Some(format!("Test content {}", i)),
                     embedding: Vec::new(),
@@ -113,7 +113,7 @@ async fn test_forget_by_namespace() {
         .upsert(UpsertRequest {
             doc_id: "keep-doc".into(),
             namespace: "keep".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("keep-doc#0".into()),
                 text: Some("Keep this".into()),
                 embedding: Vec::new(),
@@ -128,7 +128,7 @@ async fn test_forget_by_namespace() {
         .upsert(UpsertRequest {
             doc_id: "forget-doc".into(),
             namespace: "forget".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("forget-doc#0".into()),
                 text: Some("Forget this".into()),
                 embedding: Vec::new(),
@@ -226,7 +226,7 @@ async fn test_forget_by_source_ref_origin() {
         .upsert(UpsertRequest {
             doc_id: "chronik-doc".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("chronik-doc#0".into()),
                 text: Some("System event log".into()),
                 embedding: Vec::new(),
@@ -241,7 +241,7 @@ async fn test_forget_by_source_ref_origin() {
         .upsert(UpsertRequest {
             doc_id: "code-doc".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("code-doc#0".into()),
                 text: Some("Source code snippet".into()),
                 embedding: Vec::new(),
@@ -293,7 +293,7 @@ async fn test_forget_older_than() {
         .upsert(UpsertRequest {
             doc_id: "old-doc".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("old-doc#0".into()),
                 text: Some("Old content".into()),
                 embedding: Vec::new(),
@@ -347,7 +347,7 @@ async fn test_forget_by_doc_id() {
             .upsert(UpsertRequest {
                 doc_id: format!("doc-{}", i),
                 namespace: "default".into(),
-                chunks: vec![ChunkPayload {
+                chunks: vec![ChunkPayload { text_lower: None,
                     chunk_id: Some(format!("doc-{}#0", i)),
                     text: Some(format!("Content {}", i)),
                     embedding: Vec::new(),
@@ -459,7 +459,7 @@ async fn test_decay_calculation_deterministic() {
         .upsert(UpsertRequest {
             doc_id: "test-doc".into(),
             namespace: "test".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("test-doc#0".into()),
                 text: Some("Consistent decay test".into()),
                 embedding: Vec::new(),
@@ -502,7 +502,7 @@ async fn test_decay_affects_search_ranking() {
         .upsert(UpsertRequest {
             doc_id: "decay-doc".into(),
             namespace: "test".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("decay-doc#0".into()),
                 text: Some("testing decay ranking".into()),
                 embedding: Vec::new(),
@@ -576,7 +576,7 @@ async fn test_forget_uses_and_semantics() {
         .upsert(UpsertRequest {
             doc_id: "doc-old-chronik".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-old-chronik#0".into()),
                 text: Some("Old chronik content".into()),
                 embedding: Vec::new(),
@@ -592,7 +592,7 @@ async fn test_forget_uses_and_semantics() {
         .upsert(UpsertRequest {
             doc_id: "doc-old-code".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-old-code#0".into()),
                 text: Some("Old code content".into()),
                 embedding: Vec::new(),
@@ -609,7 +609,7 @@ async fn test_forget_uses_and_semantics() {
         .upsert(UpsertRequest {
             doc_id: "doc-new-chronik".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-new-chronik#0".into()),
                 text: Some("New chronik content".into()),
                 embedding: Vec::new(),
@@ -671,7 +671,7 @@ async fn test_namespace_wipe_requires_explicit_flag() {
             .upsert(UpsertRequest {
                 doc_id: format!("doc-{}", i),
                 namespace: "test".into(),
-                chunks: vec![ChunkPayload {
+                chunks: vec![ChunkPayload { text_lower: None,
                     chunk_id: Some(format!("doc-{}#0", i)),
                     text: Some(format!("Content {}", i)),
                     embedding: Vec::new(),
@@ -744,7 +744,7 @@ async fn test_future_timestamp_handling() {
         .upsert(UpsertRequest {
             doc_id: "normal-doc".into(),
             namespace: "test".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("normal-doc#0".into()),
                 text: Some("Normal content".into()),
                 embedding: Vec::new(),
@@ -795,7 +795,7 @@ async fn test_forget_method_blocks_global_wipe() {
                 .upsert(UpsertRequest {
                     doc_id: format!("doc-{}", i),
                     namespace: ns.to_string(),
-                    chunks: vec![ChunkPayload {
+                    chunks: vec![ChunkPayload { text_lower: None,
                         chunk_id: Some(format!("doc-{}#0", i)),
                         text: Some(format!("Content {} in {}", i, ns)),
                         embedding: Vec::new(),

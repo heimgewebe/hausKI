@@ -18,7 +18,7 @@ async fn test_decision_snapshot_emission() {
         .upsert(UpsertRequest {
             doc_id: "doc-1".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-1#0".into()),
                 text: Some("Rust programming language".into()),
                 embedding: Vec::new(),
@@ -34,7 +34,7 @@ async fn test_decision_snapshot_emission() {
         .upsert(UpsertRequest {
             doc_id: "doc-2".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-2#0".into()),
                 text: Some("Rust memory safety".into()),
                 embedding: Vec::new(),
@@ -91,7 +91,7 @@ async fn test_decision_snapshot_not_emitted_without_flag() {
         .upsert(UpsertRequest {
             doc_id: "doc-1".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-1#0".into()),
                 text: Some("Test content".into()),
                 embedding: Vec::new(),
@@ -139,7 +139,7 @@ async fn test_decision_outcome_recording() {
         .upsert(UpsertRequest {
             doc_id: "doc-1".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-1#0".into()),
                 text: Some("Test content".into()),
                 embedding: Vec::new(),
@@ -238,7 +238,7 @@ async fn test_decision_snapshot_includes_policy_hash() {
         .upsert(UpsertRequest {
             doc_id: "doc-1".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-1#0".into()),
                 text: Some("Test content".into()),
                 embedding: Vec::new(),

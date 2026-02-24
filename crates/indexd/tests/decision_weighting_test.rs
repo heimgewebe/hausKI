@@ -66,7 +66,7 @@ async fn test_trust_weighting_affects_ranking() {
         .upsert(UpsertRequest {
             doc_id: "doc-high-trust".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-high-trust#0".into()),
                 text: Some("Important security update information".into()),
                 embedding: Vec::new(),
@@ -83,7 +83,7 @@ async fn test_trust_weighting_affects_ranking() {
         .upsert(UpsertRequest {
             doc_id: "doc-medium-trust".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-medium-trust#0".into()),
                 text: Some("Important security update information".into()),
                 embedding: Vec::new(),
@@ -100,7 +100,7 @@ async fn test_trust_weighting_affects_ranking() {
         .upsert(UpsertRequest {
             doc_id: "doc-low-trust".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-low-trust#0".into()),
                 text: Some("Important security update information".into()),
                 embedding: Vec::new(),
@@ -194,7 +194,7 @@ async fn test_context_profile_weighting() {
         .upsert(UpsertRequest {
             doc_id: "doc-chronik".into(),
             namespace: "chronik".into(), // Actually in chronik namespace
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-chronik#0".into()),
                 text: Some("System event occurred".into()),
                 embedding: Vec::new(),
@@ -210,7 +210,7 @@ async fn test_context_profile_weighting() {
         .upsert(UpsertRequest {
             doc_id: "doc-code".into(),
             namespace: "code".into(), // Actually in code namespace
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-code#0".into()),
                 text: Some("System event occurred".into()),
                 embedding: Vec::new(),
@@ -226,7 +226,7 @@ async fn test_context_profile_weighting() {
         .upsert(UpsertRequest {
             doc_id: "doc-insights".into(),
             namespace: "insights".into(), // Actually in insights namespace
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-insights#0".into()),
                 text: Some("System event occurred".into()),
                 embedding: Vec::new(),
@@ -325,7 +325,7 @@ async fn test_combined_weighting() {
         .upsert(UpsertRequest {
             doc_id: "doc-high-trust-code".into(),
             namespace: "code".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-high-trust-code#0".into()),
                 text: Some("Function implementation details".into()),
                 embedding: Vec::new(),
@@ -342,7 +342,7 @@ async fn test_combined_weighting() {
         .upsert(UpsertRequest {
             doc_id: "doc-low-trust-code".into(),
             namespace: "code".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-low-trust-code#0".into()),
                 text: Some("Function implementation details".into()),
                 embedding: Vec::new(),
@@ -412,7 +412,7 @@ async fn test_weights_omitted_when_not_requested() {
         .upsert(UpsertRequest {
             doc_id: "doc-test".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-test#0".into()),
                 text: Some("Test content".into()),
                 embedding: Vec::new(),
@@ -481,7 +481,7 @@ async fn test_invalid_policies_fallback_to_default() {
         .upsert(UpsertRequest {
             doc_id: "doc-high".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-high#0".into()),
                 text: Some("Content".into()),
                 embedding: Vec::new(),
@@ -538,7 +538,7 @@ async fn test_invalid_policies_fallback_to_default() {
         .upsert(UpsertRequest {
             doc_id: "doc-low-min".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-low-min#0".into()),
                 text: Some("Content".into()),
                 embedding: Vec::new(),
@@ -590,7 +590,7 @@ async fn test_context_weighting_falls_back_to_origin() {
         .upsert(UpsertRequest {
             doc_id: "doc-chronik-default".into(),
             namespace: "default".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("doc-chronik-default#0".into()),
                 text: Some("Event content".into()),
                 embedding: Vec::new(),
@@ -668,7 +668,7 @@ recency:
         .upsert(UpsertRequest {
             doc_id: "doc-chronik-1.0".into(),
             namespace: "chronik".into(),
-            chunks: vec![ChunkPayload {
+            chunks: vec![ChunkPayload { text_lower: None,
                 chunk_id: Some("chunk-1".into()),
                 text: Some("Content".into()),
                 embedding: Vec::new(),
