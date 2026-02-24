@@ -62,7 +62,7 @@ jobs:
           echo "Repository root listing:"
           ls -la
           echo "Full tree listing (depth 2):"
-          ls -R | head -n 100
+          ls -R | head -n 100 || true
 
       - name: Sanity - require uv.lock when schema sources exist
         if: ${{ hashFiles('pyproject.toml') != '' }}
