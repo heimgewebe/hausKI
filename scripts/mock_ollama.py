@@ -39,6 +39,19 @@ class Handler(BaseHTTPRequestHandler):
                     content = "(mock) " + str(m.get("content", ""))
                     break
             self._send(200, {"message": {"content": content}})
+        elif self.path.startswith("/api/embed"):
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length) if length > 0 else b"{}"
+            try:
+                payload = json.loads(raw.decode("utf-8"))
+            except Exception:
+                payload = {}
+            inputs = payload.get("input") or []
+            if isinstance(inputs, str):
+                inputs = [inputs]
+            # Dummy-Vektoren (Größe 128)
+            embeddings = [[0.1 * (i % 10)] * 128 for i in range(len(inputs))]
+            self._send(200, {"embeddings": embeddings, "model": payload.get("model", "mock")})
         else:
             self._send(404, {"error": "not found"})
 

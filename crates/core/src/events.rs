@@ -26,19 +26,6 @@ pub struct Event {
     pub payload: EventPayload,
 }
 
-/// Internal use only. Do not use as untrusted input DTO.
-#[derive(Debug, Serialize, Deserialize)]
-struct RecheckReason {
-    #[serde(rename = "type")]
-    event_type: String,
-    url: String,
-    generated_at: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    sha: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    schema_ref: Option<String>,
-}
-
 pub async fn event_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -112,42 +99,15 @@ pub async fn event_handler(
                                         serde_json::Value::Bool(true),
                                     );
 
-                                    let sha = event.payload.sha.as_ref().and_then(|s| {
-                                        // SHA-Check ist syntax-only (len=64 hex), keine Inhaltsvalidierung.
-                                        // Allow input with or without 'sha256:' prefix
-                                        let raw_hex = s.strip_prefix("sha256:").unwrap_or(s);
-                                        if raw_hex.len() == 64
-                                            && raw_hex.chars().all(|c| c.is_ascii_hexdigit())
-                                        {
-                                            // Always store canonical format: sha256:<lowercase-hex>
-                                            Some(format!("sha256:{}", raw_hex.to_ascii_lowercase()))
-                                        } else {
-                                            tracing::warn!(
-                                                "Invalid SHA format (syntax-only check failed), dropping: {}",
-                                                s
-                                            );
-                                            None
-                                        }
-                                    });
+                                    let reason = build_recheck_reason(
+                                        &event.event_type,
+                                        &event.payload.url,
+                                        event.payload.generated_at.as_deref(),
+                                        event.payload.sha.as_deref(),
+                                        event.payload.schema_ref.as_deref(),
+                                    );
 
-                                    let schema_ref = event
-                                        .payload
-                                        .schema_ref
-                                        .as_deref()
-                                        .filter(|s| should_store_schema_ref(s))
-                                        .map(|s| s.to_string());
-
-                                    let reason = RecheckReason {
-                                        event_type: event.event_type.clone(),
-                                        url: event.payload.url.clone(),
-                                        generated_at: event.payload.generated_at.clone(),
-                                        sha,
-                                        schema_ref,
-                                    };
-
-                                    if let Ok(reason_val) = serde_json::to_value(reason) {
-                                        obj.insert("recheck_reason".to_string(), reason_val);
-                                    }
+                                    obj.insert("recheck_reason".to_string(), reason);
 
                                     if let Ok(new_val) = serde_json::to_vec(&obj) {
                                         let _ = mem::global()
@@ -179,6 +139,52 @@ pub async fn event_handler(
     StatusCode::OK
 }
 
+/// Constructs a recheck reason JSON object.
+///
+/// Keys: type, url, generated_at, (optional) sha, (optional) schema_ref.
+fn build_recheck_reason(
+    event_type: &str,
+    url: &str,
+    generated_at: Option<&str>,
+    sha_input: Option<&str>,
+    schema_ref_input: Option<&str>,
+) -> serde_json::Value {
+    let mut reason = serde_json::json!({
+        "type": event_type,
+        "url": url,
+        "generated_at": generated_at,
+    });
+
+    if let Some(obj) = reason.as_object_mut() {
+        // SHA-Check ist syntax-only (len=64 hex), keine Inhaltsvalidierung.
+        if let Some(s) = sha_input {
+            let raw_hex = s.strip_prefix("sha256:").unwrap_or(s);
+            if raw_hex.len() == 64 && raw_hex.chars().all(|c| c.is_ascii_hexdigit()) {
+                obj.insert(
+                    "sha".to_string(),
+                    serde_json::Value::String(format!("sha256:{}", raw_hex.to_ascii_lowercase())),
+                );
+            } else {
+                tracing::warn!(
+                    "Invalid SHA format (syntax-only check failed), dropping: {}",
+                    s
+                );
+            }
+        }
+
+        if let Some(s) = schema_ref_input {
+            if should_store_schema_ref(s) {
+                obj.insert(
+                    "schema_ref".to_string(),
+                    serde_json::Value::String(s.to_string()),
+                );
+            }
+        }
+    }
+
+    reason
+}
+
 /// Validates if a schema_ref is allowed to be stored.
 /// Policy:
 /// - Must be a valid URL
@@ -198,4 +204,84 @@ fn should_store_schema_ref(s: &str) -> bool {
         tracing::warn!("Invalid schema_ref URL, dropping: {}", s);
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_recheck_reason_minimal() {
+        let reason = build_recheck_reason("test.event", "https://example.com", None, None, None);
+        assert_eq!(
+            reason.get("type").and_then(|v| v.as_str()),
+            Some("test.event")
+        );
+        assert_eq!(
+            reason.get("url").and_then(|v| v.as_str()),
+            Some("https://example.com")
+        );
+        assert!(reason
+            .get("generated_at")
+            .map(|v| v.is_null())
+            .unwrap_or(false));
+        assert!(reason.get("sha").is_none());
+        assert!(reason.get("schema_ref").is_none());
+    }
+
+    #[test]
+    fn test_build_recheck_reason_sha_canonicalization() {
+        let raw_sha = "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991b7852B855";
+        let expected_sha =
+            "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        let reason = build_recheck_reason(
+            "test.event",
+            "https://example.com",
+            Some("2023-10-27T10:00:00Z"),
+            Some(raw_sha),
+            None,
+        );
+
+        assert_eq!(
+            reason.get("sha").and_then(|v| v.as_str()),
+            Some(expected_sha)
+        );
+        assert_eq!(
+            reason.get("generated_at").and_then(|v| v.as_str()),
+            Some("2023-10-27T10:00:00Z")
+        );
+    }
+
+    #[test]
+    fn test_build_recheck_reason_policy_guard() {
+        // This test ensures that the schema_ref domain policy is enforced.
+        // It must match schemas.heimgewebe.org to be included.
+        let schema = "https://schemas.heimgewebe.org/contracts/events/knowledge.observatory.published.v1.schema.json";
+        let reason = build_recheck_reason(
+            "test.event",
+            "https://example.com",
+            None,
+            None,
+            Some(schema),
+        );
+
+        assert_eq!(
+            reason.get("schema_ref").and_then(|v| v.as_str()),
+            Some(schema)
+        );
+    }
+
+    #[test]
+    fn test_build_recheck_reason_invalid_inputs_dropped() {
+        let reason = build_recheck_reason(
+            "test.event",
+            "https://example.com",
+            None,
+            Some("too-short"),
+            Some("http://wrong-scheme.org"),
+        );
+
+        assert!(reason.get("sha").is_none());
+        assert!(reason.get("schema_ref").is_none());
+    }
 }
