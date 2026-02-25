@@ -76,7 +76,25 @@ impl PluginRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{build_app_with_state, AppState, FeatureFlags, Limits, ModelsFile, RoutingPolicy};
+    use axum::body::Body;
+    use axum::http::{HeaderValue, Request, StatusCode};
+    use http_body_util::BodyExt;
     use std::thread;
+    use tower::ServiceExt;
+
+    fn test_app() -> (axum::Router, AppState) {
+        let limits = Limits::default();
+        let models = ModelsFile::default();
+        let routing = RoutingPolicy::default();
+        let flags = FeatureFlags::default();
+        let allowed_origin = HeaderValue::from_static("http://127.0.0.1:8080");
+
+        let (app, state) =
+            build_app_with_state(limits, models, routing, flags, false, allowed_origin);
+        state.set_ready();
+        (app, state)
+    }
 
     #[test]
     fn test_poison_recovery() {
@@ -104,6 +122,85 @@ mod tests {
         });
 
         assert!(registry.get("test").is_some());
+    }
+
+    #[tokio::test]
+    async fn test_list_plugins_handler() {
+        let (app, state) = test_app();
+
+        // Register a plugin
+        let plugin = Plugin {
+            id: "test-plugin".into(),
+            name: "Test Plugin".into(),
+            version: "1.0.0".into(),
+            description: "A test plugin".into(),
+            enabled: true,
+        };
+        state.plugins().register(plugin.clone());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/plugins")
+                    .method("GET")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let plugins: Vec<Plugin> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].id, "test-plugin");
+    }
+
+    #[tokio::test]
+    async fn test_get_plugin_handler() {
+        let (app, state) = test_app();
+
+        // Register a plugin
+        let plugin = Plugin {
+            id: "test-plugin".into(),
+            name: "Test Plugin".into(),
+            version: "1.0.0".into(),
+            description: "A test plugin".into(),
+            enabled: true,
+        };
+        state.plugins().register(plugin.clone());
+
+        // 1. Test existing plugin
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/plugins/test-plugin")
+                    .method("GET")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let received_plugin: Plugin = serde_json::from_slice(&body).unwrap();
+        assert_eq!(received_plugin.id, "test-plugin");
+
+        // 2. Test non-existent plugin
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/plugins/missing")
+                    .method("GET")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 }
 
