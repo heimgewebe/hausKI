@@ -148,7 +148,7 @@ def write_embeddings(
         )
 
     manifest_data: list[dict[str, Any]] = []
-    for meta, emb in zip(chunk_meta, embeddings, strict=False):
+    for meta, emb in zip(chunk_meta, embeddings, strict=True):
         manifest_data.append({**meta, "embedding": emb})
 
     # 4. Parquet schreiben (erfordert pyarrow)

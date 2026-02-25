@@ -9,7 +9,7 @@ on:
       toolchain:
         description: "Zu verwendende Rust-Toolchain-Version (z.B. stable, 1.80, nightly)"
         default: stable
-        required: true
+        required: false
 
 permissions:
   contents: read
