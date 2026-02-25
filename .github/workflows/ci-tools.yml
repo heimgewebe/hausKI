@@ -92,15 +92,15 @@ jobs:
               # Debug output for diagnosis, but fail strictly
               print("uv.lock not found in root.", file=sys.stderr)
               print(f"CWD: {os.getcwd()}", file=sys.stderr)
-              print("Listing current directory:", file=sys.stderr)
-              try:
-                  print(os.listdir("."), file=sys.stderr)
-              except Exception as e:
-                  print(f"Error listing dir: {e}", file=sys.stderr)
 
-              found = list(Path(".").glob("**/uv.lock"))
+              # Check for candidates elsewhere (limit output to avoid log spam)
+              found = sorted(list(Path(".").glob("**/uv.lock")))
               if found:
-                  print(f"DEBUG: Found uv.lock candidates elsewhere: {found}", file=sys.stderr)
+                  print(f"DEBUG: Found {len(found)} uv.lock candidate(s) elsewhere:", file=sys.stderr)
+                  for p in found[:5]:
+                      print(f"  - {p}", file=sys.stderr)
+                  if len(found) > 5:
+                      print(f"  ... and {len(found) - 5} more.", file=sys.stderr)
 
               print("ERROR: uv.lock must be in the repository root. Run uv lock --extra dev", file=sys.stderr)
               sys.exit(1)
