@@ -46,7 +46,8 @@ class OllamaEmbedder:
                     raise ValueError(f"Ungültiges Antwortformat von Ollama: {result}")
                 if len(embeddings) != len(texts):
                     raise ValueError(
-                        f"Anzahl Embeddings ({len(embeddings)}) entspricht nicht Input ({len(texts)})"
+                        f"Anzahl Embeddings ({len(embeddings)}) "
+                        f"entspricht nicht Input ({len(texts)})"
                     )
                 return embeddings
         except (
@@ -56,12 +57,15 @@ class OllamaEmbedder:
             json.JSONDecodeError,
             ValueError,
         ) as e:
-            msg = f"[semantah] Fehler beim Aufruf von Ollama ({self.url}, Modell: {self.model}): {e}"
+            msg = (
+                f"[semantah] Fehler beim Aufruf von Ollama "
+                f"({self.url}, Modell: {self.model}): {e}"
+            )
             if self.allow_empty:
                 print(f"WARNUNG: {msg} (Fahre fort wegen --allow-empty-embeddings)")
                 return [[] for _ in texts]
-            else:
-                raise RuntimeError(msg) from e
+
+            raise RuntimeError(msg) from e
 
 
 def parse_args() -> argparse.Namespace:
@@ -144,7 +148,7 @@ def write_embeddings(
         )
 
     manifest_data: list[dict[str, Any]] = []
-    for meta, emb in zip(chunk_meta, embeddings):
+    for meta, emb in zip(chunk_meta, embeddings, strict=True):
         manifest_data.append({**meta, "embedding": emb})
 
     # 4. Parquet schreiben (erfordert pyarrow)

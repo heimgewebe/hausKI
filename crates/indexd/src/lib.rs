@@ -134,11 +134,10 @@ impl std::fmt::Display for ContentFlag {
     }
 }
 
-/// Detect potential prompt injection patterns in text
+/// Detect potential prompt injection patterns in pre-lowercased text
 /// Returns a set of flags indicating issues found
-fn detect_injection_patterns(text: &str) -> Vec<ContentFlag> {
+fn detect_injection_patterns(text_lower: &str) -> Vec<ContentFlag> {
     let mut flags = Vec::new();
-    let text_lower = text.to_lowercase();
 
     // Imperative language patterns
     let imperative_patterns = [
@@ -749,7 +748,7 @@ impl IndexState {
         let UpsertRequest {
             doc_id,
             namespace,
-            chunks,
+            mut chunks,
             meta,
             source_ref,
         } = payload;
@@ -759,9 +758,11 @@ impl IndexState {
 
         // Detect injection patterns in all chunk text
         let mut flags = Vec::new();
-        for chunk in &chunks {
+        for chunk in &mut chunks {
             if let Some(text) = &chunk.text {
-                let chunk_flags = detect_injection_patterns(text);
+                let text_lower = text.to_lowercase();
+                let chunk_flags = detect_injection_patterns(&text_lower);
+                chunk.text_lower = Some(text_lower);
                 for flag in chunk_flags {
                     if !flags.contains(&flag) {
                         flags.push(flag);
@@ -888,8 +889,18 @@ impl IndexState {
                     continue;
                 };
 
+                // Use pre-lowercased text for performance
+                let text_lower_storage;
+                let text_lower = match chunk.text_lower.as_ref() {
+                    Some(tl) => tl,
+                    None => {
+                        text_lower_storage = text.to_lowercase();
+                        &text_lower_storage
+                    }
+                };
+
                 let Some(base_score) =
-                    substring_match_score(text, &query_lower, query_byte_len, query_char_len)
+                    substring_match_score(text_lower, &query_lower, query_byte_len, query_char_len)
                 else {
                     continue;
                 };
@@ -1173,7 +1184,12 @@ impl IndexState {
         let source_text: Vec<String> = source_doc
             .chunks
             .iter()
-            .filter_map(|c| c.text.as_ref().map(|t| t.to_lowercase()))
+            .filter_map(|c| {
+                c.text_lower
+                    .as_ref()
+                    .cloned()
+                    .or_else(|| c.text.as_ref().map(|t| t.to_lowercase()))
+            })
             .collect();
 
         // For now, use simple text-based similarity (compare all chunks with source)
@@ -1189,7 +1205,14 @@ impl IndexState {
                 };
 
                 // Simple heuristic: calculate overlap with source document text
-                let text_lower = text.to_lowercase();
+                let text_lower_storage;
+                let text_lower = match chunk.text_lower.as_ref() {
+                    Some(tl) => tl,
+                    None => {
+                        text_lower_storage = text.to_lowercase();
+                        &text_lower_storage
+                    }
+                };
                 let mut score = 0.0f32;
                 for src_text in &source_text {
                     let words: Vec<&str> = src_text.split_whitespace().collect();
@@ -1488,7 +1511,7 @@ impl IndexState {
 }
 
 fn substring_match_score(
-    text: &str,
+    text_lower: &str,
     query_lower: &str,
     query_byte_len: usize,
     query_char_len: usize,
@@ -1497,9 +1520,8 @@ fn substring_match_score(
         return None;
     }
 
-    let text_lower = text.to_lowercase();
     let mut count = 0;
-    let mut remaining = text_lower.as_str();
+    let mut remaining = text_lower;
 
     while let Some(pos) = remaining.find(query_lower) {
         count += 1;
@@ -1887,6 +1909,9 @@ pub struct ChunkPayload {
     pub chunk_id: Option<String>,
     #[serde(default)]
     pub text: Option<String>,
+    /// Pre-lowercased version of text for performance (internal use)
+    #[serde(skip)]
+    pub text_lower: Option<String>,
     #[serde(default)]
     pub embedding: Vec<f32>,
     #[serde(default)]
@@ -2308,6 +2333,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-rust#0".into()),
                     text: Some("Rust programming language".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"chunk": 0}),
                 }],
@@ -2324,6 +2350,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-cooking#0".into()),
                     text: Some("A collection of delicious recipes".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"chunk": 0}),
                 }],
@@ -2363,6 +2390,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-trim#0".into()),
                     text: Some("Rust namespaces".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"chunk": 0}),
                 }],
@@ -2418,6 +2446,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-empty#0".into()),
                     text: Some("Hello default namespace".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({"chunk": 0}),
                 }],
@@ -2475,12 +2504,14 @@ mod tests {
                     ChunkPayload {
                         chunk_id: Some("doc-1#0".into()),
                         text: Some("First chunk".into()),
+                        text_lower: None,
                         embedding: Vec::new(),
                         meta: json!({}),
                     },
                     ChunkPayload {
                         chunk_id: Some("doc-1#1".into()),
                         text: Some("Second chunk".into()),
+                        text_lower: None,
                         embedding: Vec::new(),
                         meta: json!({}),
                     },
@@ -2498,6 +2529,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-2#0".into()),
                     text: Some("Third chunk".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({}),
                 }],
@@ -2526,6 +2558,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-rust#0".into()),
                     text: Some("Rust programming language with memory safety".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({}),
                 }],
@@ -2542,6 +2575,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-rust-guide#0".into()),
                     text: Some("A guide to memory management in Rust".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({}),
                 }],
@@ -2558,6 +2592,7 @@ mod tests {
                 chunks: vec![ChunkPayload {
                     chunk_id: Some("doc-python#0".into()),
                     text: Some("Python scripting tutorial".into()),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({}),
                 }],

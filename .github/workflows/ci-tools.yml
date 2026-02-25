@@ -31,6 +31,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       # --- uv bootstrap -------------------------------------------------------
       - name: Install uv
         if: ${{ hashFiles('pyproject.toml') != '' }}
@@ -62,6 +67,7 @@ jobs:
           python3 - <<'PYTHON_SCRIPT'
           import os
           import sys
+          from pathlib import Path
 
 
           def has_jsonschema_from_toml():
@@ -88,7 +94,20 @@ jobs:
               sys.exit(0)
           # Liegt eine Schema-Quelle vor, MUSS uv.lock existieren.
           if not os.path.exists("uv.lock"):
-              print("uv.lock not found. Run uv lock --extra dev", file=sys.stderr)
+              # Debug output for diagnosis, but fail strictly
+              print("uv.lock not found in root.", file=sys.stderr)
+              print(f"CWD: {os.getcwd()}", file=sys.stderr)
+
+              # Check for candidates elsewhere (limit output to avoid log spam)
+              found = sorted(list(Path(".").glob("**/uv.lock")))
+              if found:
+                  print(f"DEBUG: Found {len(found)} uv.lock candidate(s) elsewhere:", file=sys.stderr)
+                  for p in found[:5]:
+                      print(f"  - {p}", file=sys.stderr)
+                  if len(found) > 5:
+                      print(f"  ... and {len(found) - 5} more.", file=sys.stderr)
+
+              print("ERROR: uv.lock must be in the repository root. Run uv lock --extra dev", file=sys.stderr)
               sys.exit(1)
           PYTHON_SCRIPT
 
@@ -100,11 +119,12 @@ jobs:
 
           import json
           import sys
+          import re
           from pathlib import Path
 
           lock_path = Path("uv.lock")
           if not lock_path.exists():
-              print("uv.lock not found. Run: uv lock --extra dev", file=sys.stderr)
+              print(f"ERROR: uv.lock not found at {lock_path.absolute()}", file=sys.stderr)
               sys.exit(1)
 
           raw_text = lock_path.read_text(encoding="utf-8")
@@ -143,19 +163,22 @@ jobs:
               return False
 
           def has_jsonschema_from_text():
-              lowered = raw_text.lower()
-              return 'name = "jsonschema"' in lowered or '"name": "jsonschema"' in lowered
+              # Use regex for more robust detection of the name field in TOML/JSON-like structures
+              pattern = re.compile(r'name\s*[:=]\s*["\']jsonschema["\']', re.IGNORECASE)
+              return bool(pattern.search(raw_text))
 
           if not (
               has_jsonschema_from_toml()
               or has_jsonschema_from_json()
               or has_jsonschema_from_text()
           ):
-              print("jsonschema not found in uv.lock.")
+              print(f"jsonschema not found in {lock_path.absolute()}.")
               print("Fix locally:")
               print("  uv lock --upgrade-package jsonschema==4.23.0")
               print("  # oder gesamtes Dev-Set refreshen: uv lock --extra dev")
               sys.exit(1)
+          else:
+              print(f"SUCCESS: jsonschema found in {lock_path.absolute()}")
           PYTHON_SCRIPT
 
       - name: Cache uv

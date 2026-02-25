@@ -165,6 +165,7 @@ async fn test_decay_preview_api_endpoint() {
                 chunks: vec![hauski_indexd::ChunkPayload {
                     chunk_id: Some(format!("doc-{}#0", i)),
                     text: Some(format!("Content {}", i)),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({}),
                 }],
@@ -220,6 +221,7 @@ async fn test_forget_dry_run_api() {
                 chunks: vec![hauski_indexd::ChunkPayload {
                     chunk_id: Some(format!("doc-{}#0", i)),
                     text: Some(format!("Content {}", i)),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({}),
                 }],
@@ -312,6 +314,7 @@ async fn test_search_with_decay_applied() {
             chunks: vec![hauski_indexd::ChunkPayload {
                 chunk_id: Some("test-doc#0".into()),
                 text: Some("Testing decay in search".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -406,6 +409,7 @@ async fn test_forget_api_prevents_unfiltered_deletion() {
                 chunks: vec![hauski_indexd::ChunkPayload {
                     chunk_id: Some(format!("doc-{}#0", i)),
                     text: Some(format!("Content {}", i)),
+                    text_lower: None,
                     embedding: Vec::new(),
                     meta: json!({}),
                 }],

@@ -69,6 +69,7 @@ async fn test_trust_weighting_affects_ranking() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-high-trust#0".into()),
                 text: Some("Important security update information".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -86,6 +87,7 @@ async fn test_trust_weighting_affects_ranking() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-medium-trust#0".into()),
                 text: Some("Important security update information".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -103,6 +105,7 @@ async fn test_trust_weighting_affects_ranking() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-low-trust#0".into()),
                 text: Some("Important security update information".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -197,6 +200,7 @@ async fn test_context_profile_weighting() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-chronik#0".into()),
                 text: Some("System event occurred".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -213,6 +217,7 @@ async fn test_context_profile_weighting() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-code#0".into()),
                 text: Some("System event occurred".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -229,6 +234,7 @@ async fn test_context_profile_weighting() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-insights#0".into()),
                 text: Some("System event occurred".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -328,6 +334,7 @@ async fn test_combined_weighting() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-high-trust-code#0".into()),
                 text: Some("Function implementation details".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -345,6 +352,7 @@ async fn test_combined_weighting() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-low-trust-code#0".into()),
                 text: Some("Function implementation details".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -415,6 +423,7 @@ async fn test_weights_omitted_when_not_requested() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-test#0".into()),
                 text: Some("Test content".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -484,6 +493,7 @@ async fn test_invalid_policies_fallback_to_default() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-high#0".into()),
                 text: Some("Content".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -541,6 +551,7 @@ async fn test_invalid_policies_fallback_to_default() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-low-min#0".into()),
                 text: Some("Content".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -593,6 +604,7 @@ async fn test_context_weighting_falls_back_to_origin() {
             chunks: vec![ChunkPayload {
                 chunk_id: Some("doc-chronik-default#0".into()),
                 text: Some("Event content".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
@@ -671,6 +683,7 @@ recency:
             chunks: vec![ChunkPayload {
                 chunk_id: Some("chunk-1".into()),
                 text: Some("Content".into()),
+                text_lower: None,
                 embedding: Vec::new(),
                 meta: json!({}),
             }],
