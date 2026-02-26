@@ -79,11 +79,12 @@ mod tests {
     use crate::{build_app_with_state, AppState, FeatureFlags, Limits, ModelsFile, RoutingPolicy};
     use axum::body::Body;
     use axum::http::{HeaderValue, Request, StatusCode};
+    use axum::Router;
     use http_body_util::BodyExt;
-    use std::thread;
     use tower::ServiceExt;
 
-    fn test_app() -> (axum::Router, AppState) {
+    // Helper to build a minimal app for testing.
+    fn test_app() -> (Router, AppState) {
         let limits = Limits::default();
         let models = ModelsFile::default();
         let routing = RoutingPolicy::default();
@@ -102,7 +103,7 @@ mod tests {
         let registry_clone = registry.clone();
 
         // 1. Poison the lock by panicking while holding write guard
-        let handle = thread::spawn(move || {
+        let handle = std::thread::spawn(move || {
             let _guard = registry_clone.write_plugins("test_panic");
             panic!("Oops");
         });
@@ -136,7 +137,7 @@ mod tests {
             description: "A test plugin".into(),
             enabled: true,
         };
-        state.plugins().register(plugin.clone());
+        state.plugins().register(plugin);
 
         let response = app
             .oneshot(
@@ -168,7 +169,7 @@ mod tests {
             description: "A test plugin".into(),
             enabled: true,
         };
-        state.plugins().register(plugin.clone());
+        state.plugins().register(plugin);
 
         // 1. Test existing plugin
         let response = app
