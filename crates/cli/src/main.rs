@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 use serde::Deserialize;
 use std::{
     env,
+    io::{self, IsTerminal, Write},
     net::SocketAddr,
     path::{Path, PathBuf},
 };
@@ -62,6 +63,9 @@ enum Commands {
         /// Pfad zur Playbook-Datei
         #[arg(long)]
         playbook: String,
+        /// Alle Schritte ohne Bestätigung ausführen
+        #[arg(long, short = 'y', default_value_t = false)]
+        yes: bool,
     },
     /// Bestimmt den Intent aus dem aktuellen Kontext (Git/CI)
     Intent {
@@ -153,8 +157,8 @@ fn main() -> Result<()> {
                 validate_config(&file)?;
             }
         },
-        Commands::Assist { playbook } => {
-            run_playbook(&playbook)?;
+        Commands::Assist { playbook, yes } => {
+            run_playbook(&playbook, yes)?;
         }
         Commands::Intent { output, format } => {
             run_intent(output, format)?;
@@ -198,7 +202,7 @@ fn run_intent(output_path: Option<String>, format: String) -> Result<()> {
     Ok(())
 }
 
-fn run_playbook(playbook_path: &str) -> Result<()> {
+fn run_playbook(playbook_path: &str, yes: bool) -> Result<()> {
     let content = std::fs::read_to_string(playbook_path)
         .with_context(|| format!("Could not read playbook file: {playbook_path}"))?;
     let playbook: serde_yaml_ng::Value = serde_yaml_ng::from_str(&content)
@@ -207,6 +211,27 @@ fn run_playbook(playbook_path: &str) -> Result<()> {
     if let Some(steps) = playbook.get("steps").and_then(|s| s.as_sequence()) {
         for (i, step) in steps.iter().enumerate() {
             if let Some(run_cmd) = step.get("run").and_then(|r| r.as_str()) {
+                if !yes {
+                    if !io::stdin().is_terminal() {
+                        bail!(
+                            "Confirmation required for step {}: '{}'. Use --yes to bypass.",
+                            i + 1,
+                            run_cmd
+                        );
+                    }
+                    println!("\n--- Step {} (of {}):", i + 1, steps.len());
+                    println!("Command: {}", run_cmd);
+                    print!("Execute this step? [y/N] ");
+                    io::stdout().flush()?;
+
+                    let mut input = String::new();
+                    io::stdin().read_line(&mut input)?;
+                    let input = input.trim().to_lowercase();
+                    if input != "y" && input != "yes" {
+                        bail!("Execution aborted by user at step {}.", i + 1);
+                    }
+                }
+
                 info!("Executing step {}: {}", i + 1, run_cmd);
                 let output = std::process::Command::new("sh")
                     .arg("-c")
