@@ -140,6 +140,7 @@ mod tests {
         state.plugins().register(plugin);
 
         let response = app
+            .clone()
             .oneshot(
                 Request::builder()
                     .uri("/plugins")
