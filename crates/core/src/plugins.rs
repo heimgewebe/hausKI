@@ -191,6 +191,7 @@ mod tests {
 
         // 2. Test non-existent plugin
         let response = app
+            .clone()
             .oneshot(
                 Request::builder()
                     .uri("/plugins/missing")
