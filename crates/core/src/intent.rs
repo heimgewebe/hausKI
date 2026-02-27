@@ -213,26 +213,59 @@ impl IntentResolver {
     }
 }
 
+pub trait ContextProvider {
+    fn git_output(&self, args: &[&str]) -> Result<String>;
+    fn var(&self, key: &str) -> Result<String>;
+    fn read_to_string(&self, path: &str) -> Result<String>;
+    fn path_exists(&self, path: &str) -> bool;
+}
+
+pub struct SystemContextProvider;
+
+impl ContextProvider for SystemContextProvider {
+    fn git_output(&self, args: &[&str]) -> Result<String> {
+        let output = Command::new("git").args(args).output()?;
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout)
+                .trim_end()
+                .to_string())
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            Err(anyhow::anyhow!(
+                "git {:?} failed: status={} stderr={}",
+                args,
+                output.status,
+                stderr.trim()
+            ))
+        }
+    }
+
+    fn var(&self, key: &str) -> Result<String> {
+        std::env::var(key).map_err(Into::into)
+    }
+
+    fn read_to_string(&self, path: &str) -> Result<String> {
+        std::fs::read_to_string(path).map_err(Into::into)
+    }
+
+    fn path_exists(&self, path: &str) -> bool {
+        Path::new(path).exists()
+    }
+}
+
 // Helpers to gather context from environment or git
 pub fn gather_context() -> Result<IntentContext> {
+    gather_context_with_provider(&SystemContextProvider)
+}
+
+pub fn gather_context_with_provider<P: ContextProvider>(provider: &P) -> Result<IntentContext> {
     let mut ctx = IntentContext::default();
 
     // 1. Try to get changed files from Git (local or CI)
-    // In GitHub Actions, we might use specific env vars or git commands.
-    // If local, `git status --porcelain` or `git diff --name-only main...`
-
-    // For MVP, let's try `git diff --name-only HEAD` or similar if valid.
-    // Or if in PR, `git diff --name-only origin/main...HEAD`.
-
     // Check if we are in a git repo
-    if Path::new(".git").exists() {
+    if provider.path_exists(".git") {
         // 1. Uncommitted changes (staged and unstaged) relative to HEAD
-        let output = Command::new("git")
-            .args(["diff", "--name-only", "HEAD"])
-            .output();
-
-        if let Ok(output) = output {
-            let stdout = String::from_utf8_lossy(&output.stdout);
+        if let Ok(stdout) = provider.git_output(&["diff", "--name-only", "HEAD"]) {
             for line in stdout.lines() {
                 let line = line.trim();
                 if !line.is_empty() && !ctx.changed_paths.contains(&line.to_string()) {
@@ -243,26 +276,16 @@ pub fn gather_context() -> Result<IntentContext> {
 
         // 2. Committed changes relative to main (for CI/PR context)
         // We try origin/main first, then fall back to main if origin/main doesn't exist.
-        let output_branch = Command::new("git")
-            .args(["diff", "--name-only", "origin/main...HEAD"])
-            .output();
+        let output_result = provider.git_output(&["diff", "--name-only", "origin/main...HEAD"]);
 
-        let fallback_output;
-        let output_to_use = match output_branch {
-            Ok(ref output) if output.status.success() => Some(output),
-            _ => {
-                // Fallback: try main...HEAD if origin/main doesn't exist or failed
-                fallback_output = Command::new("git")
-                    .args(["diff", "--name-only", "main...HEAD"])
-                    .output()
-                    .ok()
-                    .filter(|o| o.status.success());
-                fallback_output.as_ref()
-            }
+        let stdout = match output_result {
+            Ok(out) => Some(out),
+            Err(_) => provider
+                .git_output(&["diff", "--name-only", "main...HEAD"])
+                .ok(),
         };
 
-        if let Some(output) = output_to_use {
-            let stdout = String::from_utf8_lossy(&output.stdout);
+        if let Some(stdout) = stdout {
             for line in stdout.lines() {
                 let line = line.trim();
                 if !line.is_empty() && !ctx.changed_paths.contains(&line.to_string()) {
@@ -273,13 +296,13 @@ pub fn gather_context() -> Result<IntentContext> {
     }
 
     // 2. GitHub Context
-    if let Ok(workflow) = std::env::var("GITHUB_WORKFLOW") {
+    if let Ok(workflow) = provider.var("GITHUB_WORKFLOW") {
         ctx.workflow_name = Some(workflow);
     }
 
     // 3. Issue Comments (from event.json if available)
-    if let Ok(event_path) = std::env::var("GITHUB_EVENT_PATH") {
-        if let Ok(content) = std::fs::read_to_string(&event_path) {
+    if let Ok(event_path) = provider.var("GITHUB_EVENT_PATH") {
+        if let Ok(content) = provider.read_to_string(&event_path) {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
                 if let Some(comment) = json
                     .get("comment")
