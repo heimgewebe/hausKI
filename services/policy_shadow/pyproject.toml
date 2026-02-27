@@ -1,7 +1,7 @@
 [project]
-name = "hauski-minimal-server"
+name = "hauski-policy-shadow"
 version = "0.1.0"
-description = "Minimaler FastAPI-Dienst für Policy, Ingest und Event-Log Schnittstellen von hausKI"
+description = "Shadow Policy API for HausKI - FastAPI service for policy experimentation"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
