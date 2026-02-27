@@ -212,17 +212,17 @@ fn run_playbook(playbook_path: &str, yes: bool) -> Result<()> {
         for (i, step) in steps.iter().enumerate() {
             if let Some(run_cmd) = step.get("run").and_then(|r| r.as_str()) {
                 if !yes {
-                    if !io::stdin().is_terminal() {
+                    if !io::stdin().is_terminal() || !io::stderr().is_terminal() {
                         bail!(
-                            "Confirmation required for step {}: '{}'. Use --yes to bypass.",
+                            "Confirmation required for step {}: '{}'. Use --yes to bypass (stdin/stderr not a TTY).",
                             i + 1,
                             run_cmd
                         );
                     }
-                    println!("\n--- Step {} (of {}):", i + 1, steps.len());
-                    println!("Command: {}", run_cmd);
-                    print!("Execute this step? [y/N] ");
-                    io::stdout().flush()?;
+                    eprintln!("\n--- Step {} (of {}):", i + 1, steps.len());
+                    eprintln!("Command: {}", run_cmd);
+                    eprint!("Execute this step? [y/N] ");
+                    io::stderr().flush()?;
 
                     let mut input = String::new();
                     io::stdin().read_line(&mut input)?;
