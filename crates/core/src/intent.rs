@@ -232,7 +232,8 @@ impl ContextProvider for SystemContextProvider {
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
             Err(anyhow::anyhow!(
-                "Command failed with status: {} (stderr: {})",
+                "git {:?} failed: status={} stderr={}",
+                args,
                 output.status,
                 stderr.trim()
             ))

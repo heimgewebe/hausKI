@@ -2,14 +2,14 @@ use crate::intent::{
     gather_context_with_provider, ContextProvider, IntentContext, IntentResolver, IntentType,
 };
 use anyhow::{anyhow, Result};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // Re-implement MockContextProvider to handle the Git Output cloning issue better
 struct MockContextProviderRefined {
     git_outputs: HashMap<String, Result<String, String>>, // Store error as String
     env_vars: HashMap<String, String>,
     files: HashMap<String, String>,
-    existing_paths: Vec<String>,
+    existing_paths: HashSet<String>,
 }
 
 impl MockContextProviderRefined {
@@ -18,7 +18,7 @@ impl MockContextProviderRefined {
             git_outputs: HashMap::new(),
             env_vars: HashMap::new(),
             files: HashMap::new(),
-            existing_paths: Vec::new(),
+            existing_paths: HashSet::new(),
         }
     }
 
@@ -39,7 +39,7 @@ impl MockContextProviderRefined {
     }
 
     fn with_path(mut self, path: &str) -> Self {
-        self.existing_paths.push(path.to_string());
+        self.existing_paths.insert(path.to_string());
         self
     }
 }
@@ -69,7 +69,7 @@ impl ContextProvider for MockContextProviderRefined {
     }
 
     fn path_exists(&self, path: &str) -> bool {
-        self.existing_paths.contains(&path.to_string())
+        self.existing_paths.contains(path)
     }
 }
 
