@@ -226,11 +226,15 @@ impl ContextProvider for SystemContextProvider {
     fn git_output(&self, args: &[&str]) -> Result<String> {
         let output = Command::new("git").args(args).output()?;
         if output.status.success() {
-            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+            Ok(String::from_utf8_lossy(&output.stdout)
+                .trim_end()
+                .to_string())
         } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
             Err(anyhow::anyhow!(
-                "Command failed with status: {}",
-                output.status
+                "Command failed with status: {} (stderr: {})",
+                output.status,
+                stderr.trim()
             ))
         }
     }

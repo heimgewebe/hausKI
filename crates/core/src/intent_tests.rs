@@ -279,3 +279,22 @@ fn test_gather_context_pr_comments_invalid_json() {
     let ctx = gather_context_with_provider(&provider).expect("Gather context should succeed");
     assert!(ctx.pr_comments.is_empty());
 }
+
+#[test]
+fn test_gather_context_deduplication() {
+    // Scenario: File is both locally modified AND in the CI diff range (should appear once)
+    let provider = MockContextProviderRefined::new()
+        .with_path(".git")
+        .with_git_output(
+            &["diff", "--name-only", "HEAD"],
+            Ok("src/common.rs".to_string()),
+        )
+        .with_git_output(
+            &["diff", "--name-only", "origin/main...HEAD"],
+            Ok("src/common.rs".to_string()),
+        );
+
+    let ctx = gather_context_with_provider(&provider).expect("Gather context should succeed");
+    assert_eq!(ctx.changed_paths.len(), 1);
+    assert_eq!(ctx.changed_paths[0], "src/common.rs");
+}
