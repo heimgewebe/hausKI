@@ -1,4 +1,6 @@
-use crate::intent::{gather_context_with_provider, ContextProvider, IntentContext, IntentResolver, IntentType};
+use crate::intent::{
+    gather_context_with_provider, ContextProvider, IntentContext, IntentResolver, IntentType,
+};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
@@ -185,17 +187,19 @@ fn test_gather_context_git_local_changes() {
         // Fallback or secondary call might happen, but existing logic calls diff HEAD first
         .with_git_output(
             &["diff", "--name-only", "origin/main...HEAD"],
-             Err("Failed".to_string())
+            Err("Failed".to_string()),
         )
         .with_git_output(
             &["diff", "--name-only", "main...HEAD"],
-             Err("Failed".to_string())
+            Err("Failed".to_string()),
         );
 
     let ctx = gather_context_with_provider(&provider).expect("Gather context should succeed");
     assert_eq!(ctx.changed_paths.len(), 2);
     assert!(ctx.changed_paths.contains(&"src/main.rs".to_string()));
-    assert!(ctx.changed_paths.contains(&"crates/core/lib.rs".to_string()));
+    assert!(ctx
+        .changed_paths
+        .contains(&"crates/core/lib.rs".to_string()));
 }
 
 #[test]
@@ -213,17 +217,16 @@ fn test_gather_context_git_ci_changes() {
 
     let ctx = gather_context_with_provider(&provider).expect("Gather context should succeed");
     assert_eq!(ctx.changed_paths.len(), 1);
-    assert!(ctx.changed_paths.contains(&".github/workflows/ci.yml".to_string()));
+    assert!(ctx
+        .changed_paths
+        .contains(&".github/workflows/ci.yml".to_string()));
 }
 
 #[test]
 fn test_gather_context_git_fallback() {
     let provider = MockContextProviderRefined::new()
         .with_path(".git")
-        .with_git_output(
-            &["diff", "--name-only", "HEAD"],
-            Ok("".to_string()),
-        )
+        .with_git_output(&["diff", "--name-only", "HEAD"], Ok("".to_string()))
         .with_git_output(
             &["diff", "--name-only", "origin/main...HEAD"],
             Err("ambiguous argument".to_string()),
@@ -240,8 +243,7 @@ fn test_gather_context_git_fallback() {
 
 #[test]
 fn test_gather_context_workflow_env() {
-    let provider = MockContextProviderRefined::new()
-        .with_env("GITHUB_WORKFLOW", "CI Pipeline");
+    let provider = MockContextProviderRefined::new().with_env("GITHUB_WORKFLOW", "CI Pipeline");
 
     let ctx = gather_context_with_provider(&provider).expect("Gather context should succeed");
     assert_eq!(ctx.workflow_name, Some("CI Pipeline".to_string()));
