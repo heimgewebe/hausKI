@@ -64,7 +64,11 @@ pub async fn event_handler(
 
     if let Ok(guard) = crate::EgressGuard::from_policy(&state.routing()) {
         if let Err(e) = guard.ensure_allowed(&event.payload.url) {
-            tracing::warn!("Rejected event URL by EgressGuard: {} ({})", event.payload.url, e);
+            tracing::warn!(
+                "Rejected event URL by EgressGuard: {} ({})",
+                event.payload.url,
+                e
+            );
             return StatusCode::BAD_REQUEST;
         }
     } else {
