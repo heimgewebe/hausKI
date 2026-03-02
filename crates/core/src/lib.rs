@@ -117,23 +117,24 @@ fn create_latency_histogram() -> Histogram {
 #[derive(Clone)]
 pub struct AppState(Arc<AppStateInner>);
 
+#[allow(dead_code)]
+struct MetricsKeepalive {
+    http_requests: Family<HttpLabels, Counter<u64>>,
+    http_latency: Family<HttpDurationLabels, Histogram>,
+    build_info: Family<BuildInfoLabels, Gauge>,
+}
+
 struct AppStateInner {
     limits: Limits,
     models: ModelsFile,
     routing: RoutingPolicy,
     flags: FeatureFlags,
     chat_cfg: Arc<chat::ChatCfg>,
-    // These fields hold the metric families alive for the prometheus registry.
+    // This field holds the metric families alive for the prometheus registry.
     // They are cloned into closures but not directly read after construction.
-    #[allow(dead_code)]
-    http_requests: Family<HttpLabels, Counter<u64>>,
-    #[allow(dead_code)]
-    http_latency: Family<HttpDurationLabels, Histogram>,
+    _metrics_keepalive: MetricsKeepalive,
     metrics_recorder: Arc<MetricsCallback>,
     index: IndexState,
-    // Holds build_info metric alive for prometheus registry.
-    #[allow(dead_code)]
-    build_info: Family<BuildInfoLabels, Gauge>,
     registry: Mutex<Registry>,
     /// HTTP-Client für ausgehende Anfragen (z. B. /assist, Plugins).
     http_client: reqwest::Client,
@@ -257,17 +258,21 @@ impl AppState {
         let plugin_registry = plugins::PluginRegistry::new();
         let system_monitor = system::SystemMonitor::new();
 
+        let metrics_keepalive = MetricsKeepalive {
+            http_requests,
+            http_latency,
+            build_info,
+        };
+
         Self(Arc::new(AppStateInner {
             limits,
             models,
             routing,
             flags,
             chat_cfg,
-            http_requests,
-            http_latency,
+            _metrics_keepalive: metrics_keepalive,
             metrics_recorder,
             index,
-            build_info,
             registry: Mutex::new(registry),
             http_client,
             expose_config,
