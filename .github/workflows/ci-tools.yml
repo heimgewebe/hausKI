@@ -49,7 +49,7 @@ jobs:
           export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
           uv --version || true
           # Version 0.7.6 ist nicht mehr verfügbar, nutze aktuelle stabile Version
-          uv self update
+          uv self update --token "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Ensure uv version (current stable)
         if: ${{ hashFiles('pyproject.toml') != '' }}
