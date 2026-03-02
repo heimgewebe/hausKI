@@ -125,15 +125,12 @@ struct AppStateInner {
     chat_cfg: Arc<chat::ChatCfg>,
     // These fields hold the metric families alive for the prometheus registry.
     // They are cloned into closures but not directly read after construction.
-    #[allow(dead_code)]
-    http_requests: Family<HttpLabels, Counter<u64>>,
-    #[allow(dead_code)]
-    http_latency: Family<HttpDurationLabels, Histogram>,
+    _http_requests: Family<HttpLabels, Counter<u64>>,
+    _http_latency: Family<HttpDurationLabels, Histogram>,
     metrics_recorder: Arc<MetricsCallback>,
     index: IndexState,
     // Holds build_info metric alive for prometheus registry.
-    #[allow(dead_code)]
-    build_info: Family<BuildInfoLabels, Gauge>,
+    _build_info: Family<BuildInfoLabels, Gauge>,
     registry: Mutex<Registry>,
     /// HTTP-Client für ausgehende Anfragen (z. B. /assist, Plugins).
     http_client: reqwest::Client,
@@ -263,11 +260,11 @@ impl AppState {
             routing,
             flags,
             chat_cfg,
-            http_requests,
-            http_latency,
+            _http_requests: http_requests,
+            _http_latency: http_latency,
             metrics_recorder,
             index,
-            build_info,
+            _build_info: build_info,
             registry: Mutex::new(registry),
             http_client,
             expose_config,
