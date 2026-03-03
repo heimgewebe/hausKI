@@ -16,11 +16,15 @@ mod tests {
     // unique DB path even when multiple tests run within the same process.
     static TEST_DB_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-    // Helper to build a minimal app for testing
+    // Helper to build a minimal app for testing with default routing policy
     fn test_app(flags: FeatureFlags) -> (Router, AppState) {
+        test_app_with_routing(flags, RoutingPolicy::default())
+    }
+
+    // Helper to build a minimal app for testing with a custom routing policy
+    fn test_app_with_routing(flags: FeatureFlags, routing: RoutingPolicy) -> (Router, AppState) {
         let limits = Limits::default();
         let models = ModelsFile::default();
-        let routing = RoutingPolicy::default();
         let allowed_origin = HeaderValue::from_static("http://127.0.0.1:8080");
 
         // Combine process ID and a per-call counter so neither same-process
@@ -161,6 +165,86 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_egress_guard_rejects_by_default() {
+        let flags = FeatureFlags {
+            events_token: Some("secret123".into()),
+            ..FeatureFlags::default()
+        };
+
+        let yaml = r#"
+egress:
+  default: deny
+  allow: []
+"#;
+        let routing: RoutingPolicy = serde_yaml_ng::from_str(yaml).unwrap();
+        let (app, _state) = test_app_with_routing(flags, routing);
+
+        let event_payload = json!({
+            "type": "knowledge.observatory.published.v1",
+            "payload": {
+                "url": "https://notallowed.com/obs.json",
+                "generated_at": "2023-10-27T10:00:00Z"
+            }
+        });
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/events")
+                    .method(Method::POST)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, "Bearer secret123")
+                    .body(Body::from(event_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_egress_guard_malformed_policy_returns_internal_error() {
+        let flags = FeatureFlags {
+            events_token: Some("secret123".into()),
+            ..FeatureFlags::default()
+        };
+
+        let yaml = r#"
+egress: "not-a-map"
+"#;
+        let routing: RoutingPolicy = serde_yaml_ng::from_str(yaml).unwrap();
+        let (app, _state) = test_app_with_routing(flags, routing);
+
+        let event_payload = json!({
+            "type": "knowledge.observatory.published.v1",
+            "payload": {
+                "url": "https://example.com/obs.json",
+                "generated_at": "2023-10-27T10:00:00Z"
+            }
+        });
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/events")
+                    .method(Method::POST)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::AUTHORIZATION, "Bearer secret123")
+                    .body(Body::from(event_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     #[tokio::test]
