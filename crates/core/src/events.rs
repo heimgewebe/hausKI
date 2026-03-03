@@ -26,6 +26,8 @@ pub struct Event {
     pub payload: EventPayload,
 }
 
+/// Sanitizes a URL for logging by removing the query string and fragment.
+/// Note: This does not redact sensitive path segments (e.g. IDs).
 fn sanitize_url_for_log(url_str: &str) -> String {
     match url::Url::parse(url_str) {
         Ok(mut u) => {
@@ -78,7 +80,7 @@ pub async fn event_handler(
             "Rejected event with non-https URL: {}",
             sanitize_url_for_log(&event.payload.url)
         );
-        return StatusCode::FORBIDDEN;
+        return StatusCode::BAD_REQUEST;
     }
 
     match crate::EgressGuard::from_policy(&state.routing()) {
