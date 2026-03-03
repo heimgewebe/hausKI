@@ -291,7 +291,7 @@ impl AppState {
         self.0.models.clone()
     }
 
-    fn routing(&self) -> RoutingPolicy {
+    pub(crate) fn routing(&self) -> RoutingPolicy {
         self.0.routing.clone()
     }
 
