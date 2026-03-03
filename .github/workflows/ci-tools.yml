@@ -39,6 +39,8 @@ jobs:
       # --- uv bootstrap -------------------------------------------------------
       - name: Install uv
         if: ${{ hashFiles('pyproject.toml') != '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           # Installiere die neueste verfügbare uv-Version (Installer erwartet exakte Tags, daher ohne Wildcard)
@@ -49,7 +51,7 @@ jobs:
           export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
           uv --version || true
           # Version 0.7.6 ist nicht mehr verfügbar, nutze aktuelle stabile Version
-          uv self update --token "${{ secrets.GITHUB_TOKEN }}"
+          uv self update --token "$GITHUB_TOKEN"
 
       - name: Ensure uv version (current stable)
         if: ${{ hashFiles('pyproject.toml') != '' }}
