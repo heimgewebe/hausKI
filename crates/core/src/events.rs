@@ -62,18 +62,24 @@ pub async fn event_handler(
         return StatusCode::BAD_REQUEST;
     }
 
-    if let Ok(guard) = crate::EgressGuard::from_policy(&state.routing()) {
-        if let Err(e) = guard.ensure_allowed(&event.payload.url) {
-            tracing::warn!(
-                "Rejected event URL by EgressGuard: {} ({})",
-                event.payload.url,
-                e
-            );
-            return StatusCode::BAD_REQUEST;
+    match crate::EgressGuard::from_policy(&state.routing()) {
+        Ok(guard) => {
+            if let Err(e) = guard.ensure_allowed(&event.payload.url) {
+                tracing::warn!(
+                    "Rejected event URL by EgressGuard: {} ({})",
+                    event.payload.url,
+                    e
+                );
+                return StatusCode::BAD_REQUEST;
+            }
         }
-    } else {
-        tracing::warn!("Failed to initialize EgressGuard from policy, rejecting event URL");
-        return StatusCode::INTERNAL_SERVER_ERROR;
+        Err(err) => {
+            tracing::error!(
+                "Failed to initialize EgressGuard from policy: {:?}",
+                err
+            );
+            return StatusCode::INTERNAL_SERVER_ERROR;
+        }
     }
 
     if event.event_type == "knowledge.observatory.published.v1" {
