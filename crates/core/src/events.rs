@@ -26,6 +26,22 @@ pub struct Event {
     pub payload: EventPayload,
 }
 
+fn sanitize_url_for_log(url_str: &str) -> String {
+    match url::Url::parse(url_str) {
+        Ok(mut u) => {
+            u.set_query(None);
+            u.set_fragment(None);
+            u.to_string()
+        }
+        Err(_) => {
+            // Fallback for invalid URLs: split at first `?` or `#`
+            let without_query = url_str.split('?').next().unwrap_or(url_str);
+            let without_fragment = without_query.split('#').next().unwrap_or(without_query);
+            without_fragment.to_string()
+        }
+    }
+}
+
 pub async fn event_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -58,7 +74,10 @@ pub async fn event_handler(
 
     // 2. EgressGuard validation (SSRF prevention)
     if !event.payload.url.starts_with("https://") {
-        tracing::warn!("Rejected event with non-https URL: {}", event.payload.url);
+        tracing::warn!(
+            "Rejected event with non-https URL: {}",
+            sanitize_url_for_log(&event.payload.url)
+        );
         return StatusCode::BAD_REQUEST;
     }
 
@@ -67,7 +86,7 @@ pub async fn event_handler(
             if let Err(e) = guard.ensure_allowed(&event.payload.url) {
                 tracing::warn!(
                     "Rejected event URL by EgressGuard: {} ({})",
-                    event.payload.url,
+                    sanitize_url_for_log(&event.payload.url),
                     e
                 );
                 return StatusCode::BAD_REQUEST;
