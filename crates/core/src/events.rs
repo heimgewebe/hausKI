@@ -74,10 +74,7 @@ pub async fn event_handler(
             }
         }
         Err(err) => {
-            tracing::error!(
-                "Failed to initialize EgressGuard from policy: {:?}",
-                err
-            );
+            tracing::error!("Failed to initialize EgressGuard from policy: {:?}", err);
             return StatusCode::INTERNAL_SERVER_ERROR;
         }
     }
