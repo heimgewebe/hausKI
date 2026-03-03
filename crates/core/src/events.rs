@@ -78,7 +78,7 @@ pub async fn event_handler(
             "Rejected event with non-https URL: {}",
             sanitize_url_for_log(&event.payload.url)
         );
-        return StatusCode::BAD_REQUEST;
+        return StatusCode::FORBIDDEN;
     }
 
     match crate::EgressGuard::from_policy(&state.routing()) {
@@ -89,7 +89,7 @@ pub async fn event_handler(
                     sanitize_url_for_log(&event.payload.url),
                     e
                 );
-                return StatusCode::BAD_REQUEST;
+                return StatusCode::FORBIDDEN;
             }
         }
         Err(err) => {

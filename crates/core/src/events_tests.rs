@@ -205,7 +205,7 @@ egress:
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]
@@ -249,7 +249,7 @@ egress: "not-a-map"
 
     #[tokio::test]
     #[serial_test::serial]
-    async fn test_https_enforcement_returns_bad_request() {
+    async fn test_https_enforcement_returns_forbidden() {
         let flags = FeatureFlags {
             events_token: Some("secret123".into()),
             ..FeatureFlags::default()
@@ -274,7 +274,7 @@ egress: "not-a-map"
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]
