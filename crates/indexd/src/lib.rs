@@ -553,13 +553,18 @@ impl IndexState {
 
             // Compute stable hash of policies
             let mut hasher = Sha256::new();
-            hasher.update(
-                serde_json::to_vec(&trust).expect("Failed to serialize trust policy for hashing"),
-            );
-            hasher.update(
-                serde_json::to_vec(&context)
-                    .expect("Failed to serialize context policy for hashing"),
-            );
+            if let Ok(bytes) = serde_json::to_vec(&trust) {
+                hasher.update(bytes);
+            } else {
+                tracing::warn!("Failed to serialize trust policy for hashing, using type name");
+                hasher.update(b"trust-fallback");
+            }
+            if let Ok(bytes) = serde_json::to_vec(&context) {
+                hasher.update(bytes);
+            } else {
+                tracing::warn!("Failed to serialize context policy for hashing, using type name");
+                hasher.update(b"context-fallback");
+            }
             let hash = format!("{:x}", hasher.finalize());
 
             let source = if trust_source == "file" && context_source == "file" {
@@ -829,7 +834,7 @@ impl IndexState {
         let Some(namespace_store) = store.get(namespace.as_ref()) else {
             return Vec::new();
         };
-        let limit = request.k.unwrap_or(20).min(100);
+        let limit = request.k.unwrap_or(20).clamp(1, 100);
         let query_lower = query.to_lowercase();
         let query_char_len = query_lower.chars().count();
         let query_byte_len = query_lower.len();
@@ -1078,18 +1083,26 @@ impl IndexState {
             let candidates: Vec<DecisionCandidate> = matches
                 .iter()
                 .take(SNAPSHOT_CANDIDATES_MAX)
-                .map(|m| {
-                    // Weights must be present when snapshot emission is requested
-                    let weights = m.weights.clone().expect(
-                        "Weights must be present for snapshot emission - this is a bug if it panics"
-                    );
+                .filter_map(|m| {
+                    // Weights are always present when snapshot emission is requested
+                    // (emit_decision_snapshot forces weight calculation in the search loop)
+                    let weights = match m.weights.clone() {
+                        Some(w) => w,
+                        None => {
+                            tracing::error!(
+                                doc_id = %m.doc_id,
+                                "Missing weights during snapshot emission - skipping candidate"
+                            );
+                            return None;
+                        }
+                    };
 
-                    DecisionCandidate {
+                    Some(DecisionCandidate {
                         id: m.doc_id.clone(),
                         similarity: weights.similarity,
                         weights,
                         final_score: m.score,
-                    }
+                    })
                 })
                 .collect();
 

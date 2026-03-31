@@ -380,8 +380,14 @@ impl MemoryStore {
             let conn = pool
                 .get()
                 .context("MemoryStore::scan_prefix: r2d2 pool get")?;
-            let mut stmt = conn.prepare("SELECT key FROM memory_items WHERE key LIKE ?1")?;
-            let keys_iter = stmt.query_map(params![format!("{}%", prefix)], |row| row.get(0))?;
+            let mut stmt =
+                conn.prepare("SELECT key FROM memory_items WHERE key LIKE ?1 ESCAPE '\\'")?;
+            // Escape LIKE wildcards in the prefix to prevent unintended pattern matching
+            let escaped = prefix
+                .replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_");
+            let keys_iter = stmt.query_map(params![format!("{}%", escaped)], |row| row.get(0))?;
 
             let mut keys = Vec::new();
             for key in keys_iter {

@@ -127,7 +127,7 @@ fn is_pin_allowed(key: &str, allowlist: &[String]) -> bool {
     path = "/memory/get",
     tag = "core",
     request_body = MemoryGetRequest,
-    responses((status=200, body=MemoryGetResponse), (status=500, description="internal error"))
+    responses((status=200, body=MemoryGetResponse), (status=500, body=MemoryErrorResponse, description="internal error"))
 )]
 pub async fn memory_get_handler(
     _state: State<AppState>,
@@ -159,7 +159,13 @@ pub async fn memory_get_handler(
             .into_response(),
         Err(e) => {
             tracing::error!(error = ?e, "failed to get memory item");
-            (StatusCode::INTERNAL_SERVER_ERROR).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(MemoryErrorResponse {
+                    error: "internal error".to_string(),
+                }),
+            )
+                .into_response()
         }
     }
 }
@@ -172,7 +178,7 @@ pub async fn memory_get_handler(
     responses(
         (status=200, body=MemorySetResponse),
         (status=400, body=MemoryErrorResponse, description="invalid request"),
-        (status=500, description="internal error")
+        (status=500, body=MemoryErrorResponse, description="internal error")
     )
 )]
 pub async fn memory_set_handler(
@@ -218,7 +224,13 @@ pub async fn memory_set_handler(
         Ok(()) => (StatusCode::OK, Json(MemorySetResponse { ok: true })).into_response(),
         Err(e) => {
             tracing::error!(error = ?e, "failed to set memory item");
-            (StatusCode::INTERNAL_SERVER_ERROR).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(MemoryErrorResponse {
+                    error: "internal error".to_string(),
+                }),
+            )
+                .into_response()
         }
     }
 }
@@ -228,7 +240,7 @@ pub async fn memory_set_handler(
     path = "/memory/evict",
     tag = "core",
     request_body = MemoryEvictRequest,
-    responses((status=200, body=MemoryEvictResponse), (status=500, description="internal error"))
+    responses((status=200, body=MemoryEvictResponse), (status=500, body=MemoryErrorResponse, description="internal error"))
 )]
 pub async fn memory_evict_handler(
     _state: State<AppState>,
@@ -246,7 +258,13 @@ pub async fn memory_evict_handler(
         }
         Err(e) => {
             tracing::error!(error = ?e, "failed to evict memory item");
-            (StatusCode::INTERNAL_SERVER_ERROR).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(MemoryErrorResponse {
+                    error: "internal error".to_string(),
+                }),
+            )
+                .into_response()
         }
     }
 }
