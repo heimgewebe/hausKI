@@ -556,13 +556,13 @@ impl IndexState {
             if let Ok(bytes) = serde_json::to_vec(&trust) {
                 hasher.update(bytes);
             } else {
-                tracing::warn!("Failed to serialize trust policy for hashing, using type name");
+                tracing::warn!("Failed to serialize trust policy for hashing, using fallback");
                 hasher.update(b"trust-fallback");
             }
             if let Ok(bytes) = serde_json::to_vec(&context) {
                 hasher.update(bytes);
             } else {
-                tracing::warn!("Failed to serialize context policy for hashing, using type name");
+                tracing::warn!("Failed to serialize context policy for hashing, using fallback");
                 hasher.update(b"context-fallback");
             }
             let hash = format!("{:x}", hasher.finalize());
