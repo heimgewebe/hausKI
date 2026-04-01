@@ -1084,10 +1084,6 @@ mod tests {
         assert!(response.hits.len() <= 100);
     }
 
-    // The /ask handler clamps k to [1, MAX_K] before forwarding to IndexState::search().
-    // AskParams declares minimum=1 in its OpenAPI schema.
-    // This test verifies that the ask handler enforces the lower bound independently;
-    // IndexState::search() itself has no such minimum constraint.
     #[tokio::test]
     async fn ask_route_clamps_k_to_minimum() {
         let app = demo_app(false);
@@ -1134,7 +1130,6 @@ mod tests {
 
         let body = ask_res.into_body().collect().await.unwrap().to_bytes();
         let response: AskResponse = from_slice(&body).unwrap();
-        // k=0 is clamped to 1 by the ask handler (ask.rs), not by IndexState::search()
         assert_eq!(response.k, 1);
         assert!(response.hits.len() <= 1);
         assert!(
