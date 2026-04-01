@@ -551,7 +551,12 @@ impl IndexState {
                 }
             };
 
-            // Compute stable hash of policies
+            // Compute stable hash of policies.
+            // The hash is used solely for drift detection and diagnostics (see PolicyConfig::hash).
+            // It is NOT a cache key or decision identifier, so hash instability on a serialization
+            // failure is acceptable: the fallback bytes keep the hasher going while the warning
+            // signals the anomaly. TrustPolicy and ContextPolicy use BTreeMap<String, f32>, which
+            // cannot fail JSON serialization in practice; these branches exist for safety only.
             let mut hasher = Sha256::new();
             if let Ok(bytes) = serde_json::to_vec(&trust) {
                 hasher.update(bytes);
