@@ -551,15 +551,30 @@ impl IndexState {
                 }
             };
 
-            // Compute stable hash of policies
+            // Compute stable hash of policies.
+            // The hash is used solely for drift detection and diagnostics (see PolicyConfig::hash).
+            // It is NOT a cache key or decision identifier, so hash instability on a serialization
+            // failure is acceptable: the fallback bytes keep the hasher going while the warning
+            // signals the anomaly.
+            // Note: serde_json follows the JSON spec, which does not allow NaN or ±infinity.
+            // It will return an error for f32 values that are non-finite, making these
+            // branches reachable in principle (e.g. if policies were loaded from a source
+            // that produced non-finite weights).
             let mut hasher = Sha256::new();
-            hasher.update(
-                serde_json::to_vec(&trust).expect("Failed to serialize trust policy for hashing"),
-            );
-            hasher.update(
-                serde_json::to_vec(&context)
-                    .expect("Failed to serialize context policy for hashing"),
-            );
+            match serde_json::to_vec(&trust) {
+                Ok(bytes) => hasher.update(bytes),
+                Err(e) => {
+                    tracing::warn!(error = ?e, "Failed to serialize trust policy for hashing, using fallback");
+                    hasher.update(b"trust-fallback");
+                }
+            }
+            match serde_json::to_vec(&context) {
+                Ok(bytes) => hasher.update(bytes),
+                Err(e) => {
+                    tracing::warn!(error = ?e, "Failed to serialize context policy for hashing, using fallback");
+                    hasher.update(b"context-fallback");
+                }
+            }
             let hash = format!("{:x}", hasher.finalize());
 
             let source = if trust_source == "file" && context_source == "file" {
@@ -1072,25 +1087,35 @@ impl IndexState {
         if request.emit_decision_snapshot && !matches.is_empty() {
             let decision_id = Ulid::new().to_string();
 
-            // Build candidates list from matches, capped at SNAPSHOT_CANDIDATES_MAX
+            // Build candidates list from matches, capped at SNAPSHOT_CANDIDATES_MAX valid entries.
+            // filter_map runs before take so that invalid entries (missing weights) do not count
+            // against the cap — we collect up to SNAPSHOT_CANDIDATES_MAX *valid* candidates.
             // We only need top-N plus a few near-misses for learning
             // Weights are guaranteed to be present because emit_decision_snapshot forces weight calculation
             let candidates: Vec<DecisionCandidate> = matches
                 .iter()
-                .take(SNAPSHOT_CANDIDATES_MAX)
-                .map(|m| {
-                    // Weights must be present when snapshot emission is requested
-                    let weights = m.weights.clone().expect(
-                        "Weights must be present for snapshot emission - this is a bug if it panics"
-                    );
+                .filter_map(|m| {
+                    // Weights are always present when snapshot emission is requested
+                    // (emit_decision_snapshot forces weight calculation in the search loop)
+                    let weights = match m.weights.clone() {
+                        Some(w) => w,
+                        None => {
+                            tracing::error!(
+                                doc_id = %m.doc_id,
+                                "Missing weights during snapshot emission - skipping candidate"
+                            );
+                            return None;
+                        }
+                    };
 
-                    DecisionCandidate {
+                    Some(DecisionCandidate {
                         id: m.doc_id.clone(),
                         similarity: weights.similarity,
                         weights,
                         final_score: m.score,
-                    }
+                    })
                 })
+                .take(SNAPSHOT_CANDIDATES_MAX)
                 .collect();
 
             let candidates_count = candidates.len();
