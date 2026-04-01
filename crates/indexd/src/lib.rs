@@ -834,7 +834,7 @@ impl IndexState {
         let Some(namespace_store) = store.get(namespace.as_ref()) else {
             return Vec::new();
         };
-        let limit = request.k.unwrap_or(20).clamp(1, 100);
+        let limit = request.k.unwrap_or(20).min(100);
         let query_lower = query.to_lowercase();
         let query_char_len = query_lower.chars().count();
         let query_byte_len = query_lower.len();
