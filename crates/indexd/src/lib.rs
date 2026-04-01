@@ -555,20 +555,25 @@ impl IndexState {
             // The hash is used solely for drift detection and diagnostics (see PolicyConfig::hash).
             // It is NOT a cache key or decision identifier, so hash instability on a serialization
             // failure is acceptable: the fallback bytes keep the hasher going while the warning
-            // signals the anomaly. TrustPolicy and ContextPolicy use BTreeMap<String, f32>, which
-            // cannot fail JSON serialization in practice; these branches exist for safety only.
+            // signals the anomaly.
+            // Note: serde_json follows the JSON spec, which does not allow NaN or ±infinity.
+            // It will return an error for f32 values that are non-finite, making these
+            // branches reachable in principle (e.g. if policies were loaded from a source
+            // that produced non-finite weights).
             let mut hasher = Sha256::new();
-            if let Ok(bytes) = serde_json::to_vec(&trust) {
-                hasher.update(bytes);
-            } else {
-                tracing::warn!("Failed to serialize trust policy for hashing, using fallback");
-                hasher.update(b"trust-fallback");
+            match serde_json::to_vec(&trust) {
+                Ok(bytes) => hasher.update(bytes),
+                Err(e) => {
+                    tracing::warn!(error = ?e, "Failed to serialize trust policy for hashing, using fallback");
+                    hasher.update(b"trust-fallback");
+                }
             }
-            if let Ok(bytes) = serde_json::to_vec(&context) {
-                hasher.update(bytes);
-            } else {
-                tracing::warn!("Failed to serialize context policy for hashing, using fallback");
-                hasher.update(b"context-fallback");
+            match serde_json::to_vec(&context) {
+                Ok(bytes) => hasher.update(bytes),
+                Err(e) => {
+                    tracing::warn!(error = ?e, "Failed to serialize context policy for hashing, using fallback");
+                    hasher.update(b"context-fallback");
+                }
             }
             let hash = format!("{:x}", hasher.finalize());
 
@@ -1082,12 +1087,13 @@ impl IndexState {
         if request.emit_decision_snapshot && !matches.is_empty() {
             let decision_id = Ulid::new().to_string();
 
-            // Build candidates list from matches, capped at SNAPSHOT_CANDIDATES_MAX
+            // Build candidates list from matches, capped at SNAPSHOT_CANDIDATES_MAX valid entries.
+            // filter_map runs before take so that invalid entries (missing weights) do not count
+            // against the cap — we collect up to SNAPSHOT_CANDIDATES_MAX *valid* candidates.
             // We only need top-N plus a few near-misses for learning
             // Weights are guaranteed to be present because emit_decision_snapshot forces weight calculation
             let candidates: Vec<DecisionCandidate> = matches
                 .iter()
-                .take(SNAPSHOT_CANDIDATES_MAX)
                 .filter_map(|m| {
                     // Weights are always present when snapshot emission is requested
                     // (emit_decision_snapshot forces weight calculation in the search loop)
@@ -1109,6 +1115,7 @@ impl IndexState {
                         final_score: m.score,
                     })
                 })
+                .take(SNAPSHOT_CANDIDATES_MAX)
                 .collect();
 
             let candidates_count = candidates.len();

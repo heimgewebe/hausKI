@@ -380,9 +380,13 @@ impl MemoryStore {
             let conn = pool
                 .get()
                 .context("MemoryStore::scan_prefix: r2d2 pool get")?;
+            // The Rust literal "\\" is a single backslash; SQLite receives ESCAPE '\' (one char).
+            // SQLite does not treat backslash as special in string literals (unlike SQL Server),
+            // so '\' represents the single backslash character used as the ESCAPE argument.
             let mut stmt =
                 conn.prepare("SELECT key FROM memory_items WHERE key LIKE ?1 ESCAPE '\\'")?;
-            // Escape LIKE wildcards in the prefix to prevent unintended pattern matching
+            // Escape LIKE wildcards in the prefix to prevent unintended pattern matching.
+            // The backslash is the ESCAPE char (see above), so it must be doubled first.
             let escaped = prefix
                 .replace('\\', "\\\\")
                 .replace('%', "\\%")
@@ -665,5 +669,63 @@ mod tests {
         let item = store.get("k".into()).await.unwrap().expect("item missing");
         assert_eq!(item.ttl_sec, None, "TTL should be cleared explicitly");
         assert_eq!(item.value, b"v2");
+    }
+
+    /// Verifies that scan_prefix treats LIKE special chars (%, _, \) as literals.
+    ///
+    /// SQLite uses `ESCAPE '\'` so the escaping logic must:
+    /// - double every backslash before escaping % and _
+    /// - match only keys whose prefix matches the literal string
+    #[tokio::test]
+    async fn scan_prefix_escapes_like_special_chars() {
+        let (store, _tmp) = test_store(60);
+        let v = b"x".to_vec();
+
+        // Insert keys that contain LIKE special characters
+        for key in &[
+            "foo%bar",  // literal %
+            "foo_bar",  // literal _
+            "foo\\bar", // literal backslash
+            "fooXbar",  // should NOT be matched by any of the above prefixes
+            "foo%baz",  // another key with literal %
+        ] {
+            store
+                .set((*key).into(), v.clone(), TtlUpdate::Preserve, None)
+                .await
+                .expect("set");
+        }
+
+        // scan_prefix("foo%") must only return keys that literally start with "foo%"
+        let mut percent_keys = store.scan_prefix("foo%".into()).await.unwrap();
+        percent_keys.sort();
+        assert_eq!(
+            percent_keys,
+            vec!["foo%bar", "foo%baz"],
+            "scan_prefix with literal % must not wildcard-match"
+        );
+
+        // scan_prefix("foo_") must only return keys that literally start with "foo_"
+        let underscore_keys = store.scan_prefix("foo_".into()).await.unwrap();
+        assert_eq!(
+            underscore_keys,
+            vec!["foo_bar"],
+            "scan_prefix with literal _ must not wildcard-match"
+        );
+
+        // scan_prefix("foo\\") must only return keys that literally start with "foo\"
+        let backslash_keys = store.scan_prefix("foo\\".into()).await.unwrap();
+        assert_eq!(
+            backslash_keys,
+            vec!["foo\\bar"],
+            "scan_prefix with literal backslash must not wildcard-match"
+        );
+
+        // The plain "fooXbar" is only matched by the prefix "foo" or "fooX", not by the special prefixes
+        let plain_keys = store.scan_prefix("foo".into()).await.unwrap();
+        assert_eq!(
+            plain_keys.len(),
+            5,
+            "scan_prefix('foo') must match all five keys"
+        );
     }
 }
