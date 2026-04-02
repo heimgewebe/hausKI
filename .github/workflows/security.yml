@@ -17,6 +17,11 @@ on:
   schedule:
     - cron: "17 5 * * 1"   # Mondays 05:17 UTC (weekly baseline protection)
   workflow_dispatch:
+    inputs:
+      toolchain:
+        description: 'Rust toolchain version to use'
+        default: stable
+        required: false
 
 permissions:
   id-token: write
@@ -28,6 +33,9 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # Single source of truth for the Rust toolchain, mirroring the pattern in ci.yml.
+  # Falls back through: manual input → repository variable → 'stable'.
+  RUST_TOOLCHAIN: ${{ inputs.toolchain || github.event.inputs.toolchain || vars.RUST_TOOLCHAIN || 'stable' }}
 
 jobs:
   deny:
@@ -38,10 +46,18 @@ jobs:
       - name: Checkout repository
         # Pin to fixed v4.2.2 release to keep builds deterministic
         uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Normalize toolchain variable
+        run: |
+          set -euo pipefail
+          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
+          tc="${RUST_TOOLCHAIN:-}"
+          tc="${tc:-stable}"
+          echo "Using toolchain: $tc"
+          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@v1
         with:
-          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: stable
+          # Resolved via the global RUST_TOOLCHAIN fallback chain; never an empty string.
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Ensure vendor snapshot
         run: bash scripts/ensure-vendor.sh
       - name: Check vendor snapshot
@@ -95,10 +111,18 @@ jobs:
       - name: Checkout repository
         # Pin to fixed v4.2.2 release to keep builds deterministic
         uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Normalize toolchain variable
+        run: |
+          set -euo pipefail
+          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
+          tc="${RUST_TOOLCHAIN:-}"
+          tc="${tc:-stable}"
+          echo "Using toolchain: $tc"
+          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@v1
         with:
-          # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
-          toolchain: stable
+          # Resolved via the global RUST_TOOLCHAIN fallback chain; never an empty string.
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Ensure vendor snapshot
         run: bash scripts/ensure-vendor.sh
       - name: Check vendor snapshot
