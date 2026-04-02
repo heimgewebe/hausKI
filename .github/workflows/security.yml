@@ -46,17 +46,9 @@ jobs:
       - name: Checkout repository
         # Pin to fixed v4.2.2 release to keep builds deterministic
         uses: actions/checkout@v4.2.2
-      - name: Normalize toolchain variable
-        run: |
-          set -euo pipefail
-          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
-          tc="${RUST_TOOLCHAIN:-}"
-          tc="${tc:-stable}"
-          echo "Using toolchain: $tc"
-          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          # Resolved via the global RUST_TOOLCHAIN fallback chain; never an empty string.
+          # Resolved via the global RUST_TOOLCHAIN fallback chain (env block above).
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Ensure vendor snapshot
         run: bash scripts/ensure-vendor.sh
@@ -111,17 +103,9 @@ jobs:
       - name: Checkout repository
         # Pin to fixed v4.2.2 release to keep builds deterministic
         uses: actions/checkout@v4.2.2
-      - name: Normalize toolchain variable
-        run: |
-          set -euo pipefail
-          echo "Raw RUST_TOOLCHAIN='${RUST_TOOLCHAIN:-<unset>}'"
-          tc="${RUST_TOOLCHAIN:-}"
-          tc="${tc:-stable}"
-          echo "Using toolchain: $tc"
-          echo "RUST_TOOLCHAIN=$tc" >> "$GITHUB_ENV"
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          # Resolved via the global RUST_TOOLCHAIN fallback chain; never an empty string.
+          # Resolved via the global RUST_TOOLCHAIN fallback chain (env block above).
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Ensure vendor snapshot
         run: bash scripts/ensure-vendor.sh
