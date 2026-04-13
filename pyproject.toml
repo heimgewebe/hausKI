@@ -19,7 +19,7 @@ required-version = ">=0.7.0"
 ##   - uv:  `uv sync --extra dev --frozen`
 ##   - pip: `pip install .[dev]`
 dev = [
-  "fastapi>=0.115",
+  "fastapi>=0.135.3",
   "pydantic>=2.9",
   "ruff==0.15.8",
   "pre-commit>=3.8",
