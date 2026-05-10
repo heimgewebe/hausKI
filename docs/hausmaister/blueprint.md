@@ -104,7 +104,7 @@ Diese Trennung ist die zentrale Sicherheits- und Architekturregel.
 │ - observation.completed                      │
 │ - finding.created                            │
 │ - plan.proposed                              │
-│ - command.requested                          │
+│ - command.proposed                           │
 │ - command.approved / rejected                │
 └──────────────────────┬───────────────────────┘
                        │
