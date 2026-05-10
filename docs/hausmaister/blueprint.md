@@ -243,19 +243,19 @@ docker prune
 
 Im hausKI-Repo:
 
-Die folgenden Dateinamen sind Arbeitsnamen für den Folge-Contract-PR. Die finale Benennung muss an die bestehende hausKI-Contract-Konvention angepasst werden; insbesondere darf Versionierung nicht doppelt kodiert werden, falls das bestehende Schema bereits ein eigenes version-Feld nutzt.
+Die Dateinamen folgen der bestehenden hausKI-Contract-Konvention (`*.schema.json`). Versionierung erfolgt ausschließlich über das `version`-Feld (SemVer) innerhalb des Schemas, nicht im Dateinamen.
 
 ```text
 contracts/hausmaister/
-  hausmaister-task-request.v1.schema.json
-  hausmaister-observation-request.v1.schema.json
-  hausmaister-observation-report.v1.schema.json
-  hausmaister-finding.v1.schema.json
-  hausmaister-plan.v1.schema.json
-  hausmaister-command-proposal.v1.schema.json
-  hausmaister-command-approval.v1.schema.json
-  hausmaister-risk.v1.schema.json
-  hausmaister-policy.v1.schema.json
+  hausmaister-task-request.schema.json
+  hausmaister-observation-request.schema.json
+  hausmaister-observation-report.schema.json
+  hausmaister-finding.schema.json
+  hausmaister-plan.schema.json
+  hausmaister-command-proposal.schema.json
+  hausmaister-command-approval.schema.json
+  hausmaister-risk.schema.json
+  hausmaister-policy.schema.json
 ```
 
 Technische Namespaces nüchtern:
@@ -364,19 +364,19 @@ IDs werden als ULID verstanden; die Beispiele verwenden exemplarische ULID-Werte
 
 Events sind Beobachtung und Verlauf. Commands sind Handlungsabsicht. Nicht vermischen.
 
-Die Event-Namen sind Arbeitsnamen. Im Folge-Contract-PR ist gegen die bestehende hausKI-Event-Konvention zu prüfen, ob Versionierung im Event-Kind, im separaten version-Feld oder bewusst in beiden Formen geführt wird.
+Die Event-`kind`-Strings enthalten keine Versionsnummer. Versionierung erfolgt ausschließlich über das `version`-Feld (SemVer) gemäß der bestehenden hausKI-Event-Konvention (`contracts/events.schema.json`).
 
 ```text
-hausmaister.task.requested.v1
-hausmaister.observation.requested.v1
-hausmaister.observation.completed.v1
-hausmaister.finding.created.v1
-hausmaister.plan.proposed.v1
-hausmaister.command.proposed.v1
-hausmaister.command.approved.v1
-hausmaister.command.rejected.v1
-hausmaister.command.executed.v1
-hausmaister.command.failed.v1
+hausmaister.task.requested
+hausmaister.observation.requested
+hausmaister.observation.completed
+hausmaister.finding.created
+hausmaister.plan.proposed
+hausmaister.command.proposed
+hausmaister.command.approved
+hausmaister.command.rejected
+hausmaister.command.executed
+hausmaister.command.failed
 ```
 
 Wichtig:
