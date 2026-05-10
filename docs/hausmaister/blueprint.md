@@ -39,7 +39,7 @@ Er ist nicht:
 - Paketmanager
 - Systemdienst-Verwalter
 
-Warum: Scanner sollen deterministisch, eng begrenzt und auditierbar sein. hausKI/hausmAIster soll bewerten und entscheiden, nicht heimlich durch /home/alex stapfen wie ein Staubsauger mit Promotionsrecht.
+Warum: Scanner sollen deterministisch, eng begrenzt und auditierbar sein. hausKI/hausmAIster soll bewerten und entscheiden, nicht heimlich durch /home/<user> stapfen wie ein Staubsauger mit Promotionsrecht.
 
 ---
 
@@ -243,6 +243,8 @@ docker prune
 
 Im hausKI-Repo:
 
+Die folgenden Dateinamen sind Arbeitsnamen für den Folge-Contract-PR. Die finale Benennung muss an die bestehende hausKI-Contract-Konvention angepasst werden; insbesondere darf Versionierung nicht doppelt kodiert werden, falls das bestehende Schema bereits ein eigenes version-Feld nutzt.
+
 ```text
 contracts/hausmaister/
   hausmaister-task-request.v1.schema.json
@@ -270,11 +272,13 @@ Sichtbare UI-Sprache darf hausmAIster nutzen.
 
 ## 8. Zentrale Artefakte
 
+IDs werden als ULID verstanden; die Beispiele verwenden exemplarische ULID-Werte. Zeitstempel werden als RFC3339/UTC verstanden.
+
 ### HausmaisterTaskRequest
 
 ```json
 {
-  "task_id": "string",
+  "task_id": "01J8ZQ5M7K6M9R2T4C8V1B3N5P",
   "requested_by": "user",
   "goal": "string",
   "scope": {
@@ -294,9 +298,9 @@ Sichtbare UI-Sprache darf hausmAIster nutzen.
 
 ```json
 {
-  "report_id": "string",
+  "report_id": "01J8ZQ5M7K6M9R2T4C8V1B3N5Q",
   "source": "heim-pc|atlas|lenskit|mitschreiber",
-  "generated_at": "datetime",
+  "generated_at": "2026-05-10T12:00:00Z",
   "scope": {},
   "findings": [],
   "evidence_refs": [],
@@ -308,7 +312,7 @@ Sichtbare UI-Sprache darf hausmAIster nutzen.
 
 ```json
 {
-  "finding_id": "string",
+  "finding_id": "01J8ZQ5M7K6M9R2T4C8V1B3N5R",
   "category": "storage|repo|config|service|security|drift|unknown",
   "severity": "info|low|medium|high|critical",
   "claim": "string",
@@ -324,7 +328,7 @@ Sichtbare UI-Sprache darf hausmAIster nutzen.
 
 ```json
 {
-  "plan_id": "string",
+  "plan_id": "01J8ZQ5M7K6M9R2T4C8V1B3N5S",
   "goal": "string",
   "steps": [],
   "risk": {
@@ -340,7 +344,7 @@ Sichtbare UI-Sprache darf hausmAIster nutzen.
 
 ```json
 {
-  "command_id": "string",
+  "command_id": "01J8ZQ5M7K6M9R2T4C8V1B3N5T",
   "intent": "archive|inspect|sync|cleanup|status",
   "command": "string",
   "dry_run_available": true,
@@ -359,6 +363,8 @@ Sichtbare UI-Sprache darf hausmAIster nutzen.
 ## 9. Event-Modell
 
 Events sind Beobachtung und Verlauf. Commands sind Handlungsabsicht. Nicht vermischen.
+
+Die Event-Namen sind Arbeitsnamen. Im Folge-Contract-PR ist gegen die bestehende hausKI-Event-Konvention zu prüfen, ob Versionierung im Event-Kind, im separaten version-Feld oder bewusst in beiden Formen geführt wird.
 
 ```text
 hausmaister.task.requested.v1
@@ -443,9 +449,9 @@ RiskAssessment
   ↓
 PlanProposal
   ↓
-UserApproval
-  ↓
 CommandProposal
+  ↓
+UserApproval
   ↓
 CommandExecutor
   ↓
