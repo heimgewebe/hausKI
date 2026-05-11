@@ -105,7 +105,7 @@ jobs:
           echo "::notice::index search budget p95 target: 60ms (observability to be enforced later)"
       - name: Upload logs/artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hauski-heavy-artifacts
           path: |
