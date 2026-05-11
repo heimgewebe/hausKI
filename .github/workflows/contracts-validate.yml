@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 5
     steps:
       # Pin to fixed v4.2.2 release to keep builds deterministic
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -112,7 +112,7 @@ jobs:
       PROTECTED_REGEX: '^(json|proto)/'
     steps:
       # Pin to fixed v4.2.2 release to keep builds deterministic
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false

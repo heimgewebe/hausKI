@@ -29,7 +29,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Pin to fixed release for deterministic builds
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6
 
       # Stable bleibt Default-Toolchain für Build-Schritte außerhalb Coverage
       - name: Set up Rust toolchain
