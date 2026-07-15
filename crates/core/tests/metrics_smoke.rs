@@ -53,6 +53,6 @@ async fn metrics_endpoint_exposes_prometheus_text() {
         body.contains("# HELP") || body.contains("# TYPE"),
         "unexpected /metrics payload (length={}): first bytes: {:?}",
         body.len(),
-        &body.as_bytes().get(0..64)
+        body.as_bytes().get(0..64)
     );
 }
