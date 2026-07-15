@@ -1,28 +1,16 @@
-# hausKI-Guidance im Heimgewebe-Organismus
+# hausKI-Guidance im Heimgewebe-Systemverbund
 
-Dieses Dokument beschreibt, wie `hausKI` im Heimgewebe-Organismus arbeiten soll:
-
-- welche Signale es liest,
-- welche Contracts es respektiert,
-- wie Entscheidungen gefällt und protokolliert werden.
-
-Es baut auf dem Organismus-Dokument im Repository `heimgewebe/metarepo` auf.
-<!-- (`docs/heimgewebe-organismus.md` im Metarepo). -->
+Dieses Dokument beschreibt repositoryeigene Betriebs- und Contractregeln für `hausKI`.
+Der aktuelle Systemzweck, Lifecycle-Status und die Beziehungen zu anderen Komponenten werden
+im [Systemkatalog](https://github.com/heimgewebe/systemkatalog) geführt; dieses Dokument erzeugt
+keine zweite Rollenwahrheit.
 
 ---
 
-## 1. Rolle von hausKI im Organismus
+## 1. Rolle von hausKI
 
-Kurzfassung:
+Für `hausKI` gelten repositoryintern folgende Regeln:
 
-- `chronik` = Gedächtnis (Events)
-- `semantAH` = Sinnschicht (Insights)
-- `leitstand` = Sichtbarkeit (Digest)
-- `wgx` = Motorik (Kommandos)
-- `heimlern` = Lernen aus Feedback
-- **`hausKI` = Entscheider, der diese Schichten koordiniert**
-
-hausKI soll:
 
 1. Systemzustände aus den bestehenden Datenquellen lesen,
 2. Entscheidungen anhand von Playbooks und Policies treffen,
@@ -223,4 +211,4 @@ Auch wenn die konkrete Implementierung in Code erfolgt, folgt jedes Playbook gro
 - hausKI-Implementierung verweist in Kommentaren explizit auf relevante Abschnitte dieses Dokuments.
 
 Ziel: Entscheidungen von hausKI sind nicht „magisch“, sondern aus
-Organismus-Regeln und Contracts nachvollziehbar.
+Systemregeln und Contracts nachvollziehbar.
