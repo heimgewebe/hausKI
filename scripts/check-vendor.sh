@@ -8,6 +8,10 @@ if [ -d "docs/adrs" ]; then
     exit 1
 fi
 
+# T036 freeze gate: the historical Heimlern repository must never become a
+# runtime or fetch dependency again. This check is intentionally fail-closed.
+python3 scripts/verify_heimlern_freeze.py
+
 # Minimal list of crates that must exist in the vendored directory for offline builds.
 # We check for axum because it is the first dependency Cargo attempts to resolve
 # during workspace builds. If it is missing, Cargo will fail with a confusing
@@ -15,6 +19,7 @@ fi
 # crates.io registry with the local vendor tree.
 REQUIRED_CRATES=(
   "heimlern-core"
+  "heimlern-bandits"
   "anyhow"
   "hostname"
 )

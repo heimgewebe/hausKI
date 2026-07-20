@@ -1,0 +1,56 @@
+{
+  "consumer_base_commit": "45b6df28feffb8971985899440f5eca10ec8752b",
+  "consumer_package": {
+    "default_enabled": false,
+    "feature": "heimlern",
+    "manifest_path": "crates/policy_api/Cargo.toml",
+    "name": "hauski-policy-api"
+  },
+  "consumer_repository": "heimgewebe/hausKI",
+  "deprecated_paths": [
+    ".github/workflows/validate-aussen-optional.yml"
+  ],
+  "does_not_establish": [
+    "active_heimlern_product_role",
+    "learning_or_policy_authority",
+    "automatic_policy_application",
+    "historical_repository_mutability",
+    "semantic_equivalence_with_the_full_historical_heimlern_repository"
+  ],
+  "forbidden_runtime_markers": [
+    "github.com/heimgewebe/heimlern",
+    "git@github.com:heimgewebe/heimlern",
+    "raw.githubusercontent.com/heimgewebe/heimlern",
+    "ALLOW_HEIMLERN_MVP",
+    "HEIMLERN_INGEST_URL"
+  ],
+  "historical_source_observed_commit": "d0a5d1bf26c9a5f555b7541d97fadb27a7cf9b31",
+  "historical_source_repository": "heimgewebe/heimlern",
+  "kind": "hauski_heimlern_compatibility_freeze",
+  "required_properties": {
+    "allow_heimlern_mvp_absent": true,
+    "cargo_dependencies_are_local_paths": true,
+    "deprecated_aussensensor_direct_workflow_absent": true,
+    "historical_repository_fetch_required": false,
+    "historical_repository_runtime_required": false,
+    "vendored_packages_are_workspace_members": true
+  },
+  "schema_version": 1,
+  "status": "frozen_local_compatibility",
+  "vendored_packages": [
+    {
+      "file_count": 2,
+      "manifest_path": "vendor/heimlern-core/Cargo.toml",
+      "name": "heimlern-core",
+      "tree_sha256": "deb1382b72729e09b9569dd24377a99126e1d1709dc45698b02703be66e2f4f7",
+      "version": "0.0.1"
+    },
+    {
+      "file_count": 2,
+      "manifest_path": "vendor/heimlern-bandits/Cargo.toml",
+      "name": "heimlern-bandits",
+      "tree_sha256": "c6a15d50b8455bf39b6c16fde40d5ad304eeeae9ae6ad0a1a4fa86d2323551c8",
+      "version": "0.0.1"
+    }
+  ]
+}
