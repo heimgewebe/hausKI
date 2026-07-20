@@ -44,8 +44,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        # Pin to fixed v4.2.2 release to keep builds deterministic
-        uses: actions/checkout@v4.2.2
+        # Use the reviewed actions/checkout v6 line
+        uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Resolved via the global RUST_TOOLCHAIN fallback chain (env block above).
@@ -101,8 +101,8 @@ jobs:
     needs: [deny]
     steps:
       - name: Checkout repository
-        # Pin to fixed v4.2.2 release to keep builds deterministic
-        uses: actions/checkout@v4.2.2
+        # Use the reviewed actions/checkout v6 line
+        uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Resolved via the global RUST_TOOLCHAIN fallback chain (env block above).

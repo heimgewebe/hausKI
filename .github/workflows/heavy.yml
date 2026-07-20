@@ -43,8 +43,8 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        # Pin to fixed v4.2.2 release to keep builds deterministic
-        uses: actions/checkout@v4.2.2
+        # Use the reviewed actions/checkout v6 line
+        uses: actions/checkout@v6
       - name: Enable Rust problem matchers
         run: echo "::add-matcher::.github/rust.json"
       - name: Install jq
@@ -53,7 +53,7 @@ jobs:
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: stable
-      - uses: Swatinem/rust-cache@29f7d9a5c8d5a5ca45c8c7c3aa4642f3f7e87b94
+      - uses: Swatinem/rust-cache@77fc9855f4f7021bbc7f8154c6eb2e4fb1282988
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: Build (release)
@@ -105,7 +105,7 @@ jobs:
           echo "::notice::index search budget p95 target: 60ms (observability to be enforced later)"
       - name: Upload logs/artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hauski-heavy-artifacts
           path: |

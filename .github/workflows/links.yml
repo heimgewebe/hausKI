@@ -41,7 +41,7 @@ jobs:
         run: mkdir -p lychee
 
       - name: Checkout repository
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6
 
       - name: Setup cache for Lychee
         uses: actions/cache@v4
@@ -53,7 +53,7 @@ jobs:
 
       - name: Check links with Lychee
         id: lychee
-        uses: lycheeverse/lychee-action@v2.0.2 # official release tag
+        uses: lycheeverse/lychee-action@v2.8.0 # official release tag
         continue-on-error: ${{ github.event_name == 'pull_request' }}
         with:
           args: >
@@ -82,7 +82,7 @@ jobs:
 
       - name: Upload lychee report
         if: always() && steps.lychee.outcome != 'cancelled' && hashFiles('lychee/out.md') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lychee-report
           path: lychee/out.md

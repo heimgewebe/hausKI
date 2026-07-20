@@ -846,7 +846,40 @@ mod tests {
     };
     use http_body_util::BodyExt;
     use serde_json::{from_slice, json};
+    use serial_test::serial;
     use tower::ServiceExt;
+
+    struct ChatEnvGuard(Vec<(&'static str, Option<std::ffi::OsString>)>);
+
+    impl ChatEnvGuard {
+        fn cleared() -> Self {
+            let keys = [
+                "HAUSKI_CHAT_UPSTREAM_URL",
+                "CHAT_UPSTREAM_URL",
+                "HAUSKI_CHAT_MODEL",
+            ];
+            let previous = keys
+                .into_iter()
+                .map(|key| {
+                    let value = std::env::var_os(key);
+                    std::env::remove_var(key);
+                    (key, value)
+                })
+                .collect();
+            Self(previous)
+        }
+    }
+
+    impl Drop for ChatEnvGuard {
+        fn drop(&mut self) {
+            for (key, value) in self.0.drain(..) {
+                match value {
+                    Some(value) => std::env::set_var(key, value),
+                    None => std::env::remove_var(key),
+                }
+            }
+        }
+    }
 
     fn demo_app(expose: bool) -> axum::Router {
         demo_app_with_origin_and_flags(
@@ -1368,7 +1401,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn chat_stub_returns_service_unavailable_when_unconfigured() {
+        let _env = ChatEnvGuard::cleared();
         let app = demo_app(false);
         let payload = json!({
             "messages": [
@@ -1393,7 +1428,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn chat_stub_unavailable_payload_matches_message() {
+        let _env = ChatEnvGuard::cleared();
         let app = demo_app(false);
         let payload = json!({
             "messages": [
