@@ -17,8 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        # Pin to fixed v4.2.2 release to keep builds deterministic
-        uses: actions/checkout@v4.2.2
+        # Use the reviewed actions/checkout v6 line
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Fetch main ref explicitly
@@ -90,7 +90,7 @@ jobs:
           # Keep this pinned deterministically; update intentionally when needed.
           npx -y @openai/codex@0.77.0 exec < prompt.md > review.txt
       - name: Upload review as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: codex-review-${{ github.run_id }}
           path: review.txt

@@ -28,8 +28,8 @@ jobs:
 
     steps:
       - name: Checkout repository
-        # Pin to fixed v4.2.2 release to keep builds deterministic
-        uses: actions/checkout@v4.2.2
+        # Use the reviewed actions/checkout v6 line
+        uses: actions/checkout@v6
 
       - name: Install shfmt (für Shell-Checks im Playbook, falls nötig)
         run: sudo apt-get update && sudo apt-get install -y shfmt
@@ -57,7 +57,7 @@ jobs:
 
       - name: Cache cargo registry + target
         # Pin to fixed release for reproducibility
-        uses: Swatinem/rust-cache@v2.7.7
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           shared-key: ${{ runner.os }}-hauski-cli-${{ hashFiles('**/Cargo.lock') }}
           cache-on-failure: true
@@ -65,7 +65,7 @@ jobs:
       # WGX ist ein Shell-Tool, kein Rust-Crate.
       # Wir checken heimgewebe/wgx aus und hängen cli/ an den PATH.
       - name: Checkout wgx repository
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6
         with:
           repository: heimgewebe/wgx
           path: wgx-tool

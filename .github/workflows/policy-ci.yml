@@ -22,14 +22,14 @@ jobs:
       RUSTFLAGS: -Dwarnings
     steps:
       - name: Checkout repository
-        # Pin to fixed v4.2.2 release to keep builds deterministic
-        uses: actions/checkout@v4.2.2
+        # Use the reviewed actions/checkout v6 line
+        uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: stable
-      # Pin to fixed v2.6.0 release to keep builds deterministic
-      - uses: Swatinem/rust-cache@v2.7.7
+      # Use the reviewed Swatinem/rust-cache v2.9 line
+      - uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: .
       - name: Prepare lockfile (CI-only)

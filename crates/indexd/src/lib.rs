@@ -575,7 +575,16 @@ impl IndexState {
                     hasher.update(b"context-fallback");
                 }
             }
-            let hash = format!("{:x}", hasher.finalize());
+            let digest = hasher.finalize();
+            let hash = digest.iter().fold(
+                String::with_capacity(digest.len() * 2),
+                |mut output, byte| {
+                    use std::fmt::Write as _;
+                    write!(&mut output, "{byte:02x}")
+                        .expect("writing hexadecimal bytes to String cannot fail");
+                    output
+                },
+            );
 
             let source = if trust_source == "file" && context_source == "file" {
                 "loaded_from_disk".to_string()
