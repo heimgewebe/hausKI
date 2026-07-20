@@ -66,18 +66,22 @@ Dieses Dokument listet bewusste Abweichungen zwischen der Architektur-Dokumentat
 
 ---
 
-## 4. Nutzung von `heimlern` (Bandits / Policy-Learning)
+## 4. Historische `heimlern`-Kompatibilität
 
-**Status:** `experimental` / `deprecated assumption`
-**Gültigkeit:** Muss in Dokumentation als "optional" markiert werden.
-
-**Dokumentation**
-- Suggeriert eine "intelligente Steuerung" des Core-Servers durch Banditen-Algorithmen.
+**Status:** `frozen local compatibility`
+**Gültigkeit:** Keine aktive Lern-, Routing- oder Policy-Autorität.
 
 **Realität (Code)**
-- `vendor/heimlern-*` Crates sind vorhanden, aber in `hauski-core` nicht eingebunden.
-- Sie werden nur optional in `hauski-policy-api` genutzt.
+- `hauski-policy-api` besitzt weiterhin das optionale Feature `heimlern`.
+- Das Feature verwendet ausschließlich die lokalen Crates `vendor/heimlern-core` und
+  `vendor/heimlern-bandits`; es ist standardmäßig deaktiviert.
+- Die Crates sind kleine HausKI-Kompatibilitätsschichten und kein Spiegel der historischen
+  Heimlern-Implementierung.
+- `scripts/verify_heimlern_freeze.py` prüft bei jedem Build-, Lint- und Testeinstieg die lokale
+  Cargo-Auflösung, gebundene Dateidigestwerte und das Fehlen von Remote- oder Direktpfaden.
 
 **Begründung**
-- Die Komplexität von Reinforcement Learning im Core-Loop ist für den aktuellen Reifegrad zu hoch.
-- Dies ist ein Experimentierfeld, keine Kernfunktionalität.
+- Die bestehende API-Kompatibilität bleibt reproduzierbar, ohne das historische Heimlern-Repository
+  als Laufzeit-, Fetch- oder Entwicklungsabhängigkeit fortzuführen.
+- Eine Erweiterung zu aktiver Lernlogik benötigt einen neuen, separat registrierten Nachweis und
+  darf nicht durch die Kompatibilitätsschicht eingeschmuggelt werden.
