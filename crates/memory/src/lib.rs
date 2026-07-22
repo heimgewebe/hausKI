@@ -355,7 +355,7 @@ impl MemoryStore {
 
         task::spawn_blocking(move || {
             let conn = pool.get().context("MemoryStore::stats: r2d2 pool get")?;
-            let (pinned, unpinned) = conn.query_row(
+            let (pinned, unpinned): (i64, i64) = conn.query_row(
                 "SELECT
                     COUNT(CASE WHEN pinned = 1 THEN 1 END),
                     COUNT(CASE WHEN pinned = 0 THEN 1 END)
@@ -363,6 +363,10 @@ impl MemoryStore {
                 [],
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )?;
+            let pinned =
+                u64::try_from(pinned).context("MemoryStore::stats: negative pinned count")?;
+            let unpinned =
+                u64::try_from(unpinned).context("MemoryStore::stats: negative unpinned count")?;
             Ok::<Stats, anyhow::Error>(Stats {
                 pinned,
                 unpinned,
