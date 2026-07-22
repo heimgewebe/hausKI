@@ -32,7 +32,7 @@ jobs:
     steps:
       - name: Checkout
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Make generator executable (defensiv)
         run: |

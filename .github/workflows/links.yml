@@ -41,7 +41,7 @@ jobs:
         run: mkdir -p lychee
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup cache for Lychee
         uses: actions/cache@v4
