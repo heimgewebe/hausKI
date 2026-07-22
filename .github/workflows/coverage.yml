@@ -25,11 +25,14 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 25
+    env:
+      # Last verified working nightly; unpinned 2026-07-14 ICEs in rustc_ast during doctest coverage.
+      COVERAGE_TOOLCHAIN: nightly-2026-07-06
 
     steps:
       - name: Checkout repository
-        # Pin to fixed release for deterministic builds
-        uses: actions/checkout@v4.2.2
+        # Use the reviewed actions/checkout v6 line
+        uses: actions/checkout@v6
 
       # Stable bleibt Default-Toolchain für Build-Schritte außerhalb Coverage
       - name: Set up Rust toolchain
@@ -44,24 +47,25 @@ jobs:
         run: bash scripts/check-vendor.sh
 
       - name: Cache cargo + target
-        # Pin to a specific release for reproducibility
-        uses: Swatinem/rust-cache@v2.7.7
+        # Use the reviewed Swatinem/rust-cache v2.9 line
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           cache-on-failure: true
           shared-key: ${{ runner.os }}-cov-${{ hashFiles('**/Cargo.lock') }}
 
-      # Coverage läuft komplett mit nightly + llvm-tools, um Versionsmischung zu vermeiden
-      - name: Install nightly with llvm-tools
+      # Coverage läuft komplett mit einer belegten nightly + llvm-tools, um Versionsmischung
+      # und unkontrollierte Compilerregressionen zu vermeiden.
+      - name: Install pinned nightly with llvm-tools
         run: |
           rustup set profile minimal
-          rustup toolchain install nightly --no-self-update --component llvm-tools-preview
-          rustup component list --toolchain nightly | grep llvm-tools
+          rustup toolchain install "$COVERAGE_TOOLCHAIN" --no-self-update --component llvm-tools-preview
+          rustup component list --toolchain "$COVERAGE_TOOLCHAIN" | grep llvm-tools
 
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked --version 0.6.9
 
       - name: Clean coverage profiles
-        run: cargo +nightly llvm-cov clean --workspace
+        run: cargo +"$COVERAGE_TOOLCHAIN" llvm-cov clean --workspace
 
       - name: Run coverage (focused)
         env:
@@ -75,7 +79,7 @@ jobs:
           PKGS="--package hauski-core --package hauski-indexd"
           echo "PKGS=$PKGS"
           # 1) Erzeuge HTML-Report (inkl. Testlauf)
-          cargo +nightly llvm-cov $PKGS \
+          cargo +"$COVERAGE_TOOLCHAIN" llvm-cov $PKGS \
             --all-features \
             --doctests \
             --fail-under-lines 65 \
@@ -83,12 +87,12 @@ jobs:
           echo "HTML report: target/llvm-cov/html/index.html"
 
           # 2) Erzeuge LCOV-Report aus den bereits gesammelten Profilen
-          cargo +nightly llvm-cov report \
+          cargo +"$COVERAGE_TOOLCHAIN" llvm-cov report \
             --lcov --output-path lcov.info
 
       - name: Upload HTML coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-html
           path: target/llvm-cov/html
@@ -96,7 +100,7 @@ jobs:
 
       - name: Upload lcov
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lcov.info
           path: lcov.info
