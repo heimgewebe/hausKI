@@ -60,7 +60,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
           fetch-depth: 0
@@ -154,7 +154,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
@@ -198,7 +198,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Install shellcheck
@@ -242,7 +242,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - uses: lycheeverse/lychee-action@v2.9.0
@@ -281,7 +281,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Emit TODO notice
@@ -311,7 +311,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Enable Rust problem matchers
@@ -371,7 +371,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Normalize toolchain variable
@@ -402,7 +402,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.sha }}
       - name: Normalize toolchain variable

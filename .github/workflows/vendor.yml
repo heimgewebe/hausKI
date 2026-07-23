@@ -21,7 +21,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.

@@ -29,7 +29,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install shfmt (für Shell-Checks im Playbook, falls nötig)
         run: sudo apt-get update && sudo apt-get install -y shfmt
@@ -65,7 +65,7 @@ jobs:
       # WGX ist ein Shell-Tool, kein Rust-Crate.
       # Wir checken heimgewebe/wgx aus und hängen cli/ an den PATH.
       - name: Checkout wgx repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: heimgewebe/wgx
           path: wgx-tool

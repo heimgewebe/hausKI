@@ -45,7 +45,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Resolved via the global RUST_TOOLCHAIN fallback chain (env block above).
@@ -102,7 +102,7 @@ jobs:
     steps:
       - name: Checkout repository
         # Use the reviewed actions/checkout v6 line
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           # Resolved via the global RUST_TOOLCHAIN fallback chain (env block above).
