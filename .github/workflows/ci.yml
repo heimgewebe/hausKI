@@ -428,4 +428,4 @@ jobs:
           cargo deny check advisories
           cargo deny check bans
           cargo deny check licenses
-      - uses: rustsec/audit-check@618c2437de90585c33833719fdcddc50271940ad
+      - uses: rustsec/audit-check@858dc40f52ca2b8570b7a997c1c4e35c6fc9a432
