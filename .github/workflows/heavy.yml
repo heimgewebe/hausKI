@@ -53,7 +53,7 @@ jobs:
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: stable
-      - uses: Swatinem/rust-cache@77fc9855f4f7021bbc7f8154c6eb2e4fb1282988
+      - uses: Swatinem/rust-cache@72d126e709cad40056a62344eee609d696d62d33
       - name: Check vendor snapshot
         run: bash scripts/check-vendor.sh
       - name: Build (release)
