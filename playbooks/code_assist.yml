@@ -1,10 +1,9 @@
 version: 1
 name: code-assist-gated
 steps:
-- id: lint
-  run: |
-    if [ -x ./scripts/wgx ]; then WGX=./scripts/wgx; else WGX=wgx; fi
-    $WGX lint --export tmp/metrics.json
-- id: ai-assist
-  needs: [lint]
-  run: "hauski assist --playbook code_review --metrics tmp/metrics.json"
+  - id: rust-gates
+    run: |
+      cargo fmt --all -- --check
+      cargo clippy --all-targets -- -D warnings
+  - id: ai-assist
+    run: "./target/release/hauski-cli assist --playbook playbooks/ai_assist.yml --yes"

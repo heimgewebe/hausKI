@@ -31,9 +31,6 @@ jobs:
         # Use the reviewed actions/checkout v6 line
         uses: actions/checkout@v7
 
-      - name: Install shfmt (für Shell-Checks im Playbook, falls nötig)
-        run: sudo apt-get update && sudo apt-get install -y shfmt
-
       - name: Show resolved toolchain
         run: 'echo "Using toolchain: ${{ env.RUST_TOOLCHAIN }}"'
 
@@ -54,6 +51,7 @@ jobs:
         with:
           # Explicit input required by dtolnay/rust-toolchain to avoid setup failures.
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
 
       - name: Cache cargo registry + target
         # Pin to fixed release for reproducibility
@@ -62,21 +60,12 @@ jobs:
           shared-key: ${{ runner.os }}-hauski-cli-${{ hashFiles('**/Cargo.lock') }}
           cache-on-failure: true
 
-      # WGX ist ein Shell-Tool, kein Rust-Crate.
-      # Wir checken heimgewebe/wgx aus und hängen cli/ an den PATH.
-      - name: Checkout wgx repository
-        uses: actions/checkout@v7
-        with:
-          repository: heimgewebe/wgx
-          path: wgx-tool
-
-      - name: Add wgx to PATH
-        run: echo "${{ github.workspace }}/wgx-tool/cli" >> "$GITHUB_PATH"
-
       # Hauski-CLI bauen
       - name: Build hauski CLI (release, locked)
         run: cargo build --package hauski-cli --release --locked
 
-      # Assist-Playbook über die gebaute CLI ausführen
+      # Assist-Playbook über die gebaute CLI ausführen. GitHub Actions hat
+      # kein interaktives TTY, daher wird die bestehende explizite --yes-Option
+      # des Playbook-Runners verwendet.
       - name: Run assist playbook
-        run: ./target/release/hauski-cli assist --playbook playbooks/code_assist.yml
+        run: ./target/release/hauski-cli assist --playbook playbooks/code_assist.yml --yes
