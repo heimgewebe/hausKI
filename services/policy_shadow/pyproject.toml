@@ -5,7 +5,7 @@ description = "Shadow Policy API for HausKI - FastAPI service for policy experim
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "fastapi>=0.111,<0.112",
+  "fastapi>=0.139.2,<0.140",
   "uvicorn[standard]>=0.30,<0.31",
   "pydantic>=2.7,<3",
   "httpx>=0.27,<0.28",
